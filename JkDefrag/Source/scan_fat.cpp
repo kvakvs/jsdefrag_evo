@@ -9,22 +9,22 @@
 #include "ScanFat.h"
 */
 
-JKScanFat::JKScanFat() {
+ScanFAT::ScanFAT() {
     defrag_lib_ = DefragLib::get_instance();
 }
 
-JKScanFat::~JKScanFat() = default;
+ScanFAT::~ScanFAT() = default;
 
-JKScanFat* JKScanFat::get_instance() {
+ScanFAT* ScanFAT::get_instance() {
     if (instance_ == nullptr) {
-        instance_.reset(new JKScanFat());
+        instance_.reset(new ScanFAT());
     }
 
     return instance_.get();
 }
 
 /* Calculate the checksum of 8.3 filename. */
-UCHAR JKScanFat::calculate_short_name_check_sum(const UCHAR* name) {
+UCHAR ScanFAT::calculate_short_name_check_sum(const UCHAR* name) {
     UCHAR check_sum = 0;
 
     for (short index = 11; index != 0; index--) {
@@ -41,7 +41,7 @@ Note: the FAT stores times in local time, not in GMT time. This subroutine conve
 that into GMT time, to be compatible with the NTFS date/times.
 
 */
-uint64_t JKScanFat::convert_time(const USHORT date, const USHORT time, const USHORT time10) {
+uint64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const USHORT time10) {
     FILETIME time1;
     FILETIME time2;
     ULARGE_INTEGER time3;
@@ -68,7 +68,7 @@ cluster numbers.
 the next cluster of the file.
 
 */
-void JKScanFat::make_fragment_list(const DefragDataStruct* data, const FatDiskInfoStruct* disk_info,
+void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfoStruct* disk_info,
                                    ItemStruct* item, uint64_t cluster) {
     FragmentListStruct* new_fragment;
     FragmentListStruct* last_fragment;
@@ -182,7 +182,7 @@ void JKScanFat::make_fragment_list(const DefragDataStruct* data, const FatDiskIn
 
 /* Load a directory from disk into a new memory buffer. Return nullptr if error.
 Note: the caller is responsible for free'ing the buffer. */
-BYTE* JKScanFat::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, uint64_t StartCluster,
+BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, uint64_t StartCluster,
                                 uint64_t* OutLength) {
     BYTE* buffer;
     uint64_t fragment_length;
@@ -192,7 +192,7 @@ BYTE* JKScanFat::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskI
 
     int result;
     int max_iterate;
-    WCHAR s1[BUFSIZ];
+    wchar_t s1[BUFSIZ];
     DefragGui* gui = DefragGui::get_instance();
 
     /* Reset the OutLength to zero, in case we exit for an error. */
@@ -362,7 +362,7 @@ BYTE* JKScanFat::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskI
 }
 
 /* Analyze a directory and add all the items to the item tree. */
-void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, BYTE* Buffer,
+void ScanFAT::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, BYTE* Buffer,
                                       uint64_t Length, ItemStruct* ParentDirectory) {
     FatDirStruct* Dir;
     FatLongNameDirStruct* LDir;
@@ -370,8 +370,8 @@ void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct*
 
     uint32_t Index;
 
-    WCHAR ShortName[13];
-    WCHAR LongName[820];
+    wchar_t ShortName[13];
+    wchar_t LongName[820];
 
     int LastLongNameSection;
 
@@ -382,7 +382,7 @@ void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct*
     uint64_t SubDirLength;
     uint64_t StartCluster;
 
-    WCHAR* p1;
+    wchar_t* p1;
 
     int i;
 
@@ -393,7 +393,7 @@ void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct*
 
     /* Slow the program down to the percentage that was specified on the
     command line. */
-    defrag_lib_->slow_down(Data);
+    DefragLib::slow_down(Data);
 
     //ShowHex(Data,Buffer,256);
 
@@ -607,7 +607,7 @@ void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct*
                           Item->clusters_count_, Item->bytes_);
 
         /* Add the item record to the sorted item tree in memory. */
-        defrag_lib_->tree_insert(Data, Item);
+        DefragLib::tree_insert(Data, Item);
 
         /* Draw the item on the screen. */
         jkGui->show_analyze(Data, Item);
@@ -626,7 +626,7 @@ void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct*
         Data->count_all_bytes_ = Data->count_all_bytes_ + Item->bytes_;
         Data->count_all_clusters_ = Data->count_all_clusters_ + Item->clusters_count_;
 
-        if (defrag_lib_->get_fragment_count(Item) > 1) {
+        if (DefragLib::get_fragment_count(Item) > 1) {
             Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
             Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + Item->bytes_;
             Data->count_fragmented_clusters_ = Data->count_fragmented_clusters_ + Item->clusters_count_;
@@ -679,7 +679,7 @@ case FAT16: if (FATContent == 0xFFF7) IsBadCluster = TRUE; break;
 case FAT32: if (FATContent == 0x0FFFFFF7) IsBadCluster = TRUE; break;
 }
 */
-BOOL JKScanFat::analyze_fat_volume(DefragDataStruct* data) {
+BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
     FatBootSectorStruct BootSector;
     FatDiskInfoStruct DiskInfo;
 
@@ -698,7 +698,7 @@ BOOL JKScanFat::analyze_fat_volume(DefragDataStruct* data) {
 
     int Result;
 
-    WCHAR s1[BUFSIZ];
+    wchar_t s1[BUFSIZ];
 
     char s2[BUFSIZ];
 

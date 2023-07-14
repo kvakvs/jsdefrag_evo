@@ -74,13 +74,13 @@ struct FatDirStruct
 struct FatLongNameDirStruct
 {
 	UCHAR LDIR_Ord;                // 0   Sequence number
-	WCHAR LDIR_Name1[5];           // 1   Characters 1-5 in name
+	wchar_t LDIR_Name1[5];           // 1   Characters 1-5 in name
 	UCHAR LDIR_Attr;               // 11  Attribute, must be ATTR_LONG_NAME
 	UCHAR LDIR_Type;               // 12  Always zero
 	UCHAR LDIR_Chksum;             // 13  Checksum
-	WCHAR LDIR_Name2[6];           // 14  Characters 6-11
+	wchar_t LDIR_Name2[6];           // 14  Characters 6-11
 	UCHAR LDIR_FstClusLO[2];       // 26  Always zero
-	WCHAR LDIR_Name3[2];           // 28  Characters 12-13
+	wchar_t LDIR_Name3[2];           // 28  Characters 12-13
 };
 
 #pragma pack(pop)                     /* Reset byte alignment. */
@@ -116,14 +116,14 @@ struct FatDiskInfoStruct
 	} FatData;
 };
 
-class JKScanFat
+class ScanFAT
 {
 public:
-	JKScanFat();
-	~JKScanFat();
+	ScanFAT();
+	~ScanFAT();
 
 	// Get a non-owning pointer to instance of the class
-	static JKScanFat *get_instance();
+	static ScanFAT *get_instance();
 
 	BOOL analyze_fat_volume(DefragDataStruct *data);
 
@@ -135,7 +135,7 @@ private:
 	void analyze_fat_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInfo, BYTE *Buffer, uint64_t Length, ItemStruct *ParentDirectory);
 
 	// static member that is an instance of itself
-	inline static std::unique_ptr<JKScanFat> instance_;
+	inline static std::unique_ptr<ScanFAT> instance_;
 
 	DefragLib *defrag_lib_;
 };

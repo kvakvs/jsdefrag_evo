@@ -26,7 +26,10 @@ http://www.kessels.com/
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <tchar.h>
+
+#include "types.h"
 
 constexpr uint64_t VIRTUALFRAGMENT = 18446744073709551615UL; /* _UI64_MAX - 1 */
 
@@ -76,34 +79,44 @@ struct FragmentListStruct {
     FragmentListStruct* next_;
 };
 
-/* List in memory of all the files on disk, sorted by LCN (Logical Cluster Number). */
-
+/**
+ * \brief List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
+ */
 struct ItemStruct {
-    ItemStruct* parent_; /* Parent item. */
-    ItemStruct* smaller_; /* Next smaller item. */
-    ItemStruct* bigger_; /* Next bigger item. */
+    ItemStruct* parent_;
+    // Next smaller item
+    ItemStruct* smaller_;
+    // Next bigger item
+    ItemStruct* bigger_;
 
-    WCHAR* long_filename_; /* Long filename. */
-    WCHAR* long_path_; /* Full path on disk, long filenames. */
-    WCHAR* short_filename_; /* Short filename (8.3 DOS). */
-    WCHAR* short_path_; /* Full path on disk, short filenames. */
+    wchar_t* long_filename_;
+    // Full path on disk, long filenames.
+    wchar_t* long_path_;
+    // Short filename(8.3 DOS)
+    wchar_t* short_filename_;
+    // Full path on disk, short filenames
+    wchar_t* short_path_;
 
-    uint64_t bytes_; /* Total number of bytes. */
-    uint64_t clusters_count_; /* Total number of clusters. */
-    uint64_t creation_time_; /* 1 second = 10000000 */
+    uint64_t bytes_;
+    uint64_t clusters_count_;
+    // Unit: Microseconds
+    uint64_t creation_time_;
     uint64_t mft_change_time_;
     uint64_t last_access_time_;
 
-    FragmentListStruct* fragments_; /* List of fragments. */
+    // List of fragments
+    FragmentListStruct* fragments_;
 
-    uint64_t parent_inode_; /* The Inode number of the parent directory. */
+    // The Inode number of the parent directory
+    uint64_t parent_inode_;
 
     ItemStruct* parent_directory_;
 
-    bool is_dir_; /* true: it's a directory. */
-    bool is_unmovable_; /* true: file can't/couldn't be moved. */
-    bool is_excluded_; /* true: file is not to be defragged/optimized. */
-    bool is_hog_; /* true: file to be moved to end of disk. */
+    bool is_dir_;
+    bool is_unmovable_;
+    bool is_excluded_;
+    // file to be moved to the end of disk
+    bool is_hog_;
 };
 
 enum class DiskType {
@@ -119,10 +132,10 @@ enum class DiskType {
 struct DiskStruct {
     HANDLE volume_handle_;
 
-    WCHAR* mount_point_; /* Example: "c:" */
-    WCHAR* mount_point_slash_; /* Example: "c:\" */
-    WCHAR volume_name_[52]; /* Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}" */
-    WCHAR volume_name_slash_[52]; /* Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\" */
+    wchar_t* mount_point_; /* Example: "c:" */
+    wchar_t* mount_point_slash_; /* Example: "c:\" */
+    wchar_t volume_name_[52]; /* Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}" */
+    wchar_t volume_name_slash_[52]; /* Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\" */
 
     DiskType type_;
 
@@ -243,10 +256,9 @@ public:
         messages.
     */
 
-    __declspec(dllexport) void run_jk_defrag(WCHAR* path, OptimizeMode optimize_mode, int speed, double free_space,
-                                             WCHAR** excludes,
-                                             WCHAR** space_hogs, RunningState* run_state,
-                                             /*int *RedrawScreen, */WCHAR** debug_msg);
+    __declspec(dllexport) void run_jk_defrag(wchar_t* path, OptimizeMode optimize_mode, int speed, double free_space,
+                                             const Wstrings& excludes, const Wstrings& space_hogs, RunningState* run_state,
+                                             std::optional<Wstrings> debug_msg);
 
     /*
     
@@ -262,16 +274,16 @@ public:
     /* Other exported functions that might be useful in programs that use JkDefrag. */
 
     static __declspec(dllexport) char* stristr(char* haystack, const char* needle);
-    static __declspec(dllexport) WCHAR* stristr_w(WCHAR* haystack, const WCHAR* needle);
+    static __declspec(dllexport) wchar_t* stristr_w(wchar_t* haystack, const wchar_t* needle);
 
-    __declspec(dllexport) void system_error_str(uint32_t error_code, WCHAR* out, size_t width) const;
+    __declspec(dllexport) void system_error_str(uint32_t error_code, wchar_t* out, size_t width) const;
     __declspec(dllexport) void show_hex(struct DefragDataStruct* data, const BYTE* buffer, uint64_t count) const;
 
-    static __declspec(dllexport) bool match_mask(WCHAR* string, WCHAR* mask);
+    static __declspec(dllexport) bool match_mask(const wchar_t* string, const wchar_t* mask);
 
-    static __declspec(dllexport) WCHAR** add_array_string(WCHAR** array, const WCHAR* new_string);
-    __declspec(dllexport) WCHAR* get_short_path(const DefragDataStruct* data, const ItemStruct* item);
-    __declspec(dllexport) WCHAR* get_long_path(const DefragDataStruct* data, const ItemStruct* item);
+    // static __declspec(dllexport) wchar_t** add_array_string(wchar_t** array, const wchar_t* new_string);
+    __declspec(dllexport) wchar_t* get_short_path(const DefragDataStruct* data, const ItemStruct* item);
+    __declspec(dllexport) wchar_t* get_long_path(const DefragDataStruct* data, const ItemStruct* item);
 
     static __declspec(dllexport) void slow_down(DefragDataStruct* data);
 
@@ -294,10 +306,10 @@ public:
     static __declspec(dllexport) void call_show_status(DefragDataStruct* data, int phase, int zone);
 
 private:
-    static WCHAR lower_case(WCHAR c);
+    static wchar_t lower_case(wchar_t c);
 
-    void append_to_short_path(const ItemStruct* item, WCHAR* path, size_t length);
-    void append_to_long_path(const ItemStruct* item, WCHAR* path, size_t length);
+    void append_to_short_path(const ItemStruct* item, wchar_t* path, size_t length);
+    void append_to_long_path(const ItemStruct* item, wchar_t* path, size_t length);
     static uint64_t find_fragment_begin(const ItemStruct* item, uint64_t lcn);
 
     static ItemStruct* find_item_at_lcn(const DefragDataStruct* data, uint64_t lcn);
@@ -338,27 +350,27 @@ private:
                         uint64_t size) const; /* Number of clusters to be moved. */
 
     int move_item3(DefragDataStruct* data,
-                  ItemStruct* item,
-                  HANDLE file_handle,
-                  uint64_t new_lcn, /* Where to move to. */
-                  uint64_t offset, /* Number of first cluster to be moved. */
-                  uint64_t size, /* Number of clusters to be moved. */
-                  int strategy) const; /* 0: move in one part, 1: move individual fragments. */
+                   ItemStruct* item,
+                   HANDLE file_handle,
+                   uint64_t new_lcn, /* Where to move to. */
+                   uint64_t offset, /* Number of first cluster to be moved. */
+                   uint64_t size, /* Number of clusters to be moved. */
+                   int strategy) const; /* 0: move in one part, 1: move individual fragments. */
 
     int move_item4(DefragDataStruct* data,
+                   ItemStruct* item,
+                   HANDLE file_handle,
+                   uint64_t new_lcn, /* Where to move to. */
+                   uint64_t offset, /* Number of first cluster to be moved. */
+                   uint64_t size, /* Number of clusters to be moved. */
+                   int direction) const; /* 0: move up, 1: move down. */
+
+    int move_item(DefragDataStruct* data,
                   ItemStruct* item,
-                  HANDLE file_handle,
                   uint64_t new_lcn, /* Where to move to. */
                   uint64_t offset, /* Number of first cluster to be moved. */
                   uint64_t size, /* Number of clusters to be moved. */
                   int direction) const; /* 0: move up, 1: move down. */
-
-    int move_item(DefragDataStruct* data,
-                 ItemStruct* item,
-                 uint64_t new_lcn, /* Where to move to. */
-                 uint64_t offset, /* Number of first cluster to be moved. */
-                 uint64_t size, /* Number of clusters to be moved. */
-                 int direction) const; /* 0: move up, 1: move down. */
 
     static ItemStruct* find_highest_item(const DefragDataStruct* data,
                                          uint64_t cluster_start,
@@ -376,9 +388,9 @@ private:
 
     int compare_items(ItemStruct* Item1, ItemStruct* Item2, int SortField);
 
-    void scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentDirectory);
+    void scan_dir(DefragDataStruct* Data, wchar_t* Mask, ItemStruct* ParentDirectory);
 
-    void analyze_volume(DefragDataStruct* Data);
+    void analyze_volume(DefragDataStruct* data);
 
     void fixup(DefragDataStruct* data);
 
@@ -396,9 +408,9 @@ private:
 
     void optimize_up(DefragDataStruct* data);
 
-    void defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMode opt_mode);
+    void defrag_one_path(DefragDataStruct* data, const wchar_t* path, OptimizeMode opt_mode);
 
-    void defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, OptimizeMode opt_mode);
+    void defrag_mountpoints(DefragDataStruct* data, const wchar_t* mount_point, OptimizeMode opt_mode);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<DefragLib> instance_;

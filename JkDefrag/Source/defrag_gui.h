@@ -29,11 +29,11 @@ public:
 	// Get instance of the class
 	static DefragGui *get_instance();
 
-	void clear_screen(WCHAR *format, ...);
-	void draw_cluster(DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int color);
+	void clear_screen(const wchar_t *format, ...);
+	void draw_cluster(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int color);
 
 	void fill_squares( int clusterStartSquareNum, int clusterEndSquareNum );
-	void show_debug(DebugLevel level, const ItemStruct *item, WCHAR *format, ...);
+	void show_debug(DebugLevel level, const ItemStruct *item, const wchar_t *format, ...);
 	void show_status(const DefragDataStruct *data);
 	void show_analyze(const DefragDataStruct *data, const ItemStruct *item);
 	void show_move(const ItemStruct *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
@@ -56,7 +56,7 @@ private:
 	MSG message_{};
 	// UINT_PTR size_timer_;
 
-	WCHAR messages_[6][50000]{};        /* The texts displayed on the screen. */
+	wchar_t messages_[6][50000]{};        /* The texts displayed on the screen. */
 	DebugLevel debug_level_;
 
 	uint64_t progress_start_time_;       /* The time at percentage zero. */

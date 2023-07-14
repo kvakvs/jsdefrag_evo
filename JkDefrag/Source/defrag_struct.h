@@ -18,7 +18,7 @@ public:
     DefragStruct();
     ~DefragStruct();
 
-    WCHAR versiontext_[100];
+    wchar_t versiontext_[100];
 
     enum colors {
         COLOREMPTY,

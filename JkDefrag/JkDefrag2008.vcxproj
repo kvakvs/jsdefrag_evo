@@ -188,6 +188,7 @@
     <ClInclude Include="Source\scan_fat.h" />
     <ClInclude Include="Source\scan_ntfs.h" />
     <ClInclude Include="Source\std_afx.h" />
+    <ClInclude Include="Source\types.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resource\JkDefrag.ico" />

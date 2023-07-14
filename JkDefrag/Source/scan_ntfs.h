@@ -155,7 +155,7 @@ struct FILENAME_ATTRIBUTE {
     // NTFS=0x01, DOS=0x02 
     UCHAR name_type_; 
 
-    WCHAR name_[1];
+    wchar_t name_[1];
 };
 
 struct OBJECTID_ATTRIBUTE {
@@ -247,7 +247,7 @@ struct EA_ATTRIBUTE {
 };
 
 struct ATTRIBUTE_DEFINITION {
-    WCHAR attribute_name_[64];
+    wchar_t attribute_name_[64];
 
     ULONG attribute_number_;
     ULONG unknown_[2];
@@ -296,7 +296,7 @@ struct ATTRIBUTE_DEFINITION {
 struct StreamStruct {
     StreamStruct* next_;
 
-    WCHAR* stream_name_; /* "stream name" */
+    wchar_t* stream_name_; /* "stream name" */
 
     ATTRIBUTE_TYPE stream_type_; /* "stream type" */
 
@@ -312,8 +312,8 @@ struct InodeDataStruct {
 
     bool is_directory_; /* true: it's a directory. */
 
-    WCHAR* long_filename_; /* Long filename. */
-    WCHAR* short_filename_; /* Short filename (8.3 DOS). */
+    wchar_t* long_filename_; /* Long filename. */
+    wchar_t* short_filename_; /* Short filename (8.3 DOS). */
 
     uint64_t bytes_; /* Total number of bytes. */
     uint64_t creation_time_; /* 1 second = 10000000 */
@@ -346,18 +346,18 @@ struct NtfsDiskInfoStruct {
     } buffers_[3];
 };
 
-class ScanNtfs {
+class ScanNTFS {
 public:
-    ScanNtfs();
-    ~ScanNtfs();
+    ScanNTFS();
+    ~ScanNTFS();
 
     // Get instance of the class
-    static ScanNtfs* get_instance();
+    static ScanNTFS* get_instance();
 
     BOOL analyze_ntfs_volume(DefragDataStruct* data);
 
 private:
-    static WCHAR* stream_type_names(ATTRIBUTE_TYPE stream_type);
+    static wchar_t* stream_type_names(ATTRIBUTE_TYPE stream_type);
 
     bool fixup_raw_mftdata(DefragDataStruct* data, const NtfsDiskInfoStruct* disk_info, BYTE* buffer,
                            uint64_t buf_length) const;
@@ -368,7 +368,7 @@ private:
     static BOOL translate_rundata_to_fragmentlist(
         const DefragDataStruct* data,
         InodeDataStruct* inode_data,
-        WCHAR* stream_name,
+        wchar_t* stream_name,
         ATTRIBUTE_TYPE stream_type,
         const BYTE* run_data,
         uint32_t run_data_length,
@@ -377,7 +377,7 @@ private:
 
     void CleanupStreams(InodeDataStruct* InodeData, BOOL CleanupFragments);
 
-    WCHAR* ConstructStreamName(WCHAR* FileName1, WCHAR* FileName2, StreamStruct* Stream);
+    wchar_t* ConstructStreamName(wchar_t* FileName1, wchar_t* FileName2, StreamStruct* Stream);
 
     BOOL ProcessAttributes(
         DefragDataStruct* Data,
@@ -410,7 +410,7 @@ private:
         uint64_t BufLength);
 
     // static member that is an instance of itself
-    inline static std::unique_ptr<ScanNtfs> instance_;
+    inline static std::unique_ptr<ScanNTFS> instance_;
 
     //	JKDefragGui *m_jkGui;
     DefragLib* defrag_lib_{};

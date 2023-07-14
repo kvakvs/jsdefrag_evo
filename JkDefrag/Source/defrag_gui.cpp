@@ -163,7 +163,7 @@ void DefragGui::set_display_data(const HDC dc) {
 }
 
 /* Callback: clear the screen. */
-void DefragGui::clear_screen(WCHAR* format, ...) {
+void DefragGui::clear_screen(const wchar_t* format, ...) {
     va_list var_args;
 
     /* If there is no message then return. */
@@ -256,7 +256,7 @@ void DefragGui::show_analyze(const DefragDataStruct* data, const ItemStruct* ite
 }
 
 /* Callback: show a debug message. */
-void DefragGui::show_debug(const DebugLevel level, const ItemStruct* item, WCHAR* format, ...) {
+void DefragGui::show_debug(const DebugLevel level, const ItemStruct* item, const wchar_t* format, ...) {
     va_list var_args;
 
     if (debug_level_ < level) return;
@@ -278,7 +278,7 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct* item, WCHAR
 }
 
 /* Callback: paint a cluster on the screen in a color. */
-void DefragGui::draw_cluster(DefragDataStruct* data, uint64_t cluster_start, const uint64_t cluster_end,
+void DefragGui::draw_cluster(const DefragDataStruct* data, const uint64_t cluster_start, const uint64_t cluster_end,
                              const int color) {
     __timeb64 now{};
     [[maybe_unused]] Rect window_size = client_window_size_;
@@ -509,8 +509,7 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             log_->log_message(L"- Average end-begin distance: %.0f clusters", data->average_distance_);
         }
 
-        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
-             tree_next(item)) {
+        for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
             if (item->is_unmovable_ != true) continue;
             if (item->is_excluded_ == true) continue;
             if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
@@ -525,8 +524,7 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             total_bytes = 0;
             total_clusters = 0;
 
-            for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
-                 tree_next(item)) {
+            for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
                 if (item->is_unmovable_ != true) continue;
                 if (item->is_excluded_ == true) continue;
                 if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
@@ -535,12 +533,12 @@ void DefragGui::show_status(const DefragDataStruct* data) {
                         _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0))
                     continue;
 
-                fragments = defrag_lib_->get_fragment_count(item);
+                fragments = DefragLib::get_fragment_count(item);
 
                 if (item->long_path_ == nullptr) {
                     log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->bytes_,
                                       item->clusters_count_,
-                                      defrag_lib_->get_item_lcn(item));
+                                      DefragLib::get_item_lcn(item));
                 }
                 else {
                     log_->log_message(L"  %9lu %11I64u %9I64u %s", fragments, item->bytes_, item->clusters_count_,
@@ -556,12 +554,11 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             log_->log_message(L"  %9I64u %11I64u %9I64u Total", total_fragments, total_bytes, total_clusters);
         }
 
-        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
-             tree_next(item)) {
+        for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
             if (item->is_excluded_ == true) continue;
             if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
 
-            fragments = defrag_lib_->get_fragment_count(item);
+            fragments = DefragLib::get_fragment_count(item);
 
             if (fragments <= 1) continue;
 
@@ -576,19 +573,18 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             total_bytes = 0;
             total_clusters = 0;
 
-            for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
-                 tree_next(item)) {
+            for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
                 if (item->is_excluded_ == true) continue;
                 if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
 
-                fragments = defrag_lib_->get_fragment_count(item);
+                fragments = DefragLib::get_fragment_count(item);
 
                 if (fragments <= 1) continue;
 
                 if (item->long_path_ == nullptr) {
                     log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->bytes_,
                                       item->clusters_count_,
-                                      defrag_lib_->get_item_lcn(item));
+                                      DefragLib::get_item_lcn(item));
                 }
                 else {
                     log_->log_message(L"  %9lu %11I64u %9I64u %s", fragments, item->bytes_, item->clusters_count_,
@@ -606,8 +602,7 @@ void DefragGui::show_status(const DefragDataStruct* data) {
 
         int last_largest = 0;
 
-        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
-             tree_next(item)) {
+        for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
             if (item->long_filename_ != nullptr &&
                 (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
                     _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
@@ -647,12 +642,12 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             for (i = 0; i < last_largest; i++) {
                 if (largest_items[i]->long_path_ == nullptr) {
                     log_->log_message(L"  %9u %11I64u %9I64u [at cluster %I64u]",
-                                      defrag_lib_->get_fragment_count(largest_items[i]),
+                                      DefragLib::get_fragment_count(largest_items[i]),
                                       largest_items[i]->bytes_, largest_items[i]->clusters_count_,
-                                      defrag_lib_->get_item_lcn(largest_items[i]));
+                                      DefragLib::get_item_lcn(largest_items[i]));
                 }
                 else {
-                    log_->log_message(L"  %9u %11I64u %9I64u %s", defrag_lib_->get_fragment_count(largest_items[i]),
+                    log_->log_message(L"  %9u %11I64u %9I64u %s", DefragLib::get_fragment_count(largest_items[i]),
                                       largest_items[i]->bytes_, largest_items[i]->clusters_count_,
                                       largest_items[i]->long_path_);
                 }
@@ -707,7 +702,7 @@ void DefragGui::paint_image(HDC dc) {
 
     FontFamily font_family(L"Tahoma");
     Font font(&font_family, 12, FontStyleRegular, UnitPixel);
-    WCHAR* text;
+    wchar_t* text;
     PointF point_f(2.0f, 0.0f);
 
     text = messages_[0];
@@ -926,7 +921,7 @@ void DefragGui::on_paint(HDC dc) const {
         Font       font(&fontFamily,12,FontStyleRegular, UnitPixel);
         PointF     pointF(132.0f, 120.0f);
     
-        WCHAR      *text;
+        wchar_t      *text;
     
         text = Messages[2];
     
@@ -1274,7 +1269,7 @@ void DefragGui::ShowDiskmap(DefragDataStruct* Data) {
     /* Colorize all the files on the screen.
     Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
     ignore it. */
-    for (Item = defrag_lib_->tree_smallest(Data->item_tree_); Item != nullptr; Item = defrag_lib_->tree_next(Item)) {
+    for (Item = DefragLib::tree_smallest(Data->item_tree_); Item != nullptr; Item = DefragLib::tree_next(Item)) {
         if (*Data->running_ != RunningState::RUNNING) break;
         //		if (*Data->RedrawScreen != 2) break;
 

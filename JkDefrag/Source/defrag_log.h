@@ -4,17 +4,17 @@ class DefragLog
 {
 public:
 	DefragLog();
-	void log_message(WCHAR *format, ...);
-	void set_log_filename(WCHAR *file_name);
+	void log_message(const wchar_t* format, ...) const;
+	void set_log_filename(const wchar_t* file_name);
 
-	WCHAR my_name_[MAX_PATH];
-	WCHAR my_short_name_[MAX_PATH];
+	wchar_t my_name_[MAX_PATH];
+	wchar_t my_short_name_[MAX_PATH];
 
-	WCHAR *get_log_filename();
+	wchar_t *get_log_filename();
 
 protected:
 private:
-	WCHAR log_file_[MAX_PATH];
+	wchar_t log_file_[MAX_PATH];
 
 	DefragLib *defrag_lib_;
 };

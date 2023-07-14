@@ -1,4 +1,7 @@
 #pragma once
+#include <string>
+#include <vector>
+
 #include "defrag_lib.h"
 
 /* The big data struct that holds all the defragger's variables for a single thread. */
@@ -11,18 +14,20 @@ struct DefragDataStruct {
     bool use_last_access_time_; /* If TRUE then use LastAccessTime for SpaceHogs. */
     int cannot_move_dirs_; /* If bigger than 20 then do not move dirs. */
 
-    WCHAR* include_mask_; /* Example: "c:\t1\*" */
+    wchar_t* include_mask_; /* Example: "c:\t1\*" */
     DiskStruct disk_;
 
     double free_space_; /* Percentage of total disk size 0..100. */
 
-    /* Tree in memory with information about all the files. */
-
+    // Tree in memory with information about all the files. 
     ItemStruct* item_tree_;
     int balance_count_;
-    WCHAR** excludes_; /* Array with exclude masks. */
-    bool use_default_space_hogs_; /* TRUE: use the built-in SpaceHogs. */
-    WCHAR** space_hogs_; /* Array with SpaceHog masks. */
+    // Array with exclude masks
+    Wstrings excludes_;
+    // use the built-in SpaceHogs
+    bool use_default_space_hogs_;
+    // Array with SpaceHog masks
+    std::vector<std::wstring> space_hogs_;
     uint64_t zones_[4]; /* Begin (LCN) of the zones. */
 
     ExcludesStruct mft_excludes_[3]; /* List of clusters reserved for the MFT. */
@@ -31,7 +36,7 @@ struct DefragDataStruct {
      * Counters filled before Phase 1.
      */
 
-     // Size of the volume, in clusters. 
+    // Size of the volume, in clusters. 
     uint64_t total_clusters_;
     // Number of bytes per cluster.
     uint64_t bytes_per_cluster_;
@@ -64,13 +69,14 @@ struct DefragDataStruct {
     uint64_t phase_todo_; /* Number of items to do in this Phase. */
     uint64_t phase_done_; /* Number of items already done in this Phase. */
 
-    /* Variables used to throttle the speed. */
-
+    // Variables used to throttle the speed
+    //struct {
     int speed_; /* Speed as a percentage 1..100. */
     int64_t start_time_;
     int64_t running_time_;
     int64_t last_checkpoint_;
+    //} throttle_;
 
-    /* The array with error messages. */
-    WCHAR** debug_msg_;
+    // The array with error messages
+    Wstrings debug_msg_;
 };

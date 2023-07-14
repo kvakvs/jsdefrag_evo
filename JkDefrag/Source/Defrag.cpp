@@ -21,6 +21,8 @@ http://www.kessels.com/
 #include "std_afx.h"
 #include "defrag.h"
 
+#include "types.h"
+
 Defrag::Defrag()
     : running_state_(RunningState::STOPPED),
       i_am_running_(RunningState::STOPPED),
@@ -174,7 +176,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
     BOOL result = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
 
     if (result == FALSE) {
-        WCHAR s2[BUFSIZ];
+        wchar_t s2[BUFSIZ];
         defrag_lib->system_error_str(GetLastError(), s2, BUFSIZ);
 
         log->log_message(L"  Failed to initialize SymInitialize(): %s", s2);
@@ -266,13 +268,13 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     DefragGui* gui = instance_->gui_;
     DefragLib* defrag_lib = instance_->defrag_lib_;
 
-    /* Setup the defaults. */
+    // Setup the defaults
     optimize_mode.mode_ = OptimizeMode::AnalyzeFixupFastopt;
-    /* 0...100 */
+    // Range 0...100 
     int speed = 100;
     double free_space = 1;
-    WCHAR** excludes = nullptr;
-    WCHAR** space_hogs = nullptr;
+    Wstrings excludes;
+    Wstrings space_hogs;
     bool quit_on_finish = false;
 
     /* Fetch the commandline. */
@@ -328,7 +330,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum)_wtol(argv[i]);
 
-                if (optimize_mode.mode_ < OptimizeMode::AnalyzeFixup || optimize_mode.mode_ >= OptimizeMode::Max) {
+                if (optimize_mode.mode_ < OptimizeMode::AnalyzeOnly || optimize_mode.mode_ >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
@@ -346,7 +348,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             if (wcsncmp(argv[i], L"-a", 2) == 0) {
                 optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum)_wtol(&argv[i][2]);
 
-                if (optimize_mode.mode_ < 1 || optimize_mode.mode_ > 11) {
+                if (optimize_mode.mode_ < OptimizeMode::AnalyzeOnly || optimize_mode.mode_ >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
@@ -491,7 +493,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     continue;
                 }
 
-                WCHAR* LogFile = log->get_log_filename();
+                wchar_t* LogFile = log->get_log_filename();
 
                 if (*LogFile != '\0') {
                     gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-l' accepted, logfile = %s",
@@ -506,7 +508,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-l", 2) == 0 && wcslen(argv[i]) >= 3) {
-                WCHAR* LogFile = log->get_log_filename();
+                wchar_t* LogFile = log->get_log_filename();
 
                 if (*LogFile != '\0') {
                     gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-l' accepted, logfile = %s",
@@ -531,7 +533,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     continue;
                 }
 
-                excludes = defrag_lib->add_array_string(excludes, argv[i]);
+                excludes.push_back(argv[i]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-e' accepted, added '%s' to the excludes", argv[i]);
@@ -540,7 +542,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-e", 2) == 0 && wcslen(argv[i]) >= 3) {
-                excludes = defrag_lib->add_array_string(excludes, &argv[i][2]);
+                excludes.push_back(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-e' accepted, added '%s' to the excludes",
@@ -560,7 +562,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     continue;
                 }
 
-                space_hogs = defrag_lib->add_array_string(space_hogs, argv[i]);
+                space_hogs.push_back(argv[i]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-u' accepted, added '%s' to the spacehogs", argv[i]);
@@ -569,7 +571,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-u", 2) == 0 && wcslen(argv[i]) >= 3) {
-                space_hogs = defrag_lib->add_array_string(space_hogs, &argv[i][2]);
+                space_hogs.push_back(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-u' accepted, added '%s' to the spacehogs",
@@ -614,8 +616,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             if (*argv[i] == '\0') continue;
 
             defrag_lib->run_jk_defrag(argv[i], optimize_mode, speed, free_space, excludes, space_hogs,
-                                 &instance_->running_state_,
-                                 /*&JKDefragGui::getInstance()->RedrawScreen,*/nullptr);
+                                 &instance_->running_state_, std::nullopt);
 
             do_all_volumes = false;
         }
@@ -624,8 +625,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     /* If no paths are specified on the commandline then defrag all fixed harddisks. */
     if (do_all_volumes == true && instance_->i_am_running_ == RunningState::RUNNING) {
         defrag_lib->run_jk_defrag(nullptr, optimize_mode, speed, free_space, excludes, space_hogs,
-                             &instance_->running_state_,
-                             /*&JKDefragGui::getInstance()->RedrawScreen,*/nullptr);
+                             &instance_->running_state_, std::nullopt);
     }
 
     /* If the "-q" command line argument was specified then exit the program. */
@@ -645,13 +645,13 @@ true.
 bool Defrag::is_already_running(void) const {
     PROCESSENTRY32 pe32;
     char my_name[MAX_PATH];
-    WCHAR s1[BUFSIZ];
+    wchar_t s1[BUFSIZ];
 
     /* Get a process-snapshot from the kernel. */
     const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (snapshot == INVALID_HANDLE_VALUE) {
-        WCHAR s2[BUFSIZ];
+        wchar_t s2[BUFSIZ];
         defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
         swprintf_s(s2, BUFSIZ, L"Cannot get process snapshot: %s", s1);

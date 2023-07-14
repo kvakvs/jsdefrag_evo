@@ -22,6 +22,8 @@ http://www.kessels.com/
 
 #include "std_afx.h"
 
+#include <optional>
+
 #include "defrag_data_struct.h"
 
 DefragLib::DefragLib() = default;
@@ -43,7 +45,7 @@ a different array. Do not change this default array, simply create a new
 array in your program and specify it as a parameter.
 
 */
-WCHAR* DefaultDebugMsg[] =
+wchar_t* default_debug_msg[] =
 {
     /*  0 */ L"",
     /*  1 */ L"",
@@ -122,10 +124,10 @@ char* DefragLib::stristr(char* haystack, const char* needle) {
 }
 
 /* Search case-insensitive for a substring. */
-WCHAR* DefragLib::stristr_w(WCHAR* haystack, const WCHAR* needle) {
+wchar_t* DefragLib::stristr_w(wchar_t* haystack, const wchar_t* needle) {
     if (haystack == nullptr || needle == nullptr) return nullptr;
 
-    WCHAR* p1 = haystack;
+    wchar_t* p1 = haystack;
     const size_t i = wcslen(needle);
 
     while (*p1 != 0) {
@@ -138,30 +140,28 @@ WCHAR* DefragLib::stristr_w(WCHAR* haystack, const WCHAR* needle) {
 }
 
 /* Return a string with the error message for GetLastError(). */
-void DefragLib::system_error_str(const uint32_t error_code, WCHAR* out, const size_t width) const {
-    WCHAR s1[BUFSIZ];
+void DefragLib::system_error_str(const uint32_t error_code, wchar_t* out, const size_t width) const {
+    wchar_t buffer[BUFSIZ];
 
     FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
-                   nullptr, error_code, 0, s1, BUFSIZ, nullptr);
+                   nullptr, error_code, 0, buffer, BUFSIZ, nullptr);
 
     /* Strip trailing whitespace. */
-    WCHAR* p1 = wcschr(s1, '\0');
+    wchar_t* p1 = wcschr(buffer, '\0');
 
-    while (p1 != s1) {
+    while (p1 != buffer) {
         p1--;
-
-        if (*p1 != ' ' && *p1 != '\t' && *p1 != '\n' && *p1 != '\r') break;
-
+        if (!std::isspace(*p1)) break;
         *p1 = '\0';
     }
 
-    /* Add error number. */
-    swprintf_s(out, width, L"[%lu] %s", error_code, s1);
+    // Add error number. 
+    swprintf_s(out, width, L"[%lu] %s", error_code, buffer);
 }
 
 /* Translate character to lowercase. */
-WCHAR DefragLib::lower_case(const WCHAR c) {
-    if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
+wchar_t DefragLib::lower_case(const wchar_t c) {
+    if (std::isupper(c)) return c - 'A' + 'a';
 
     return c;
 }
@@ -174,8 +174,8 @@ void DefragLib::show_hex([[maybe_unused]] DefragDataStruct* data, const BYTE* bu
     int j;
 
     for (int i = 0; i < count; i = i + 16) {
-        WCHAR s2[BUFSIZ];
-        WCHAR s1[BUFSIZ];
+        wchar_t s2[BUFSIZ];
+        wchar_t s1[BUFSIZ];
         swprintf_s(s1,BUFSIZ, L"%4u %4X   ", i, i);
 
         for (j = 0; j < 16; j++) {
@@ -218,13 +218,13 @@ true, otherwise false. The mask may contain wildcard characters '?' (any
 character) '*' (any characters).
 
 */
-bool DefragLib::match_mask(WCHAR* string, WCHAR* mask) {
+bool DefragLib::match_mask(const wchar_t* string, const wchar_t* mask) {
     if (string == nullptr) return false; /* Just to speed up things. */
     if (mask == nullptr) return false;
     if (wcscmp(mask, L"*") == 0) return true;
 
-    WCHAR* m = mask;
-    WCHAR* s = string;
+    auto m = mask;
+    auto s = string;
 
     while (*m != '\0' && *s != '\0') {
         if (lower_case(*m) != lower_case(*s) && *m != '?') {
@@ -260,45 +260,45 @@ last item in the array is nullptr. If the array is not empty then append the
 new string, realloc() the array.
 
 */
-WCHAR** DefragLib::add_array_string(WCHAR** array, const WCHAR* new_string) {
-    WCHAR** new_array;
-
-    /* Sanity check. */
-    if (new_string == nullptr) return array;
-
-    if (array == nullptr) {
-        new_array = (WCHAR**)malloc(2 * sizeof(WCHAR*));
-
-        if (new_array == nullptr) return nullptr;
-
-        new_array[0] = _wcsdup(new_string);
-
-        if (new_array[0] == nullptr) return nullptr;
-
-        new_array[1] = nullptr;
-
-        return new_array;
-    }
-
-    int i = 0;
-
-    while (array[i] != nullptr) i++;
-
-    new_array = (WCHAR**)realloc(array, (i + 2) * sizeof(WCHAR*));
-
-    if (new_array == nullptr) return nullptr;
-
-    new_array[i] = _wcsdup(new_string);
-
-    if (new_array[i] == nullptr) return nullptr;
-
-    new_array[i + 1] = nullptr;
-
-    return new_array;
-}
+// wchar_t** DefragLib::add_array_string(wchar_t** array, const wchar_t* new_string) {
+//     wchar_t** new_array;
+//
+//     /* Sanity check. */
+//     if (new_string == nullptr) return array;
+//
+//     if (array == nullptr) {
+//         new_array = (wchar_t**)malloc(2 * sizeof(wchar_t*));
+//
+//         if (new_array == nullptr) return nullptr;
+//
+//         new_array[0] = _wcsdup(new_string);
+//
+//         if (new_array[0] == nullptr) return nullptr;
+//
+//         new_array[1] = nullptr;
+//
+//         return new_array;
+//     }
+//
+//     int i = 0;
+//
+//     while (array[i] != nullptr) i++;
+//
+//     new_array = (wchar_t**)realloc(array, (i + 2) * sizeof(wchar_t*));
+//
+//     if (new_array == nullptr) return nullptr;
+//
+//     new_array[i] = _wcsdup(new_string);
+//
+//     if (new_array[i] == nullptr) return nullptr;
+//
+//     new_array[i + 1] = nullptr;
+//
+//     return new_array;
+// }
 
 /* Subfunction of GetShortPath(). */
-void DefragLib::append_to_short_path(const ItemStruct* item, WCHAR* path, const size_t length) {
+void DefragLib::append_to_short_path(const ItemStruct* item, wchar_t* path, const size_t length) {
     if (item->parent_directory_ != nullptr) append_to_short_path(item->parent_directory_, path, length);
 
     wcscat_s(path, length, L"\\");
@@ -317,7 +317,7 @@ Return a string with the full path of an item, constructed from the short names.
 Return nullptr if error. The caller must free() the new string.
 
 */
-WCHAR* DefragLib::get_short_path(const DefragDataStruct* data, const ItemStruct* item) {
+wchar_t* DefragLib::get_short_path(const DefragDataStruct* data, const ItemStruct* item) {
     /* Sanity check. */
     if (item == nullptr) return nullptr;
 
@@ -337,7 +337,7 @@ WCHAR* DefragLib::get_short_path(const DefragDataStruct* data, const ItemStruct*
     }
 
     /* Allocate new string. */
-    const auto path = (WCHAR*)malloc(sizeof(WCHAR) * length);
+    const auto path = (wchar_t*)malloc(sizeof(wchar_t) * length);
 
     if (path == nullptr) return nullptr;
 
@@ -350,7 +350,7 @@ WCHAR* DefragLib::get_short_path(const DefragDataStruct* data, const ItemStruct*
 }
 
 /* Subfunction of GetLongPath(). */
-void DefragLib::append_to_long_path(const ItemStruct* item, WCHAR* path, const size_t length) {
+void DefragLib::append_to_long_path(const ItemStruct* item, wchar_t* path, const size_t length) {
     if (item->parent_directory_ != nullptr) append_to_long_path(item->parent_directory_, path, length);
 
     wcscat_s(path, length, L"\\");
@@ -369,7 +369,7 @@ Return a string with the full path of an item, constructed from the long names.
 Return nullptr if error. The caller must free() the new string.
 
 */
-WCHAR* DefragLib::get_long_path(const DefragDataStruct* data, const ItemStruct* item) {
+wchar_t* DefragLib::get_long_path(const DefragDataStruct* data, const ItemStruct* item) {
     /* Sanity check. */
     if (item == nullptr) return nullptr;
 
@@ -389,7 +389,7 @@ WCHAR* DefragLib::get_long_path(const DefragDataStruct* data, const ItemStruct* 
     }
 
     /* Allocate new string. */
-    const auto path = (WCHAR*)malloc(sizeof(WCHAR) * length);
+    const auto path = (wchar_t*)malloc(sizeof(wchar_t) * length);
 
     if (path == nullptr) return nullptr;
 
@@ -890,9 +890,9 @@ opened then show an error message and return nullptr.
 */
 HANDLE DefragLib::open_item_handle(const DefragDataStruct* data, const ItemStruct* item) const {
     HANDLE file_handle;
-    WCHAR error_string[BUFSIZ];
+    wchar_t error_string[BUFSIZ];
     const size_t length = wcslen(item->long_path_) + 5;
-    auto path = (WCHAR*)malloc(sizeof(WCHAR) * length);
+    auto path = (wchar_t*)malloc(sizeof(wchar_t) * length);
 
     swprintf_s(path, length, L"\\\\?\\%s", item->long_path_);
 
@@ -916,7 +916,8 @@ HANDLE DefragLib::open_item_handle(const DefragDataStruct* data, const ItemStruc
 
     DefragGui* jkGui = DefragGui::get_instance();
 
-    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15], item->long_path_, error_string);
+    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15].c_str(), item->long_path_,
+                      error_string);
 
     return nullptr;
 }
@@ -982,7 +983,7 @@ int DefragLib::get_fragments(const DefragDataStruct* data, ItemStruct* item, con
     }
 
     /* Show debug message: "Getting cluster bitmap: %s" */
-    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[10], item->long_path_);
+    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[10].c_str(), item->long_path_);
 
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
@@ -1029,14 +1030,14 @@ int DefragLib::get_fragments(const DefragDataStruct* data, ItemStruct* item, con
             /* Show debug message. */
             if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
                 /* "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u" */
-                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[11],
+                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[11].c_str(),
                                 extent_data.extents_[i].lcn_,
                                 vcn,
                                 extent_data.extents_[i].next_vcn_);
             }
             else {
                 /* "Extent (virtual): Vcn=%I64u, NextVcn=%I64u" */
-                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[46], vcn,
+                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[46].c_str(), vcn,
                                 extent_data.extents_[i].next_vcn_);
             }
 
@@ -1076,11 +1077,12 @@ int DefragLib::get_fragments(const DefragDataStruct* data, ItemStruct* item, con
 
     /* If there was an error while reading the clustermap then return false. */
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
-        WCHAR error_string[BUFSIZ];
+        wchar_t error_string[BUFSIZ];
         /* Show debug message: "Cannot process clustermap of '%s': %s" */
         system_error_str(error_code, error_string,BUFSIZ);
 
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[43], item->long_path_, error_string);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[43].c_str(), item->long_path_,
+                        error_string);
 
         return false;
     }
@@ -1481,11 +1483,11 @@ bool DefragLib::find_gap(const DefragDataStruct* data, const uint64_t minimum_lc
         }
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
-            WCHAR s1[BUFSIZ];
+            wchar_t s1[BUFSIZ];
             /* Show debug message: "ERROR: could not get volume bitmap: %s" */
             system_error_str(GetLastError(), s1,BUFSIZ);
 
-            gui->show_debug(DebugLevel::Warning, nullptr, data->debug_msg_[12], s1);
+            gui->show_debug(DebugLevel::Warning, nullptr, data->debug_msg_[12].c_str(), s1);
 
             return false;
         }
@@ -1515,7 +1517,8 @@ bool DefragLib::find_gap(const DefragDataStruct* data, const uint64_t minimum_lc
 
                 if (prev_in_use == 0 && in_use != 0) {
                     /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
-                    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13], cluster_start,
+                    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13].c_str(),
+                                    cluster_start,
                                     lcn - cluster_start);
 
                     /* If the gap is bigger/equal than the mimimum size then return it,
@@ -1565,7 +1568,7 @@ bool DefragLib::find_gap(const DefragDataStruct* data, const uint64_t minimum_lc
     /* Process the last gap. */
     if (prev_in_use == 0) {
         /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
-        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13], cluster_start,
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13].c_str(), cluster_start,
                         lcn - cluster_start);
 
         if (cluster_start >= minimum_lcn && lcn - cluster_start >= minimum_size) {
@@ -1955,7 +1958,7 @@ uint32_t DefragLib::move_item2(DefragDataStruct* data, const HANDLE file_handle,
 int DefragLib::move_item3(DefragDataStruct* data, ItemStruct* item, const HANDLE file_handle, const uint64_t new_lcn,
                           const uint64_t offset, const uint64_t size, const int strategy) const {
     uint32_t error_code;
-    WCHAR error_string[BUFSIZ];
+    wchar_t error_string[BUFSIZ];
     DefragGui* gui = DefragGui::get_instance();
 
     /* Slow the program down if so selected. */
@@ -2033,7 +2036,7 @@ int DefragLib::move_item4(DefragDataStruct* data, ItemStruct* item, const HANDLE
     if (is_fragmented(item, offset, size) == false) return true;
 
     /* Show debug message: "Windows could not move the file, trying alternative method." */
-    gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[42]);
+    gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[42].c_str());
 
     /* Find another gap on disk for the item. */
     if (direction == 0) {
@@ -2069,7 +2072,7 @@ int DefragLib::move_item4(DefragDataStruct* data, ItemStruct* item, const HANDLE
     /* If the block is still fragmented then return false. */
     if (is_fragmented(item, offset, size) == true) {
         /* Show debug message: "Alternative method failed, leaving file where it is." */
-        gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[45]);
+        gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[45].c_str());
 
         return false;
     }
@@ -2236,7 +2239,7 @@ ItemStruct* DefragLib::find_best_item(const DefragDataStruct* data, const uint64
     DefragGui* gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for perfect fit %I64d[%I64d]",
-                      cluster_start, cluster_end - cluster_start);
+                    cluster_start, cluster_end - cluster_start);
 
     /* Walk backwards through all the items on disk and select the first item that
     fits inside the free block, and combined with other items will fill the gap
@@ -2328,7 +2331,7 @@ ItemStruct* DefragLib::find_best_item(const DefragDataStruct* data, const uint64
     }
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                      L"No perfect fit found, all items above the gap are bigger than the gap.");
+                    L"No perfect fit found, all items above the gap are bigger than the gap.");
 
     return nullptr;
 }
@@ -2342,7 +2345,7 @@ void DefragLib::call_show_status(DefragDataStruct* data, const int phase, const 
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
         // Most efficient if power of 2 
-        BYTE buffer_[65536]; 
+        BYTE buffer_[65536];
     } bitmap_data{};
 
     uint32_t error_code;
@@ -2364,7 +2367,7 @@ void DefragLib::call_show_status(DefragDataStruct* data, const int phase, const 
         /* Fetch a block of cluster data. */
         bitmap_param.StartingLcn.QuadPart = lcn;
         error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
-                                    &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
+                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -2555,6 +2558,7 @@ void DefragLib::compare_items([[maybe_unused]] DefragDataStruct* data, const Ite
     struct {
         uint32_t extent_count_;
         uint64_t starting_vcn_;
+
         struct {
             uint64_t next_vcn_;
             uint64_t lcn_;
@@ -2569,7 +2573,7 @@ void DefragLib::compare_items([[maybe_unused]] DefragDataStruct* data, const Ite
 
     uint32_t ErrorCode;
 
-    WCHAR ErrorString[BUFSIZ];
+    wchar_t ErrorString[BUFSIZ];
 
     int MaxLoop;
 
@@ -2584,13 +2588,13 @@ void DefragLib::compare_items([[maybe_unused]] DefragDataStruct* data, const Ite
 
     if (item->is_dir_ == false) {
         file_handle = CreateFileW(item->long_path_,FILE_READ_ATTRIBUTES,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                 nullptr,OPEN_EXISTING,FILE_FLAG_NO_BUFFERING, nullptr);
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr,OPEN_EXISTING,FILE_FLAG_NO_BUFFERING, nullptr);
     }
     else {
         file_handle = CreateFileW(item->long_path_,GENERIC_READ,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                 nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     }
 
     if (file_handle == INVALID_HANDLE_VALUE) {
@@ -2745,7 +2749,7 @@ void DefragLib::compare_items([[maybe_unused]] DefragDataStruct* data, const Ite
 /* Scan all files in a directory and all it's subdirectories (recursive)
 and store the information in a tree in memory for later use by the
 optimizer. */
-void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentDirectory) {
+void DefragLib::scan_dir(DefragDataStruct* Data, wchar_t* Mask, ItemStruct* ParentDirectory) {
     ItemStruct* Item;
 
     FragmentListStruct* Fragment;
@@ -2754,8 +2758,8 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
     WIN32_FIND_DATAW FindFileData;
 
-    WCHAR* RootPath;
-    WCHAR* TempPath;
+    wchar_t* RootPath;
+    wchar_t* TempPath;
 
     HANDLE FileHandle;
 
@@ -2771,7 +2775,7 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
     size_t Length;
 
-    WCHAR* p1;
+    wchar_t* p1;
 
     DefragGui* jkGui = DefragGui::get_instance();
 
@@ -2792,7 +2796,7 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
     if (p1 != nullptr) *p1 = 0;
 
     /* Show debug message: "Analyzing: %s". */
-    jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, Data->debug_msg_[23], Mask);
+    jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, Data->debug_msg_[23].c_str(), Mask);
 
     /* Fetch the current time in the uint64_t format (1 second = 10000000). */
     GetSystemTime(&Time1);
@@ -2864,7 +2868,7 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
         Length = wcslen(RootPath) + wcslen(FindFileData.cFileName) + 2;
 
-        Item->long_path_ = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+        Item->long_path_ = (wchar_t*)malloc(sizeof(wchar_t) * Length);
 
         if (Item->long_path_ == nullptr) break;
 
@@ -2876,7 +2880,7 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
         Length = wcslen(RootPath) + wcslen(FindFileData.cAlternateFileName) + 2;
 
-        Item->short_path_ = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+        Item->short_path_ = (wchar_t*)malloc(sizeof(wchar_t) * Length);
 
         if (Item->short_path_ == nullptr) break;
 
@@ -2937,7 +2941,7 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
             Length = wcslen(RootPath) + wcslen(FindFileData.cFileName) + 4;
 
-            TempPath = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+            TempPath = (wchar_t*)malloc(sizeof(wchar_t) * Length);
 
             if (TempPath != nullptr) {
                 swprintf_s(TempPath, Length, L"%s\\%s\\*", RootPath, FindFileData.cFileName);
@@ -2960,37 +2964,37 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
         /* Show debug info about the file. */
         /* Show debug message: "%I64d clusters at %I64d, %I64d bytes" */
-        jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[16], Item->clusters_count_,
+        jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[16].c_str(), Item->clusters_count_,
                           get_item_lcn(Item), Item->bytes_);
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
             /* Show debug message: "Special file attribute: Compressed" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[17]);
+            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[17].c_str());
         }
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) != 0) {
             /* Show debug message: "Special file attribute: Encrypted" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[18]);
+            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[18].c_str());
         }
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) != 0) {
             /* Show debug message: "Special file attribute: Offline" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[19]);
+            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[19].c_str());
         }
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
             /* Show debug message: "Special file attribute: Read-only" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[20]);
+            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[20].c_str());
         }
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE) != 0) {
             /* Show debug message: "Special file attribute: Sparse-file" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[21]);
+            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[21].c_str());
         }
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0) {
             /* Show debug message: "Special file attribute: Temporary" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[22]);
+            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[22].c_str());
         }
 
         /* Save some memory if short and long filename are the same. */
@@ -3049,78 +3053,71 @@ void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* Parent
 
 /* Scan all files in a volume and store the information in a tree in
 memory for later use by the optimizer. */
-void DefragLib::analyze_volume(DefragDataStruct* Data) {
-    ItemStruct* Item;
-
-    BOOL Result;
-
-    uint64_t SystemTime;
-
-    SYSTEMTIME Time1;
-
-    FILETIME Time2;
-
-    ULARGE_INTEGER Time3;
-
+void DefragLib::analyze_volume(DefragDataStruct* data) {
+    ItemStruct* item;
+    uint64_t system_time;
+    SYSTEMTIME time1;
+    FILETIME time2;
     int i;
 
-    DefragGui* jkGui = DefragGui::get_instance();
-    JKScanFat* jkScanFat = JKScanFat::get_instance();
-    ScanNtfs* jkScanNtfs = ScanNtfs::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
+    ScanFAT* scan_fat = ScanFAT::get_instance();
+    ScanNTFS* scan_ntfs = ScanNTFS::get_instance();
 
-    call_show_status(Data, 1, -1); /* "Phase 1: Analyze" */
+    call_show_status(data, 1, -1); /* "Phase 1: Analyze" */
 
     /* Fetch the current time in the uint64_t format (1 second = 10000000). */
-    GetSystemTime(&Time1);
+    GetSystemTime(&time1);
 
-    if (SystemTimeToFileTime(&Time1, &Time2) == FALSE) {
-        SystemTime = 0;
+    if (SystemTimeToFileTime(&time1, &time2) == FALSE) {
+        system_time = 0;
     }
     else {
-        Time3.LowPart = Time2.dwLowDateTime;
-        Time3.HighPart = Time2.dwHighDateTime;
+        ULARGE_INTEGER time3;
+        time3.LowPart = time2.dwLowDateTime;
+        time3.HighPart = time2.dwHighDateTime;
 
-        SystemTime = Time3.QuadPart;
+        system_time = time3.QuadPart;
     }
 
     /* Scan NTFS disks. */
-    Result = jkScanNtfs->analyze_ntfs_volume(Data);
+    bool result = scan_ntfs->analyze_ntfs_volume(data);
 
     /* Scan FAT disks. */
-    if (Result == FALSE && *Data->running_ == RunningState::RUNNING) Result = jkScanFat->analyze_fat_volume(Data);
+    if (result == FALSE && *data->running_ == RunningState::RUNNING) result = scan_fat->analyze_fat_volume(data);
 
     /* Scan all other filesystems. */
-    if (Result == FALSE && *Data->running_ == RunningState::RUNNING) {
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is not a FAT or NTFS disk, using the slow scanner.");
+    if (result == FALSE && *data->running_ == RunningState::RUNNING) {
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"This is not a FAT or NTFS disk, using the slow scanner.");
 
         /* Setup the width of the progress bar. */
-        Data->phase_todo_ = Data->total_clusters_ - Data->count_free_clusters_;
+        data->phase_todo_ = data->total_clusters_ - data->count_free_clusters_;
 
         for (i = 0; i < 3; i++) {
-            Data->phase_todo_ = Data->phase_todo_ - (Data->mft_excludes_[i].end_ - Data->mft_excludes_[i].start_);
+            data->phase_todo_ = data->phase_todo_ - (data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_);
         }
 
         /* Scan all the files. */
-        scan_dir(Data, Data->include_mask_, nullptr);
+        scan_dir(data, data->include_mask_, nullptr);
     }
 
     /* Update the diskmap with the colors. */
-    Data->phase_done_ = Data->phase_todo_;
-    jkGui->draw_cluster(Data, 0, 0, 0);
+    data->phase_done_ = data->phase_todo_;
+    gui->draw_cluster(data, 0, 0, 0);
 
     /* Setup the progress counter and the file/dir counters. */
-    Data->phase_done_ = 0;
-    Data->phase_todo_ = 0;
+    data->phase_done_ = 0;
+    data->phase_todo_ = 0;
 
-    for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-        Data->phase_todo_ = Data->phase_todo_ + 1;
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        data->phase_todo_ = data->phase_todo_ + 1;
     }
 
-    jkGui->show_analyze(nullptr, nullptr);
+    gui->show_analyze(nullptr, nullptr);
 
     /* Walk through all the items one by one. */
-    for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-        if (*Data->running_ != RunningState::RUNNING) break;
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        if (*data->running_ != RunningState::RUNNING) break;
 
         /* If requested then redraw the diskmap. */
         //		if (*Data->RedrawScreen == 1) m_jkGui->ShowDiskmap(Data);
@@ -3128,20 +3125,20 @@ void DefragLib::analyze_volume(DefragDataStruct* Data) {
         /* Construct the full path's of the item. The MFT contains only the filename, plus
         a pointer to the directory. We have to construct the full paths's by joining
         all the names of the directories, and the name of the file. */
-        if (Item->long_path_ == nullptr) Item->long_path_ = get_long_path(Data, Item);
-        if (Item->short_path_ == nullptr) Item->short_path_ = get_short_path(Data, Item);
+        if (item->long_path_ == nullptr) item->long_path_ = get_long_path(data, item);
+        if (item->short_path_ == nullptr) item->short_path_ = get_short_path(data, item);
 
         /* Save some memory if the short and long paths are the same. */
-        if (Item->long_path_ != nullptr &&
-            Item->short_path_ != nullptr &&
-            Item->long_path_ != Item->short_path_ &&
-            _wcsicmp(Item->long_path_, Item->short_path_) == 0) {
-            free(Item->short_path_);
-            Item->short_path_ = Item->long_path_;
+        if (item->long_path_ != nullptr &&
+            item->short_path_ != nullptr &&
+            item->long_path_ != item->short_path_ &&
+            _wcsicmp(item->long_path_, item->short_path_) == 0) {
+            free(item->short_path_);
+            item->short_path_ = item->long_path_;
         }
 
-        if (Item->long_path_ == nullptr && Item->short_path_ != nullptr) Item->long_path_ = Item->short_path_;
-        if (Item->long_path_ != nullptr && Item->short_path_ == nullptr) Item->short_path_ = Item->long_path_;
+        if (item->long_path_ == nullptr && item->short_path_ != nullptr) item->long_path_ = item->short_path_;
+        if (item->long_path_ != nullptr && item->short_path_ == nullptr) item->short_path_ = item->long_path_;
 
         /* For debugging only: compare the data with the output from the
         FSCTL_GET_RETRIEVAL_POINTERS function call. */
@@ -3150,22 +3147,22 @@ void DefragLib::analyze_volume(DefragDataStruct* Data) {
         */
 
         /* Apply the Mask and set the Exclude flag of all items that do not match. */
-        if (match_mask(Item->long_path_, Data->include_mask_) == false &&
-            match_mask(Item->short_path_, Data->include_mask_) == false) {
-            Item->is_excluded_ = true;
+        if (match_mask(item->long_path_, data->include_mask_) == false &&
+            match_mask(item->short_path_, data->include_mask_) == false) {
+            item->is_excluded_ = true;
 
-            colorize_item(Data, Item, 0, 0, false);
+            colorize_item(data, item, 0, 0, false);
         }
 
         /* Determine if the item is to be excluded by comparing it's name with the
         Exclude masks. */
-        if (Item->is_excluded_ == false && Data->excludes_ != nullptr) {
-            for (i = 0; Data->excludes_[i] != nullptr; i++) {
-                if (match_mask(Item->long_path_, Data->excludes_[i]) == true ||
-                    match_mask(Item->short_path_, Data->excludes_[i]) == true) {
-                    Item->is_excluded_ = true;
+        if (item->is_excluded_ == false) {
+            for (auto& s : data->excludes_) {
+                if (match_mask(item->long_path_, s.c_str()) == true ||
+                    match_mask(item->short_path_, s.c_str()) == true) {
+                    item->is_excluded_ = true;
 
-                    colorize_item(Data, Item, 0, 0, false);
+                    colorize_item(data, item, 0, 0, false);
 
                     break;
                 }
@@ -3173,76 +3170,75 @@ void DefragLib::analyze_volume(DefragDataStruct* Data) {
         }
 
         /* Exclude my own logfile. */
-        if (Item->is_excluded_ == false &&
-            Item->long_filename_ != nullptr &&
-            (_wcsicmp(Item->long_filename_, L"jkdefrag.log") == 0 ||
-                _wcsicmp(Item->long_filename_, L"jkdefragcmd.log") == 0 ||
-                _wcsicmp(Item->long_filename_, L"jkdefragscreensaver.log") == 0)) {
-            Item->is_excluded_ = true;
+        if (item->is_excluded_ == false &&
+            item->long_filename_ != nullptr &&
+            (_wcsicmp(item->long_filename_, L"jkdefrag.log") == 0 ||
+                _wcsicmp(item->long_filename_, L"jkdefragcmd.log") == 0 ||
+                _wcsicmp(item->long_filename_, L"jkdefragscreensaver.log") == 0)) {
+            item->is_excluded_ = true;
 
-            colorize_item(Data, Item, 0, 0, false);
+            colorize_item(data, item, 0, 0, false);
         }
 
         /* The item is a SpaceHog if it's larger than 50 megabytes, or last access time
         is more than 30 days ago, or if it's filename matches a SpaceHog mask. */
-        if (Item->is_excluded_ == false && Item->is_dir_ == false) {
-            if (Data->use_default_space_hogs_ == true && Item->bytes_ > 50 * 1024 * 1024) {
-                Item->is_hog_ = true;
+        if (item->is_excluded_ == false && item->is_dir_ == false) {
+            if (data->use_default_space_hogs_ == true && item->bytes_ > 50 * 1024 * 1024) {
+                item->is_hog_ = true;
             }
-            else if (Data->use_default_space_hogs_ == true &&
-                Data->use_last_access_time_ == TRUE &&
-                Item->last_access_time_ + (uint64_t)(30 * 24 * 60 * 60) * 10000000 < SystemTime) {
-                Item->is_hog_ = true;
+            else if (data->use_default_space_hogs_ == true &&
+                data->use_last_access_time_ == TRUE &&
+                item->last_access_time_ + (uint64_t)(30 * 24 * 60 * 60) * 10000000 < system_time) {
+                item->is_hog_ = true;
             }
-            else if (Data->space_hogs_ != nullptr) {
-                for (i = 0; Data->space_hogs_[i] != nullptr; i++) {
-                    if (match_mask(Item->long_path_, Data->space_hogs_[i]) == true ||
-                        match_mask(Item->short_path_, Data->space_hogs_[i]) == true) {
-                        Item->is_hog_ = true;
-
+            else {
+                for (const auto& s : data->space_hogs_[i]) {
+                    if (match_mask(item->long_path_, &s) == true ||
+                        match_mask(item->short_path_, &s) == true) {
+                        item->is_hog_ = true;
                         break;
                     }
                 }
             }
 
-            if (Item->is_hog_ == true) colorize_item(Data, Item, 0, 0, false);
+            if (item->is_hog_ == true) colorize_item(data, item, 0, 0, false);
         }
 
         /* Special exception for "http://www.safeboot.com/". */
-        if (match_mask(Item->long_path_, L"*\\safeboot.fs") == true) Item->is_unmovable_ = true;
+        if (match_mask(item->long_path_, L"*\\safeboot.fs") == true) item->is_unmovable_ = true;
 
         /* Special exception for Acronis OS Selector. */
-        if (match_mask(Item->long_path_, L"?:\\bootwiz.sys") == true) Item->is_unmovable_ = true;
-        if (match_mask(Item->long_path_, L"*\\BOOTWIZ\\*") == true) Item->is_unmovable_ = true;
+        if (match_mask(item->long_path_, L"?:\\bootwiz.sys") == true) item->is_unmovable_ = true;
+        if (match_mask(item->long_path_, L"*\\BOOTWIZ\\*") == true) item->is_unmovable_ = true;
 
         /* Special exception for DriveCrypt by "http://www.securstar.com/". */
-        if (match_mask(Item->long_path_, L"?:\\BootAuth?.sys") == true) Item->is_unmovable_ = true;
+        if (match_mask(item->long_path_, L"?:\\BootAuth?.sys") == true) item->is_unmovable_ = true;
 
         /* Special exception for Symantec GoBack. */
-        if (match_mask(Item->long_path_, L"*\\Gobackio.bin") == true) Item->is_unmovable_ = true;
+        if (match_mask(item->long_path_, L"*\\Gobackio.bin") == true) item->is_unmovable_ = true;
 
         /* The $BadClus file maps the entire disk and is always unmovable. */
-        if (Item->long_filename_ != nullptr &&
-            (_wcsicmp(Item->long_filename_, L"$BadClus") == 0 ||
-                _wcsicmp(Item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
-            Item->is_unmovable_ = true;
+        if (item->long_filename_ != nullptr &&
+            (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
+                _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+            item->is_unmovable_ = true;
         }
 
         /* Update the progress percentage. */
-        Data->phase_done_ = Data->phase_done_ + 1;
+        data->phase_done_ = data->phase_done_ + 1;
 
-        if (Data->phase_done_ % 10000 == 0) jkGui->draw_cluster(Data, 0, 0, 0);
+        if (data->phase_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, 0);
     }
 
     /* Force the percentage to 100%. */
-    Data->phase_done_ = Data->phase_todo_;
-    jkGui->draw_cluster(Data, 0, 0, 0);
+    data->phase_done_ = data->phase_todo_;
+    gui->draw_cluster(data, 0, 0, 0);
 
     /* Calculate the begin of the zone's. */
-    calculate_zones(Data);
+    calculate_zones(data);
 
     /* Call the ShowAnalyze() callback one last time. */
-    jkGui->show_analyze(Data, nullptr);
+    gui->show_analyze(data, nullptr);
 }
 
 /* Move items to their zone. This will:
@@ -3326,7 +3322,7 @@ void DefragLib::fixup(DefragDataStruct* data) {
 
         if (is_fragmented(item, 0, item->clusters_count_) == true) {
             /* "I am fragmented." */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[53]);
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[53].c_str());
 
             move_me = true;
         }
@@ -3337,21 +3333,21 @@ void DefragLib::fixup(DefragDataStruct* data) {
                 (item_lcn >= data->mft_excludes_[2].start_ && item_lcn < data->mft_excludes_[2].end_)) &&
             (data->disk_.type_ != DiskType::NTFS || match_mask(item->long_path_, L"?:\\$MFT") != true)) {
             /* "I am in MFT reserved space." */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[54]);
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[54].c_str());
 
             move_me = true;
         }
 
         if (file_zone == 1 && item_lcn < data->zones_[1] && move_me == false) {
             /* "I am a regular file in zone 1." */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[55]);
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[55].c_str());
 
             move_me = true;
         }
 
         if (file_zone == 2 && item_lcn < data->zones_[2] && move_me == false) {
             /* "I am a spacehog in zone 1 or 2." */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[56]);
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[56].c_str());
 
             move_me = true;
         }
@@ -3386,7 +3382,7 @@ void DefragLib::fixup(DefragDataStruct* data) {
 
             if (result == false) {
                 /* Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]" */
-                gui->show_debug(DebugLevel::Progress, item, data->debug_msg_[25], get_item_lcn(item),
+                gui->show_debug(DebugLevel::Progress, item, data->debug_msg_[25].c_str(), get_item_lcn(item),
                                 item->clusters_count_);
 
                 gap_end[file_zone] = gap_begin[file_zone]; /* Force re-scan of gap. */
@@ -3489,7 +3485,7 @@ void DefragLib::defragment(DefragDataStruct* Data) {
 
             if (Result == false) {
                 /* Show debug message: "Disk is full, cannot defragment." */
-                jkGui->show_debug(DebugLevel::Progress, Item, Data->debug_msg_[44]);
+                jkGui->show_debug(DebugLevel::Progress, Item, Data->debug_msg_[44].c_str());
 
                 return;
             }
@@ -4276,7 +4272,7 @@ void DefragLib::optimize_volume(DefragDataStruct* data) {
             /* If the gap could not be filled then skip. */
             if (gap_begin < gap_end) {
                 /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28], gap_begin,
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28].c_str(), gap_begin,
                                 gap_end - gap_begin);
 
                 gap_begin = gap_end;
@@ -4369,7 +4365,7 @@ void DefragLib::optimize_up(DefragDataStruct* data) {
         /* If the gap could not be filled then skip. */
         if (gap_begin < gap_end) {
             /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28], gap_begin,
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28].c_str(), gap_begin,
                             gap_end - gap_begin);
 
             gap_end = gap_begin;
@@ -4380,46 +4376,32 @@ void DefragLib::optimize_up(DefragDataStruct* data) {
 
 /* Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 and may contain wildcards '*' and '?'. */
-void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMode opt_mode) {
-    HANDLE ProcessTokenHandle;
-
-    LUID TakeOwnershipValue;
-
-    TOKEN_PRIVILEGES TokenPrivileges;
-
-    STARTING_LCN_INPUT_BUFFER BitmapParam;
+void DefragLib::defrag_one_path(DefragDataStruct* data, const wchar_t* path, OptimizeMode opt_mode) {
+    HANDLE process_token_handle;
+    LUID take_ownership_value;
+    TOKEN_PRIVILEGES token_privileges;
+    STARTING_LCN_INPUT_BUFFER bitmap_param;
 
     struct {
-        uint64_t StartingLcn;
-        uint64_t BitmapSize;
+        uint64_t starting_lcn_;
+        uint64_t bitmap_size_;
+        BYTE buffer_[8];
+    } bitmap_data{};
 
-        BYTE Buffer[8];
-    } BitmapData;
+    NTFS_VOLUME_DATA_BUFFER ntfs_data;
 
-    NTFS_VOLUME_DATA_BUFFER NtfsData;
-
-    uint64_t FreeBytesToCaller;
-    uint64_t TotalBytes;
-    uint64_t FreeBytes;
-
-    int Result;
-
-    uint32_t ErrorCode;
-
-    size_t Length;
-
-    __timeb64 Time;
-
-    FILE* Fin;
-
-    WCHAR s1[BUFSIZ];
-    WCHAR* p1;
-
+    uint64_t free_bytes_to_caller;
+    uint64_t total_bytes;
+    uint64_t free_bytes;
+    int result;
+    uint32_t error_code;
+    size_t length;
+    __timeb64 time{};
+    FILE* fin;
+    wchar_t* p1;
     DWORD w;
-
     int i;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Initialize the data. Some items are inherited from the caller and are not
     initialized. */
@@ -4459,32 +4441,32 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     data->phase_todo_ = 0;
     data->phase_done_ = 0;
 
-    _ftime64_s(&Time);
+    _ftime64_s(&time);
 
-    data->start_time_ = Time.time * 1000 + Time.millitm;
+    data->start_time_ = time.time * 1000 + time.millitm;
     data->last_checkpoint_ = data->start_time_;
     data->running_time_ = 0;
 
     /* Compare the item with the Exclude masks. If a mask matches then return,
     ignoring the item. */
-    if (data->excludes_ != nullptr) {
-        for (i = 0; data->excludes_[i] != nullptr; i++) {
-            if (this->match_mask(path, data->excludes_[i]) == true) break;
-            if (wcschr(data->excludes_[i], L'*') == nullptr &&
-                wcslen(data->excludes_[i]) <= 3 &&
-                lower_case(path[0]) == lower_case(data->excludes_[i][0]))
-                break;
-        }
 
-        if (data->excludes_[i] != nullptr) {
-            /* Show debug message: "Ignoring volume '%s' because of exclude mask '%s'." */
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[47], path, data->excludes_[i]);
-            return;
-        }
+    for (const auto& s : data->excludes_) {
+        if (this->match_mask(path, s.c_str()) == true) break;
+        if (wcschr(s.c_str(), L'*') == nullptr &&
+            s.length() <= 3 &&
+            lower_case(path[0]) == lower_case(data->excludes_[i][0]))
+            break;
     }
 
+    if (data->excludes_.size() >= i) {
+        // Show debug message: "Ignoring volume '%s' because of exclude mask '%s'." 
+        gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[47].c_str(), path, data->excludes_[i]);
+        return;
+    }
+
+
     /* Clear the screen and show "Processing '%s'" message. */
-    jkGui->clear_screen(data->debug_msg_[14], path);
+    gui->clear_screen(data->debug_msg_[14].c_str(), path);
 
     /* Try to change our permissions so we can access special files and directories
     such as "C:\System Volume Information". If this does not succeed then quietly
@@ -4492,19 +4474,19 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     SE_BACKUP_NAME = Backup and Restore Privileges.
     */
     if (OpenProcessToken(GetCurrentProcess(),TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
-                         &ProcessTokenHandle) != 0 &&
-        LookupPrivilegeValue(0,SE_BACKUP_NAME, &TakeOwnershipValue) != 0) {
-        TokenPrivileges.PrivilegeCount = 1;
-        TokenPrivileges.Privileges[0].Luid = TakeOwnershipValue;
-        TokenPrivileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+                         &process_token_handle) != 0 &&
+        LookupPrivilegeValue(0,SE_BACKUP_NAME, &take_ownership_value) != 0) {
+        token_privileges.PrivilegeCount = 1;
+        token_privileges.Privileges[0].Luid = take_ownership_value;
+        token_privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-        if (AdjustTokenPrivileges(ProcessTokenHandle,FALSE, &TokenPrivileges,
+        if (AdjustTokenPrivileges(process_token_handle,FALSE, &token_privileges,
                                   sizeof(TOKEN_PRIVILEGES), 0, 0) == FALSE) {
-            jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
+            gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
         }
     }
     else {
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
     }
 
     /* Try finding the MountPoint by treating the input path as a path to
@@ -4513,9 +4495,9 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     data->disk_.mount_point_ = _wcsdup(path);
     if (data->disk_.mount_point_ == nullptr) return;
 
-    Result = GetVolumePathNameW(path, data->disk_.mount_point_, (uint32_t)wcslen(data->disk_.mount_point_) + 1);
+    result = GetVolumePathNameW(path, data->disk_.mount_point_, (uint32_t)wcslen(data->disk_.mount_point_) + 1);
 
-    if (Result == 0) wcscpy_s(data->disk_.mount_point_, wcslen(path) + 1, path);
+    if (result == 0) wcscpy_s(data->disk_.mount_point_, wcslen(path) + 1, path);
 
     /* Make two versions of the MountPoint, one with a trailing backslash and one without. */
     p1 = wcschr(data->disk_.mount_point_, 0);
@@ -4525,28 +4507,29 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
         if (*p1 == '\\') *p1 = 0;
     }
 
-    Length = wcslen(data->disk_.mount_point_) + 2;
+    length = wcslen(data->disk_.mount_point_) + 2;
 
-    data->disk_.mount_point_slash_ = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+    data->disk_.mount_point_slash_ = (wchar_t*)malloc(sizeof(wchar_t) * length);
 
     if (data->disk_.mount_point_slash_ == nullptr) {
         free(data->disk_.mount_point_);
         return;
     }
 
-    swprintf_s(data->disk_.mount_point_slash_, Length, L"%s\\", data->disk_.mount_point_);
+    swprintf_s(data->disk_.mount_point_slash_, length, L"%s\\", data->disk_.mount_point_);
 
     /* Determine the name of the volume (something like
     "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\"). */
-    Result = GetVolumeNameForVolumeMountPointW(data->disk_.mount_point_slash_,
+    result = GetVolumeNameForVolumeMountPointW(data->disk_.mount_point_slash_,
                                                data->disk_.volume_name_slash_,MAX_PATH);
 
-    if (Result == 0) {
+    if (result == 0) {
         if (wcslen(data->disk_.mount_point_slash_) > 52 - 1 - 4) {
             /* "Cannot find volume name for mountpoint '%s': %s" */
             system_error_str(GetLastError(), s1,BUFSIZ);
 
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40], data->disk_.mount_point_slash_, s1);
+            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(), data->disk_.mount_point_slash_,
+                            s1);
 
             free(data->disk_.mount_point_);
             free(data->disk_.mount_point_slash_);
@@ -4569,9 +4552,9 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
 
     /* Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin
     with 4 zero bytes). */
-    Length = wcslen(data->disk_.mount_point_slash_) + 14;
+    length = wcslen(data->disk_.mount_point_slash_) + 14;
 
-    p1 = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+    p1 = (wchar_t*)malloc(sizeof(wchar_t) * length);
 
     if (p1 == nullptr) {
         free(data->disk_.mount_point_slash_);
@@ -4580,15 +4563,15 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
         return;
     }
 
-    swprintf_s(p1, Length, L"%s\\hiberfil.sys", data->disk_.mount_point_slash_);
+    swprintf_s(p1, length, L"%s\\hiberfil.sys", data->disk_.mount_point_slash_);
 
-    Result = _wfopen_s(&Fin, p1, L"rb");
+    result = _wfopen_s(&fin, p1, L"rb");
 
-    if (Result == 0 && Fin != nullptr) {
+    if (result == 0 && fin != nullptr) {
         w = 0;
 
-        if (fread(&w, 4, 1, Fin) == 1 && w != 0) {
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
+        if (fread(&w, 4, 1, fin) == 1 && w != 0) {
+            gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
 
             free(data->disk_.mount_point_);
             free(data->disk_.mount_point_slash_);
@@ -4601,18 +4584,19 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     free(p1);
 
     /* Show debug message: "Opening volume '%s' at mountpoint '%s'" */
-    jkGui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[29], data->disk_.volume_name_,
-                      data->disk_.mount_point_);
+    gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[29].c_str(), data->disk_.volume_name_,
+                    data->disk_.mount_point_);
 
     /* Open the VolumeHandle. If error then leave. */
     data->disk_.volume_handle_ = CreateFileW(data->disk_.volume_name_,GENERIC_READ,
                                              FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,OPEN_EXISTING, 0, nullptr);
 
     if (data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
-        system_error_str(GetLastError(), s1,BUFSIZ);
+        wchar_t last_error[BUFSIZ];
+        system_error_str(GetLastError(), last_error,BUFSIZ);
 
-        jkGui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': %s",
-                          data->disk_.volume_name_, data->disk_.mount_point_, s1);
+        gui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': reason %s",
+                        data->disk_.volume_name_, data->disk_.mount_point_, last_error);
 
         free(data->disk_.mount_point_);
         free(data->disk_.mount_point_slash_);
@@ -4630,24 +4614,24 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     requires a drive letter so cannot be used on unmounted volumes or
     volumes that are mounted on a directory, and FSCTL_GET_NTFS_VOLUME_DATA
     only works for NTFS volumes. */
-    BitmapParam.StartingLcn.QuadPart = 0;
+    bitmap_param.StartingLcn.QuadPart = 0;
 
     //	long koko = FSCTL_GET_VOLUME_BITMAP;
 
-    ErrorCode = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
-                                &BitmapParam, sizeof BitmapParam, &BitmapData, sizeof BitmapData, &w, nullptr);
+    error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
+                                 &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
 
-    if (ErrorCode != 0) {
-        ErrorCode = NO_ERROR;
+    if (error_code != 0) {
+        error_code = NO_ERROR;
     }
     else {
-        ErrorCode = GetLastError();
+        error_code = GetLastError();
     }
 
-    if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) {
+    if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
         /* Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'" */
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[32], data->disk_.volume_name_,
-                          data->disk_.mount_point_);
+        gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[32].c_str(), data->disk_.volume_name_,
+                        data->disk_.mount_point_);
 
         CloseHandle(data->disk_.volume_handle_);
 
@@ -4657,80 +4641,83 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
         return;
     }
 
-    data->total_clusters_ = BitmapData.StartingLcn + BitmapData.BitmapSize;
+    data->total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
     /* Determine the number of bytes per cluster.
     Again I have to do this in a roundabout manner. As far as I know there is
     no system call that returns the number of bytes per cluster, so first I have
     to get the total size of the disk and then divide by the number of clusters.
     */
-    ErrorCode = GetDiskFreeSpaceExW(path, (PULARGE_INTEGER)&FreeBytesToCaller,
-                                    (PULARGE_INTEGER)&TotalBytes, (PULARGE_INTEGER)&FreeBytes);
+    error_code = GetDiskFreeSpaceExW(path, (PULARGE_INTEGER)&free_bytes_to_caller,
+                                     (PULARGE_INTEGER)&total_bytes, (PULARGE_INTEGER)&free_bytes);
 
-    if (ErrorCode != 0) data->bytes_per_cluster_ = TotalBytes / data->total_clusters_;
+    if (error_code != 0) data->bytes_per_cluster_ = total_bytes / data->total_clusters_;
 
     /* Setup the list of clusters that cannot be used. The Master File
     Table cannot be moved and cannot be used by files. All this is
     only necessary for NTFS volumes. */
-    ErrorCode = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_NTFS_VOLUME_DATA,
-                                nullptr, 0, &NtfsData, sizeof NtfsData, &w, nullptr);
+    error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_NTFS_VOLUME_DATA,
+                                 nullptr, 0, &ntfs_data, sizeof ntfs_data, &w, nullptr);
 
-    if (ErrorCode != 0) {
+    if (error_code != 0) {
         /* Note: NtfsData.TotalClusters.QuadPart should be exactly the same
         as the Data->TotalClusters that was determined in the previous block. */
 
-        data->bytes_per_cluster_ = NtfsData.BytesPerCluster;
+        data->bytes_per_cluster_ = ntfs_data.BytesPerCluster;
 
-        data->mft_excludes_[0].start_ = NtfsData.MftStartLcn.QuadPart;
-        data->mft_excludes_[0].end_ = NtfsData.MftStartLcn.QuadPart +
-                NtfsData.MftValidDataLength.QuadPart / NtfsData.BytesPerCluster;
-        data->mft_excludes_[1].start_ = NtfsData.MftZoneStart.QuadPart;
-        data->mft_excludes_[1].end_ = NtfsData.MftZoneEnd.QuadPart;
-        data->mft_excludes_[2].start_ = NtfsData.Mft2StartLcn.QuadPart;
-        data->mft_excludes_[2].end_ = NtfsData.Mft2StartLcn.QuadPart +
-                NtfsData.MftValidDataLength.QuadPart / NtfsData.BytesPerCluster;
+        data->mft_excludes_[0].start_ = ntfs_data.MftStartLcn.QuadPart;
+        data->mft_excludes_[0].end_ = ntfs_data.MftStartLcn.QuadPart +
+                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
+        data->mft_excludes_[1].start_ = ntfs_data.MftZoneStart.QuadPart;
+        data->mft_excludes_[1].end_ = ntfs_data.MftZoneEnd.QuadPart;
+        data->mft_excludes_[2].start_ = ntfs_data.Mft2StartLcn.QuadPart;
+        data->mft_excludes_[2].end_ = ntfs_data.Mft2StartLcn.QuadPart +
+                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
 
         /* Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d" */
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[33],
-                          NtfsData.MftStartLcn.QuadPart, NtfsData.MftZoneStart.QuadPart,
-                          NtfsData.MftZoneEnd.QuadPart, NtfsData.Mft2StartLcn.QuadPart,
-                          NtfsData.MftValidDataLength.QuadPart / NtfsData.BytesPerCluster);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[33].c_str(),
+                        ntfs_data.MftStartLcn.QuadPart, ntfs_data.MftZoneStart.QuadPart,
+                        ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
+                        ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster);
 
         /* Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d" */
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 0, data->mft_excludes_[0].start_,
-                          0,
-                          data->mft_excludes_[0].end_);
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 1, data->mft_excludes_[1].start_,
-                          1,
-                          data->mft_excludes_[1].end_);
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 2, data->mft_excludes_[2].start_,
-                          2,
-                          data->mft_excludes_[2].end_);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34].c_str(), 0,
+                        data->mft_excludes_[0].start_,
+                        0,
+                        data->mft_excludes_[0].end_);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34].c_str(), 1,
+                        data->mft_excludes_[1].start_,
+                        1,
+                        data->mft_excludes_[1].end_);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34].c_str(), 2,
+                        data->mft_excludes_[2].start_,
+                        2,
+                        data->mft_excludes_[2].end_);
     }
 
     /* Fixup the input mask.
     - If the length is 2 or 3 characters then rewrite into "c:\*".
     - If it does not contain a wildcard then append '*'.
     */
-    Length = wcslen(path) + 3;
+    length = wcslen(path) + 3;
 
-    data->include_mask_ = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+    data->include_mask_ = (wchar_t*)malloc(sizeof(wchar_t) * length);
 
     if (data->include_mask_ == nullptr) return;
 
-    wcscpy_s(data->include_mask_, Length, path);
+    wcscpy_s(data->include_mask_, length, path);
 
     if (wcslen(path) == 2 || wcslen(path) == 3) {
-        swprintf_s(data->include_mask_, Length, L"%c:\\*", lower_case(path[0]));
+        swprintf_s(data->include_mask_, length, L"%c:\\*", lower_case(path[0]));
     }
     else if (wcschr(path, L'*') == nullptr) {
-        swprintf_s(data->include_mask_, Length, L"%s*", path);
+        swprintf_s(data->include_mask_, length, L"%s*", path);
     }
 
-    jkGui->show_debug(DebugLevel::Fatal, nullptr, L"Input mask: %s", data->include_mask_);
+    gui->show_debug(DebugLevel::Fatal, nullptr, L"Input mask: %s", data->include_mask_);
 
     /* Defragment and optimize. */
-    jkGui->ShowDiskmap(data);
+    gui->ShowDiskmap(data);
 
     if (*data->running_ == RunningState::RUNNING) analyze_volume(data);
 
@@ -4797,18 +4784,16 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
 /* Subfunction for DefragAllDisks(). It will ignore removable disks, and
 will iterate for disks that are mounted on a subdirectory of another
 disk (instead of being mounted on a drive). */
-void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, OptimizeMode opt_mode) {
-    WCHAR VolumeNameSlash[BUFSIZ];
-    WCHAR VolumeName[BUFSIZ];
-
-    int DriveType;
+void DefragLib::defrag_mountpoints(DefragDataStruct* data, const wchar_t* mount_point, const OptimizeMode opt_mode) {
+    wchar_t VolumeNameSlash[BUFSIZ];
+    wchar_t VolumeName[BUFSIZ];
 
     DWORD FileSystemFlags;
 
     HANDLE FindMountpointHandle;
 
-    WCHAR RootPath[MAX_PATH + BUFSIZ];
-    WCHAR* FullRootPath;
+    wchar_t RootPath[MAX_PATH + BUFSIZ];
+    wchar_t* FullRootPath;
 
     HANDLE VolumeHandle;
 
@@ -4818,44 +4803,43 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
 
     uint32_t ErrorCode;
 
-    WCHAR s1[BUFSIZ];
-    WCHAR* p1;
+    wchar_t s1[BUFSIZ];
+    wchar_t* p1;
 
     DWORD w;
 
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
-    if (*Data->running_ != RunningState::RUNNING) return;
+    if (*data->running_ != RunningState::RUNNING) return;
 
     /* Clear the screen and show message "Analyzing volume '%s'" */
-    jkGui->clear_screen(Data->debug_msg_[37], MountPoint);
+    gui->clear_screen(data->debug_msg_[37].c_str(), mount_point);
 
     /* Return if this is not a fixed disk. */
-    DriveType = GetDriveTypeW(MountPoint);
 
-    if (DriveType != DRIVE_FIXED) {
-        if (DriveType == DRIVE_UNKNOWN) {
-            jkGui->clear_screen(L"Ignoring volume '%s' because the drive type cannot be determined.", MountPoint);
+    if (const int drive_type = GetDriveTypeW(mount_point); drive_type != DRIVE_FIXED) {
+        if (drive_type == DRIVE_UNKNOWN) {
+            gui->clear_screen(L"Ignoring volume '%s' because the drive type cannot be determined.", mount_point);
         }
 
-        if (DriveType == DRIVE_NO_ROOT_DIR) {
-            jkGui->clear_screen(L"Ignoring volume '%s' because there is no volume mounted.", MountPoint);
+        if (drive_type == DRIVE_NO_ROOT_DIR) {
+            gui->clear_screen(L"Ignoring volume '%s' because there is no volume mounted.", mount_point);
         }
 
-        if (DriveType == DRIVE_REMOVABLE) {
-            jkGui->clear_screen(L"Ignoring volume '%s' because it has removable media.", MountPoint);
+        if (drive_type == DRIVE_REMOVABLE) {
+            gui->clear_screen(L"Ignoring volume '%s' because it has removable media.", mount_point);
         }
 
-        if (DriveType == DRIVE_REMOTE) {
-            jkGui->clear_screen(L"Ignoring volume '%s' because it is a remote (network) drive.", MountPoint);
+        if (drive_type == DRIVE_REMOTE) {
+            gui->clear_screen(L"Ignoring volume '%s' because it is a remote (network) drive.", mount_point);
         }
 
-        if (DriveType == DRIVE_CDROM) {
-            jkGui->clear_screen(L"Ignoring volume '%s' because it is a CD-ROM drive.", MountPoint);
+        if (drive_type == DRIVE_CDROM) {
+            gui->clear_screen(L"Ignoring volume '%s' because it is a CD-ROM drive.", mount_point);
         }
 
-        if (DriveType == DRIVE_RAMDISK) {
-            jkGui->clear_screen(L"Ignoring volume '%s' because it is a RAM disk.", MountPoint);
+        if (drive_type == DRIVE_RAMDISK) {
+            gui->clear_screen(L"Ignoring volume '%s' because it is a RAM disk.", mount_point);
         }
 
         return;
@@ -4863,20 +4847,20 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
 
     /* Determine the name of the volume, something like
     "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\". */
-    Result = GetVolumeNameForVolumeMountPointW(MountPoint, VolumeNameSlash,BUFSIZ);
+    Result = GetVolumeNameForVolumeMountPointW(mount_point, VolumeNameSlash,BUFSIZ);
 
     if (Result == 0) {
         ErrorCode = GetLastError();
 
         if (ErrorCode == 3) {
             /* "Ignoring volume '%s' because it is not a harddisk." */
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, Data->debug_msg_[57], MountPoint);
+            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[57].c_str(), mount_point);
         }
         else {
             /* "Cannot find volume name for mountpoint: %s" */
             system_error_str(ErrorCode, s1,BUFSIZ);
 
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, Data->debug_msg_[40], MountPoint, s1);
+            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(), mount_point, s1);
         }
 
         return;
@@ -4887,7 +4871,7 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
 
     if ((FileSystemFlags & FILE_READ_ONLY_VOLUME) != 0) {
         /* Clear the screen and show message "Ignoring disk '%s' because it is read-only." */
-        jkGui->clear_screen(Data->debug_msg_[36], MountPoint);
+        gui->clear_screen(data->debug_msg_[36].c_str(), mount_point);
 
         return;
     }
@@ -4910,15 +4894,15 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
     if (VolumeHandle == INVALID_HANDLE_VALUE) {
         system_error_str(GetLastError(), s1,BUFSIZ);
 
-        jkGui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': %s",
-                          VolumeName, MountPoint, s1);
+        gui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': %s",
+                          VolumeName, mount_point, s1);
 
         return;
     }
 
     if (DeviceIoControl(VolumeHandle,FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &w, nullptr) == 0) {
         /* Show debug message: "Volume '%s' at mountpoint '%s' is not mounted." */
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, Data->debug_msg_[31], VolumeName, MountPoint);
+        gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[31].c_str(), VolumeName, mount_point);
 
         CloseHandle(VolumeHandle);
 
@@ -4928,14 +4912,14 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
     CloseHandle(VolumeHandle);
 
     /* Defrag the disk. */
-    Length = wcslen(MountPoint) + 2;
+    Length = wcslen(mount_point) + 2;
 
-    p1 = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+    p1 = (wchar_t*)malloc(sizeof(wchar_t) * Length);
 
     if (p1 != nullptr) {
-        swprintf_s(p1, Length, L"%s*", MountPoint);
+        swprintf_s(p1, Length, L"%s*", mount_point);
 
-        defrag_one_path(Data, p1, opt_mode);
+        defrag_one_path(data, p1, opt_mode);
 
         free(p1);
     }
@@ -4953,13 +4937,13 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
     if (FindMountpointHandle == INVALID_HANDLE_VALUE) return;
 
     do {
-        Length = wcslen(MountPoint) + wcslen(RootPath) + 1;
-        FullRootPath = (WCHAR*)malloc(sizeof(WCHAR) * Length);
+        Length = wcslen(mount_point) + wcslen(RootPath) + 1;
+        FullRootPath = (wchar_t*)malloc(sizeof(wchar_t) * Length);
 
         if (FullRootPath != nullptr) {
-            swprintf_s(FullRootPath, Length, L"%s%s", MountPoint, RootPath);
+            swprintf_s(FullRootPath, Length, L"%s%s", mount_point, RootPath);
 
-            defrag_mountpoints(Data, FullRootPath, opt_mode);
+            defrag_mountpoints(data, FullRootPath, opt_mode);
 
             free(FullRootPath);
         }
@@ -4971,14 +4955,14 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
 
 /* Run the defragger/optimizer. See the .h file for a full explanation. */
 void DefragLib::run_jk_defrag(
-    WCHAR* path,
+    wchar_t* path,
     OptimizeMode optimize_mode,
     int speed,
     double free_space,
-    WCHAR** excludes,
-    WCHAR** space_hogs,
+    const Wstrings& excludes,
+    const Wstrings& space_hogs,
     RunningState* run_state,
-    WCHAR** debug_msg) {
+    std::optional<Wstrings> debug_msg) {
     DefragDataStruct data{};
 
     //	int DefaultRedrawScreen;
@@ -4992,7 +4976,7 @@ void DefragLib::run_jk_defrag(
     DWORD KeyDisposition;
     DWORD Length;
 
-    WCHAR s1[BUFSIZ];
+    wchar_t s1[BUFSIZ];
 
     int i;
 
@@ -5022,82 +5006,89 @@ void DefragLib::run_jk_defrag(
         *Data.RedrawScreen = 0;
     */
 
-    if (debug_msg == nullptr || debug_msg[0] == nullptr) {
-        data.debug_msg_ = DefaultDebugMsg;
+    if (!debug_msg.has_value() || debug_msg.value().empty()) {
+        data.debug_msg_.clear();
+        for (auto& def : default_debug_msg) {
+            data.debug_msg_.push_back(def);
+        }
     }
     else {
-        data.debug_msg_ = debug_msg;
+        data.debug_msg_ = debug_msg.value();
     }
 
-    /* Make a copy of the SpaceHogs array. */
-    data.space_hogs_ = nullptr;
+    // Make a copy of the SpaceHogs array
+    data.space_hogs_.clear();
     data.use_default_space_hogs_ = TRUE;
 
-    if (space_hogs != nullptr) {
-        for (i = 0; space_hogs[i] != nullptr; i++) {
-            if (_wcsicmp(space_hogs[i], L"DisableDefaults") == 0) {
-                data.use_default_space_hogs_ = FALSE;
-            }
-            else {
-                data.space_hogs_ = add_array_string(data.space_hogs_, space_hogs[i]);
-            }
+    for (const auto& sh : space_hogs) {
+        if (_wcsicmp(sh.c_str(), L"DisableDefaults") == 0) {
+            data.use_default_space_hogs_ = FALSE;
+        }
+        else {
+            data.space_hogs_.push_back(space_hogs[i]);
         }
     }
 
     if (data.use_default_space_hogs_ == TRUE) {
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\$RECYCLE.BIN\\*"); /* Vista */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\RECYCLED\\*"); /* FAT on 2K/XP */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\RECYCLER\\*"); /* NTFS on 2K/XP */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\$*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Downloaded Installations\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Ehome\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Fonts\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Help\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\I386\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\IME\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Installer\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\ServicePackFiles\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\SoftwareDistribution\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Speech\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\Symbols\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\ie7updates\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINDOWS\\system32\\dllcache\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\$*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\Downloaded Installations\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\I386\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\Installer\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\ServicePackFiles\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\SoftwareDistribution\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\WINNT\\ie7updates\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\*\\Installshield Installation Information\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\I386\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\System Volume Information\\*");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"?:\\windows.old\\*");
+        data.space_hogs_.emplace_back(L"?:\\$RECYCLE.BIN\\*"); /* Vista */
+        data.space_hogs_.emplace_back(L"?:\\RECYCLED\\*"); /* FAT on 2K/XP */
+        data.space_hogs_.emplace_back(L"?:\\RECYCLER\\*"); /* NTFS on 2K/XP */
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\$*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Downloaded Installations\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Ehome\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Fonts\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Help\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\I386\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\IME\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Installer\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\ServicePackFiles\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\SoftwareDistribution\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Speech\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Symbols\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\ie7updates\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\system32\\dllcache\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\$*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\Downloaded Installations\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\I386\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\Installer\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\ServicePackFiles\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\SoftwareDistribution\\*");
+        data.space_hogs_.emplace_back(L"?:\\WINNT\\ie7updates\\*");
+        data.space_hogs_.emplace_back(L"?:\\*\\Installshield Installation Information\\*");
+        data.space_hogs_.emplace_back(L"?:\\I386\\*");
+        data.space_hogs_.emplace_back(L"?:\\System Volume Information\\*");
+        data.space_hogs_.emplace_back(L"?:\\windows.old\\*");
 
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.7z");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.arj");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.avi");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.bak");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.bup"); /* DVD */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.bz2");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.cab");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.chm"); /* Help files */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.dvr-ms");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.gz");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.ifo"); /* DVD */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.log");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.lzh");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.mp3");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.msi");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.old");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.pdf");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.rar");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.rpm");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.tar");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.wmv");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.vob"); /* DVD */
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.z");
-        data.space_hogs_ = add_array_string(data.space_hogs_, L"*.zip");
+        data.space_hogs_.emplace_back(L"*.7z");
+        data.space_hogs_.emplace_back(L"*.arj");
+        data.space_hogs_.emplace_back(L"*.bz2");
+        data.space_hogs_.emplace_back(L"*.gz");
+        data.space_hogs_.emplace_back(L"*.z");
+        data.space_hogs_.emplace_back(L"*.zip");
+
+        data.space_hogs_.emplace_back(L"*.bak");
+        data.space_hogs_.emplace_back(L"*.bup"); /* DVD */
+        data.space_hogs_.emplace_back(L"*.cab");
+        data.space_hogs_.emplace_back(L"*.chm"); /* Help files */
+        data.space_hogs_.emplace_back(L"*.dvr-ms");
+        data.space_hogs_.emplace_back(L"*.ifo"); /* DVD */
+        data.space_hogs_.emplace_back(L"*.log");
+        data.space_hogs_.emplace_back(L"*.lzh");
+        data.space_hogs_.emplace_back(L"*.msi");
+        data.space_hogs_.emplace_back(L"*.old");
+        data.space_hogs_.emplace_back(L"*.pdf");
+        data.space_hogs_.emplace_back(L"*.rar");
+        data.space_hogs_.emplace_back(L"*.rpm");
+        data.space_hogs_.emplace_back(L"*.tar");
+
+        data.space_hogs_.emplace_back(L"*.avi");
+        data.space_hogs_.emplace_back(L"*.mpg"); // MPEG2
+        data.space_hogs_.emplace_back(L"*.mp3"); // MPEG3 sound
+        data.space_hogs_.emplace_back(L"*.mp4"); // MPEG4 video
+        data.space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis sound
+        data.space_hogs_.emplace_back(L"*.wmv"); // Windows media video
+        data.space_hogs_.emplace_back(L"*.vob"); // DVD 
+        data.space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis Video 
     }
 
     /* If the NtfsDisableLastAccessUpdate setting in the registry is 1, then disable
@@ -5140,11 +5131,11 @@ void DefragLib::run_jk_defrag(
         defrag_one_path(&data, path, optimize_mode);
     }
     else {
-        WCHAR* drives;
+        wchar_t* drives;
         uint32_t drives_size;
         drives_size = GetLogicalDriveStringsW(0, nullptr);
 
-        drives = (WCHAR*)malloc(sizeof(WCHAR) * (drives_size + 1));
+        drives = (wchar_t*)malloc(sizeof(wchar_t) * (drives_size + 1));
 
         if (drives != nullptr) {
             drives_size = GetLogicalDriveStringsW(drives_size, drives);
@@ -5153,10 +5144,10 @@ void DefragLib::run_jk_defrag(
                 /* "Could not get list of volumes: %s" */
                 system_error_str(GetLastError(), s1,BUFSIZ);
 
-                gui->show_debug(DebugLevel::Warning, nullptr, data.debug_msg_[39], s1);
+                gui->show_debug(DebugLevel::Warning, nullptr, data.debug_msg_[39].c_str(), s1);
             }
             else {
-                WCHAR* drive;
+                wchar_t* drive;
                 drive = drives;
 
                 while (*drive != '\0') {
@@ -5169,16 +5160,10 @@ void DefragLib::run_jk_defrag(
             free(drives);
         }
 
-        gui->clear_screen(data.debug_msg_[38]);
+        gui->clear_screen(data.debug_msg_[38].c_str());
     }
 
     /* Cleanup. */
-    if (data.space_hogs_ != nullptr) {
-        for (i = 0; data.space_hogs_[i] != nullptr; i++) free(data.space_hogs_[i]);
-
-        free(data.space_hogs_);
-    }
-
     *data.running_ = RunningState::STOPPED;
 }
 
