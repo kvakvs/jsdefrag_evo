@@ -450,7 +450,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     find_handle = FindFirstFileW(mask, &find_file_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
-        free(root_path);
+        delete root_path;
         return;
     }
 
@@ -475,7 +475,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         if (item != nullptr) {
             while (item->fragments_ != nullptr) {
                 fragment = item->fragments_->next_;
-                free(item->fragments_);
+                delete item->fragments_;
                 item->fragments_ = fragment;
             }
 
@@ -551,12 +551,12 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 
             length = wcslen(root_path) + wcslen(find_file_data.cFileName) + 4;
 
-            temp_path = (wchar_t *) malloc(sizeof(wchar_t) * length);
+            temp_path = new wchar_t[length];
 
             if (temp_path != nullptr) {
                 swprintf_s(temp_path, length, L"%s\\%s\\*", root_path, find_file_data.cFileName);
                 scan_dir(data, temp_path, item);
-                free(temp_path);
+                delete temp_path;
             }
         }
 
@@ -611,13 +611,13 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     FindClose(find_handle);
 
     /* Cleanup. */
-    free(root_path);
+    delete root_path;
 
     if (item != nullptr) {
         while (item->fragments_ != nullptr) {
             fragment = item->fragments_->next_;
 
-            free(item->fragments_);
+            delete item->fragments_;
 
             item->fragments_ = fragment;
         }

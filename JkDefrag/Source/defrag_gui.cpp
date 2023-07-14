@@ -118,7 +118,7 @@ void DefragGui::set_display_data(HDC dc) {
     /*
         if (m_clusterSquares != nullptr)
         {
-            delete[] m_clusterSquares;
+            delete m_clusterSquares;
         }
     */
 

@@ -295,13 +295,9 @@ struct ATTRIBUTE_DEFINITION {
 
 struct StreamStruct {
     StreamStruct* next_;
-
-    wchar_t* stream_name_; /* "stream name" */
-
-    ATTRIBUTE_TYPE stream_type_; /* "stream type" */
-
+    std::wstring stream_name_;
+    ATTRIBUTE_TYPE stream_type_;
     FragmentListStruct* fragments_; /* The fragments of the stream. */
-
     uint64_t clusters_; /* Total number of clusters. */
     uint64_t bytes_; /* Total number of bytes. */
 };
@@ -310,10 +306,11 @@ struct InodeDataStruct {
     uint64_t inode_; /* The Inode number. */
     uint64_t parent_inode_; /* The Inode number of the parent directory. */
 
-    bool is_directory_; /* true: it's a directory. */
+    bool is_directory_;
 
-    wchar_t* long_filename_; /* Long filename. */
-    wchar_t* short_filename_; /* Short filename (8.3 DOS). */
+    wchar_t* long_filename_;
+    // Short filename (8.3 DOS)
+    wchar_t* short_filename_;
 
     uint64_t bytes_; /* Total number of bytes. */
     uint64_t creation_time_; /* 1 second = 10000000 */
@@ -354,7 +351,7 @@ public:
     // Get instance of the class
     static ScanNTFS* get_instance();
 
-    BOOL analyze_ntfs_volume(DefragDataStruct* data);
+    bool analyze_ntfs_volume(DefragDataStruct* data);
 
 private:
     static const wchar_t * stream_type_names(const ATTRIBUTE_TYPE stream_type);
@@ -375,28 +372,28 @@ private:
             const uint64_t starting_vcn,
             const uint64_t bytes);
 
-    void cleanup_streams(InodeDataStruct* InodeData, BOOL CleanupFragments);
+    static void cleanup_streams(InodeDataStruct* inode_data, BOOL cleanup_fragments);
 
-    wchar_t* construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, StreamStruct* stream);
+    std::wstring construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, StreamStruct* stream);
 
-    BOOL process_attributes(
-        DefragDataStruct* Data,
-        NtfsDiskInfoStruct* DiskInfo,
-        InodeDataStruct* InodeData,
-        BYTE* Buffer,
-        uint64_t BufLength,
-        USHORT Instance,
-        int Depth);
+    bool process_attributes(
+        DefragDataStruct* data,
+        NtfsDiskInfoStruct* disk_info,
+        InodeDataStruct* inode_data,
+        BYTE* buffer,
+        uint64_t buf_length,
+        USHORT instance,
+        int depth);
 
     void process_attribute_list(
-        DefragDataStruct* Data,
-        NtfsDiskInfoStruct* DiskInfo,
-        InodeDataStruct* InodeData,
-        BYTE* Buffer,
-        uint64_t BufLength,
-        int Depth);
+        DefragDataStruct* data,
+        NtfsDiskInfoStruct* disk_info,
+        InodeDataStruct* inode_data,
+        BYTE* buffer,
+        uint64_t buf_length,
+        int depth);
 
-    BOOL interpret_mft_record(
+    bool interpret_mft_record(
         DefragDataStruct* data,
         NtfsDiskInfoStruct* disk_info,
         ItemStruct** inode_array,

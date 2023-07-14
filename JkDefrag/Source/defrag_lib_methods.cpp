@@ -1171,11 +1171,10 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
 
     length = wcslen(data->disk_.mount_point_) + 2;
-
-    data->disk_.mount_point_slash_ = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    data->disk_.mount_point_slash_ = new wchar_t[length];
 
     if (data->disk_.mount_point_slash_ == nullptr) {
-        free(data->disk_.mount_point_);
+        delete data->disk_.mount_point_;
         return;
     }
 
@@ -1195,8 +1194,8 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
             gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(), data->disk_.mount_point_slash_,
                             s1);
 
-            free(data->disk_.mount_point_);
-            free(data->disk_.mount_point_slash_);
+            delete data->disk_.mount_point_;
+            delete data->disk_.mount_point_slash_;
 
             return;
         }
@@ -1218,11 +1217,11 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     with 4 zero bytes). */
     length = wcslen(data->disk_.mount_point_slash_) + 14;
 
-    p1 = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    p1 = new wchar_t[length];
 
     if (p1 == nullptr) {
-        free(data->disk_.mount_point_slash_);
-        free(data->disk_.mount_point_);
+        delete data->disk_.mount_point_slash_;
+        delete data->disk_.mount_point_;
 
         return;
     }
@@ -1237,15 +1236,15 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
             gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
 
-            free(data->disk_.mount_point_);
-            free(data->disk_.mount_point_slash_);
-            free(p1);
+            delete data->disk_.mount_point_;
+            delete data->disk_.mount_point_slash_;
+            delete p1;
 
             return;
         }
     }
 
-    free(p1);
+    delete p1;
 
     /* Show debug message: "Opening volume '%s' at mountpoint '%s'" */
     gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[29].c_str(), data->disk_.volume_name_,
@@ -1262,8 +1261,8 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         gui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': reason %s",
                         data->disk_.volume_name_, data->disk_.mount_point_, last_error);
 
-        free(data->disk_.mount_point_);
-        free(data->disk_.mount_point_slash_);
+        delete data->disk_.mount_point_;
+        delete data->disk_.mount_point_slash_;
 
         return;
     }
@@ -1298,8 +1297,8 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
         CloseHandle(data->disk_.volume_handle_);
 
-        free(data->disk_.mount_point_);
-        free(data->disk_.mount_point_slash_);
+        delete data->disk_.mount_point_;
+        delete data->disk_.mount_point_slash_;
 
         return;
     }
@@ -1364,7 +1363,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     */
     length = wcslen(path) + 3;
 
-    data->include_mask_ = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    data->include_mask_ = new wchar_t[length];
 
     if (data->include_mask_ == nullptr) return;
 
@@ -1441,8 +1440,8 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     /* Cleanup. */
     delete_item_tree(data->item_tree_);
 
-    if (data->disk_.mount_point_ != nullptr) free(data->disk_.mount_point_);
-    if (data->disk_.mount_point_slash_ != nullptr) free(data->disk_.mount_point_slash_);
+    delete data->disk_.mount_point_;
+    delete data->disk_.mount_point_slash_;
 }
 
 /* Subfunction for DefragAllDisks(). It will ignore removable disks, and
@@ -1567,14 +1566,12 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
     /* Defrag the disk. */
     length = wcslen(mount_point) + 2;
 
-    p1 = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    p1 = new wchar_t[length];
 
     if (p1 != nullptr) {
         swprintf_s(p1, length, L"%s*", mount_point);
-
         defrag_one_path(data, p1, opt_mode);
-
-        free(p1);
+        delete p1;
     }
 
     /* According to Microsoft I should check here if the disk has support for

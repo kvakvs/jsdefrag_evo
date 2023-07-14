@@ -249,10 +249,7 @@ void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path)
 }
 
 /*
-
 Return a string with the full path of an item, constructed from the short names.
-Return nullptr if error. The caller must free() the new string.
-
 */
 std::wstring DefragLib::get_short_path(const DefragDataStruct *data, const ItemStruct *item) {
     /* Sanity check. */
@@ -284,7 +281,6 @@ void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) 
 
 /*
 Return a string with the full path of an item, constructed from the long names.
-Return nullptr if error. The caller must free() the new string.
 */
 std::wstring DefragLib::get_long_path(const DefragDataStruct *data, const ItemStruct *item) {
     // Sanity check
@@ -362,31 +358,28 @@ HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruc
     HANDLE file_handle;
     wchar_t error_string[BUFSIZ];
     const size_t length = wcslen(item->get_long_path()) + 5;
-    auto path = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    auto path = std::make_unique<wchar_t[]>(length);
 
-    swprintf_s(path, length, L"\\\\?\\%s", item->get_long_path());
+    swprintf_s(path.get(), length, L"\\\\?\\%s", item->get_long_path());
 
     if (item->is_dir_) {
-        file_handle = CreateFileW(path, GENERIC_READ,
+        file_handle = CreateFileW(path.get(), GENERIC_READ,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     } else {
-        file_handle = CreateFileW(path, FILE_READ_ATTRIBUTES,
+        file_handle = CreateFileW(path.get(), FILE_READ_ATTRIBUTES,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr);
     }
-
-    free(path);
 
     if (file_handle != INVALID_HANDLE_VALUE) return file_handle;
 
     /* Show error message: "Could not open '%s': %s" */
     system_error_str(GetLastError(), error_string, BUFSIZ);
 
-    DefragGui *jkGui = DefragGui::get_instance();
-
-    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15].c_str(), item->get_long_path(),
-                      error_string);
+    DefragGui *gui = DefragGui::get_instance();
+    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15].c_str(), item->get_long_path(),
+                    error_string);
 
     return nullptr;
 }
@@ -423,9 +416,7 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
 
     while (item->fragments_ != nullptr) {
         last_fragment = item->fragments_->next_;
-
-        free(item->fragments_);
-
+        delete item->fragments_;
         item->fragments_ = last_fragment;
     }
 
@@ -518,20 +509,18 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
 
             /* Add the fragment to the Fragments. */
 
-            if (const auto new_fragment = (FragmentListStruct *) malloc(sizeof(FragmentListStruct)); new_fragment !=
-                                                                                                     nullptr) {
-                new_fragment->lcn_ = extent_data.extents_[i].lcn_;
-                new_fragment->next_vcn_ = extent_data.extents_[i].next_vcn_;
-                new_fragment->next_ = nullptr;
+            auto new_fragment = new FragmentListStruct();
+            new_fragment->lcn_ = extent_data.extents_[i].lcn_;
+            new_fragment->next_vcn_ = extent_data.extents_[i].next_vcn_;
+            new_fragment->next_ = nullptr;
 
-                if (item->fragments_ == nullptr) {
-                    item->fragments_ = new_fragment;
-                } else {
-                    if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
-                }
-
-                last_fragment = new_fragment;
+            if (item->fragments_ == nullptr) {
+                item->fragments_ = new_fragment;
+            } else {
+                if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
             }
+
+            last_fragment = new_fragment;
 
             /* The Vcn of the next fragment is the NextVcn field in this record. */
             vcn = extent_data.extents_[i].next_vcn_;
@@ -1269,7 +1258,7 @@ void DefragLib::run_jk_defrag(
         uint32_t drives_size;
         drives_size = GetLogicalDriveStringsW(0, nullptr);
 
-        drives = (wchar_t *) malloc(sizeof(wchar_t) * (drives_size + 1));
+        drives = new wchar_t[drives_size + 1];
 
         if (drives != nullptr) {
             drives_size = GetLogicalDriveStringsW(drives_size, drives);
@@ -1290,7 +1279,7 @@ void DefragLib::run_jk_defrag(
                 }
             }
 
-            free(drives);
+            delete drives;
         }
 
         gui->clear_screen(data.debug_msg_[38].c_str());

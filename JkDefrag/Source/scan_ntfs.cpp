@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "std_afx.h"
 #include "defrag_data_struct.h"
 
@@ -15,7 +17,7 @@ ScanNTFS::~ScanNTFS() = default;
 
 ScanNTFS *ScanNTFS::get_instance() {
     if (instance_ == nullptr) {
-        instance_.reset(new ScanNTFS());
+        instance_ = std::make_unique<ScanNTFS>();
     }
 
     return instance_.get();
@@ -94,7 +96,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruc
                 DebugLevel::Progress, nullptr,
                 L"This is not a valid MFT record, it does not begin with FILE (maybe trying to read past the end?).");
 
-        defrag_lib_->show_hex(data, buffer, buf_length);
+        DefragLib::show_hex(data, buffer, buf_length);
 
         return FALSE;
     }
@@ -136,7 +138,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruc
 
 Read the data that is specified in a RunData list from disk into memory, skipping the first Offset bytes.
 Return a malloc'ed buffer with the data, or nullptr if error.
-Note: The caller must free() the buffer.
+Note: The caller owns the returned buffer.
 
 */
 BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info,
@@ -182,13 +184,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
 
     /* Allocate the data buffer. Clear the buffer with zero's in case of sparse
     content. */
-    buffer = (BYTE *) malloc((size_t) wanted_length);
-
-    if (buffer == nullptr) {
-        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-        return nullptr;
-    }
+    buffer = new BYTE[wanted_length];
 
     memset(buffer, 0, (size_t) wanted_length);
 
@@ -291,12 +287,11 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
         if (const errno_t result = ReadFile(data->disk_.volume_handle_, &buffer[extent_vcn - offset],
                                             (uint32_t) extent_length, &bytes_read, &g_overlapped); result == 0) {
             wchar_t s1[BUFSIZ];
-            defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
+            DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
 
             gui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading disk: %s", s1);
 
-            free(buffer);
-
+            delete buffer;
             return nullptr;
         }
     }
@@ -332,10 +327,10 @@ BOOL ScanNTFS::translate_rundata_to_fragmentlist(const DefragDataStruct *data, I
     /* Find the stream in the list of streams. If not found then create a new stream. */
     for (stream = inode_data->streams_; stream != nullptr; stream = stream->next_) {
         if (stream->stream_type_ != stream_type) continue;
-        if (stream_name == nullptr && stream->stream_name_ == nullptr) break;
-        if (stream_name != nullptr && stream->stream_name_ != nullptr &&
-            wcscmp(stream->stream_name_, stream_name) == 0)
+        if (stream_name == nullptr) break;
+        if (stream_name != nullptr && stream->stream_name_ == stream_name) {
             break;
+        }
     }
 
     if (stream == nullptr) {
@@ -347,22 +342,16 @@ BOOL ScanNTFS::translate_rundata_to_fragmentlist(const DefragDataStruct *data, I
                             stream_type_names(stream_type));
         }
 
-        stream = (StreamStruct *) malloc(sizeof(StreamStruct));
-
-        if (stream == nullptr) {
-            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-            return FALSE;
-        }
+        stream = new StreamStruct();
 
         stream->next_ = inode_data->streams_;
 
         inode_data->streams_ = stream;
 
-        stream->stream_name_ = nullptr;
+        stream->stream_name_.clear();
 
         if (stream_name != nullptr && wcslen(stream_name) > 0) {
-            stream->stream_name_ = _wcsdup(stream_name);
+            stream->stream_name_ = stream_name;
         }
 
         stream->stream_type_ = stream_type;
@@ -402,7 +391,7 @@ BOOL ScanNTFS::translate_rundata_to_fragmentlist(const DefragDataStruct *data, I
     uint32_t index = 0;
 
     int64_t lcn = 0;
-    int64_t vcn = starting_vcn;
+    auto vcn = starting_vcn;
 
     if (run_data != nullptr)
         while (run_data[index] != 0) {
@@ -478,13 +467,7 @@ BOOL ScanNTFS::translate_rundata_to_fragmentlist(const DefragDataStruct *data, I
             }
 
             /* Add the extent to the Fragments. */
-            const auto new_fragment = (FragmentListStruct *) malloc(sizeof(FragmentListStruct));
-
-            if (new_fragment == nullptr) {
-                gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-                return FALSE;
-            }
+            auto new_fragment = new FragmentListStruct();
 
             new_fragment->lcn_ = lcn;
 
@@ -507,44 +490,42 @@ BOOL ScanNTFS::translate_rundata_to_fragmentlist(const DefragDataStruct *data, I
 
 /*
 
-Cleanup the Streams data in an InodeData struct. If CleanFragments is TRUE then
+Cleanup the Streams data in an inode_data struct. If CleanFragments is TRUE then
 also cleanup the fragments.
 
 */
-void ScanNTFS::cleanup_streams(InodeDataStruct *InodeData, BOOL CleanupFragments) {
-    StreamStruct *Stream;
-    StreamStruct *TempStream;
+void ScanNTFS::cleanup_streams(InodeDataStruct *inode_data, BOOL cleanup_fragments) {
+    StreamStruct *stream;
+    StreamStruct *temp_stream;
+    FragmentListStruct *fragment;
+    FragmentListStruct *temp_fragment;
 
-    FragmentListStruct *Fragment;
-    FragmentListStruct *TempFragment;
+    stream = inode_data->streams_;
 
-    Stream = InodeData->streams_;
+    while (stream != nullptr) {
+        if (cleanup_fragments == TRUE) {
+            fragment = stream->fragments_;
 
-    while (Stream != nullptr) {
-        if (Stream->stream_name_ != nullptr) free(Stream->stream_name_);
+            while (fragment != nullptr) {
+                temp_fragment = fragment;
+                fragment = fragment->next_;
 
-        if (CleanupFragments == TRUE) {
-            Fragment = Stream->fragments_;
-
-            while (Fragment != nullptr) {
-                TempFragment = Fragment;
-                Fragment = Fragment->next_;
-
-                free(TempFragment);
+                delete temp_fragment;
             }
         }
 
-        TempStream = Stream;
-        Stream = Stream->next_;
+        temp_stream = stream;
+        stream = stream->next_;
 
-        free(TempStream);
+        delete temp_stream;
     }
 
-    InodeData->streams_ = nullptr;
+    inode_data->streams_ = nullptr;
 }
 
 /* Construct the full stream name from the filename, the stream name, and the stream type. */
-wchar_t *ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, StreamStruct *stream) {
+std::wstring
+ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, StreamStruct *stream) {
     size_t length;
 
     auto file_name = file_name_1;
@@ -552,13 +533,12 @@ wchar_t *ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar
     if (file_name == nullptr || wcslen(file_name) == 0) file_name = file_name_2;
     if (file_name != nullptr && wcslen(file_name) == 0) file_name = nullptr;
 
-    wchar_t *stream_name = nullptr;
+    const wchar_t *stream_name = nullptr;
     ATTRIBUTE_TYPE stream_type = ATTRIBUTE_TYPE::AttributeInvalid;
 
     if (stream != nullptr) {
-        stream_name = stream->stream_name_;
-
-        if (stream_name != nullptr && wcslen(stream_name) == 0) stream_name = nullptr;
+        stream_name = stream->stream_name_.c_str();
+        if (wcslen(stream_name) == 0) stream_name = nullptr;
 
         stream_type = stream->stream_type_;
     }
@@ -566,9 +546,9 @@ wchar_t *ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar
     /* If the stream_name is empty and the stream_type is Data then return only the
     file_name. The Data stream is the default stream of regular files. */
     if ((stream_name == nullptr || wcslen(stream_name) == 0) && stream_type == ATTRIBUTE_TYPE::AttributeData) {
-        if (file_name == nullptr || wcslen(file_name) == 0) return nullptr;
+        if (file_name == nullptr || wcslen(file_name) == 0) return {};
 
-        return _wcsdup(file_name);
+        return file_name;
     }
 
     /* If the stream_name is "$I30" and the stream_type is AttributeIndexAllocation then
@@ -577,18 +557,18 @@ wchar_t *ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar
     if (stream_name != nullptr &&
         wcscmp(stream_name, L"$I30") == 0 &&
         stream_type == ATTRIBUTE_TYPE::AttributeIndexAllocation) {
-        if (file_name == nullptr || wcslen(file_name) == 0) return nullptr;
+        if (file_name == nullptr || wcslen(file_name) == 0) return {};
 
-        return _wcsdup(file_name);
+        return file_name;
     }
 
     // If the stream_name is empty and the stream_type is Data then return only the
     // file_name. The Data stream is the default stream of regular files.
     if ((stream_name == nullptr || wcslen(stream_name) == 0)
         && wcslen(stream_type_names(stream_type)) == 0) {
-        if (file_name == nullptr || wcslen(file_name) == 0) return nullptr;
+        if (file_name == nullptr || wcslen(file_name) == 0) return {};
 
-        return _wcsdup(file_name);
+        return file_name;
     }
 
     length = 3;
@@ -598,11 +578,11 @@ wchar_t *ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar
 
     length = length + wcslen(stream_type_names(stream_type));
 
-    if (length == 3) return nullptr;
+    if (length == 3) return {};
 
-    auto *p1 = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    auto *p1 = new wchar_t[length];
 
-    if (p1 == nullptr) return nullptr;
+    if (p1 == nullptr) return {};
 
     *p1 = 0;
 
@@ -635,228 +615,190 @@ Process a list of attributes and store the gathered information in the Item
 struct. Return FALSE if an error occurred.
 
 */
-void ScanNTFS::process_attribute_list(
-        DefragDataStruct *Data,
-        NtfsDiskInfoStruct *DiskInfo,
-        InodeDataStruct *InodeData,
-        BYTE *Buffer,
-        uint64_t BufLength,
-        int Depth) {
-    BYTE *Buffer2;
+void
+ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data,
+                                 BYTE *buffer, uint64_t buf_length, int depth) {
+    std::unique_ptr<BYTE[]> buffer_2;
+    ATTRIBUTE_LIST *attribute;
+    ULONG attribute_offset;
 
-    ATTRIBUTE_LIST *Attribute;
-
-    ULONG AttributeOffset;
-
-    FILE_RECORD_HEADER *FileRecordHeader;
-    FragmentListStruct *Fragment;
-
-    uint64_t RefInode;
-    uint64_t BaseInode;
-    uint64_t Vcn;
-    uint64_t RealVcn;
-    uint64_t RefInodeVcn;
-
-    OVERLAPPED gOverlapped;
-
-    ULARGE_INTEGER Trans;
-
-    DWORD BytesRead;
-
-    int Result;
-
+    FILE_RECORD_HEADER *file_record_header;
+    FragmentListStruct *fragment;
+    uint64_t ref_inode;
+    uint64_t base_inode;
+    uint64_t vcn;
+    uint64_t real_vcn;
+    uint64_t ref_inode_vcn;
+    OVERLAPPED g_overlapped;
+    ULARGE_INTEGER trans;
+    DWORD bytes_read;
+    int result;
     wchar_t *p1;
     wchar_t s1[BUFSIZ];
-
-    DefragGui *jkGui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     /* Sanity checks. */
-    if (Buffer == nullptr || BufLength == 0) return;
+    if (buffer == nullptr || buf_length == 0) return;
 
-    if (Depth > 1000) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: infinite attribute loop, the MFT may be corrupt.");
+    if (depth > 1000) {
+        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: infinite attribute loop, the MFT may be corrupt.");
 
         return;
     }
 
-    jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                      L"    Processing AttributeList for Inode %I64u, %u bytes",
-                      InodeData->inode_,
-                      BufLength);
+    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                    L"    Processing AttributeList for Inode %I64u, %u bytes",
+                    inode_data->inode_,
+                    buf_length);
 
     /* Walk through all the attributes and gather information. */
-    for (AttributeOffset = 0; AttributeOffset < BufLength; AttributeOffset = AttributeOffset + Attribute->length_) {
-        Attribute = (ATTRIBUTE_LIST *) &Buffer[AttributeOffset];
+    for (attribute_offset = 0;
+         attribute_offset < buf_length; attribute_offset = attribute_offset + attribute->length_) {
+        attribute = (ATTRIBUTE_LIST *) &buffer[attribute_offset];
 
         /* Exit if no more attributes. AttributeLists are usually not closed by the
         0xFFFFFFFF endmarker. Reaching the end of the buffer is therefore normal and
         not an error. */
-        if (AttributeOffset + 3 > BufLength) break;
-        if (*(ULONG *) Attribute == 0xFFFFFFFF) break;
-        if (Attribute->length_ < 3) break;
-        if (AttributeOffset + Attribute->length_ > BufLength) break;
+        if (attribute_offset + 3 > buf_length) break;
+        if (*(ULONG *) attribute == 0xFFFFFFFF) break;
+        if (attribute->length_ < 3) break;
+        if (attribute_offset + attribute->length_ > buf_length) break;
 
         /* Extract the referenced Inode. If it's the same as the calling Inode then ignore
         (if we don't ignore then the program will loop forever, because for some
         reason the info in the calling Inode is duplicated here...). */
-        RefInode = (uint64_t) Attribute->file_reference_number_.inode_number_low_part_ +
-                   ((uint64_t) Attribute->file_reference_number_.inode_number_high_part_ << 32);
+        ref_inode = (uint64_t) attribute->file_reference_number_.inode_number_low_part_ +
+                    ((uint64_t) attribute->file_reference_number_.inode_number_high_part_ << 32);
 
-        if (RefInode == InodeData->inode_) continue;
+        if (ref_inode == inode_data->inode_) continue;
 
         /* Show debug message. */
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"    List attribute: %s",
-                          stream_type_names(Attribute->attribute_type_));
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                          L"      LowestVcn = %I64u, RefInode = %I64u, InodeSequence = %u, Instance = %u",
-                          Attribute->lowest_vcn_, RefInode, Attribute->file_reference_number_.sequence_number_,
-                          Attribute->instance_);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"    List attribute: %s",
+                        stream_type_names(attribute->attribute_type_));
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                        L"      LowestVcn = %I64u, ref_inode = %I64u, InodeSequence = %u, Instance = %u",
+                        attribute->lowest_vcn_, ref_inode, attribute->file_reference_number_.sequence_number_,
+                        attribute->instance_);
 
         /* Extract the streamname. I don't know why AttributeLists can have names, and
         the name is not used further down. It is only extracted for debugging purposes.
         */
-        if (Attribute->name_length_ > 0) {
-            p1 = (wchar_t *) malloc(sizeof(wchar_t) * (Attribute->name_length_ + 1));
+        if (attribute->name_length_ > 0) {
+            p1 = new wchar_t[attribute->name_length_ + 1];
 
-            if (p1 == nullptr) {
-                jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
+            wcsncpy_s(p1, attribute->name_length_ + 1,
+                      (wchar_t *) &buffer[attribute_offset + attribute->name_offset_], attribute->name_length_);
 
-                return;
-            }
+            p1[attribute->name_length_] = 0;
 
-            wcsncpy_s(p1, Attribute->name_length_ + 1,
-                      (wchar_t *) &Buffer[AttributeOffset + Attribute->name_offset_], Attribute->name_length_);
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      AttributeList name = '%s'", p1);
 
-            p1[Attribute->name_length_] = 0;
-
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      AttributeList name = '%s'", p1);
-
-            free(p1);
+            delete p1;
         }
 
         /* Find the fragment in the MFT that contains the referenced Inode. */
-        Vcn = 0;
-        RealVcn = 0;
-        RefInodeVcn = RefInode * DiskInfo->bytes_per_mft_record_ / (DiskInfo->bytes_per_sector_ * DiskInfo->
+        vcn = 0;
+        real_vcn = 0;
+        ref_inode_vcn = ref_inode * disk_info->bytes_per_mft_record_ / (disk_info->bytes_per_sector_ * disk_info->
                 sectors_per_cluster_);
 
-        for (Fragment = InodeData->mft_data_fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
-            if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-                if (RefInodeVcn >= RealVcn && RefInodeVcn < RealVcn + Fragment->next_vcn_ - Vcn) {
+        for (fragment = inode_data->mft_data_fragments_; fragment != nullptr; fragment = fragment->next_) {
+            if (fragment->lcn_ != VIRTUALFRAGMENT) {
+                if (ref_inode_vcn >= real_vcn && ref_inode_vcn < real_vcn + fragment->next_vcn_ - vcn) {
                     break;
                 }
 
-                RealVcn = RealVcn + Fragment->next_vcn_ - Vcn;
+                real_vcn = real_vcn + fragment->next_vcn_ - vcn;
             }
 
-            Vcn = Fragment->next_vcn_;
+            vcn = fragment->next_vcn_;
         }
 
-        if (Fragment == nullptr) {
-            jkGui->show_debug(
+        if (fragment == nullptr) {
+            gui->show_debug(
                     DebugLevel::DetailedGapFinding, nullptr,
                     L"      Error: Inode %I64u is an extension of Inode %I64u, but does not exist (outside the MFT).",
-                    RefInode, InodeData->inode_);
+                    ref_inode, inode_data->inode_);
 
             continue;
         }
 
         /* Fetch the record of the referenced Inode from disk. */
-        Buffer2 = (BYTE *) malloc((size_t) DiskInfo->bytes_per_mft_record_);
+        buffer_2 = std::make_unique<BYTE[]>((size_t) disk_info->bytes_per_mft_record_);
 
-        if (Buffer2 == nullptr) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
+        trans.QuadPart = (fragment->lcn_ - real_vcn) * disk_info->bytes_per_sector_ *
+                         disk_info->sectors_per_cluster_ + ref_inode * disk_info->bytes_per_mft_record_;
 
-            return;
-        }
+        g_overlapped.Offset = trans.LowPart;
+        g_overlapped.OffsetHigh = trans.HighPart;
+        g_overlapped.hEvent = nullptr;
 
-        Trans.QuadPart = (Fragment->lcn_ - RealVcn) * DiskInfo->bytes_per_sector_ *
-                         DiskInfo->sectors_per_cluster_ + RefInode * DiskInfo->bytes_per_mft_record_;
+        result = ReadFile(data->disk_.volume_handle_, buffer_2.get(), (uint32_t) disk_info->bytes_per_mft_record_,
+                          &bytes_read,
+                          &g_overlapped);
 
-        gOverlapped.Offset = Trans.LowPart;
-        gOverlapped.OffsetHigh = Trans.HighPart;
-        gOverlapped.hEvent = nullptr;
-
-        Result = ReadFile(Data->disk_.volume_handle_, Buffer2, (uint32_t) DiskInfo->bytes_per_mft_record_, &BytesRead,
-                          &gOverlapped);
-
-        if (Result == 0 || BytesRead != DiskInfo->bytes_per_mft_record_) {
+        if (result == 0 || bytes_read != disk_info->bytes_per_mft_record_) {
             defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"      Error while reading Inode %I64u: %s", RefInode,
-                              s1);
-
-            free(Buffer2);
+            gui->show_debug(DebugLevel::Progress, nullptr, L"      Error while reading Inode %I64u: %s", ref_inode,
+                            s1);
 
             return;
         }
 
         /* Fixup the raw data. */
-        if (fixup_raw_mftdata(Data, DiskInfo, Buffer2, DiskInfo->bytes_per_mft_record_) == FALSE) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"The error occurred while processing Inode %I64u",
-                              RefInode);
-
-            free(Buffer2);
+        if (fixup_raw_mftdata(data, disk_info, buffer_2.get(), disk_info->bytes_per_mft_record_) == FALSE) {
+            gui->show_debug(DebugLevel::Progress, nullptr, L"The error occurred while processing Inode %I64u",
+                            ref_inode);
 
             continue;
         }
 
         /* If the Inode is not in use then skip. */
-        FileRecordHeader = (FILE_RECORD_HEADER *) Buffer2;
+        file_record_header = (FILE_RECORD_HEADER *) buffer_2.get();
 
-        if ((FileRecordHeader->flags_ & 1) != 1) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      Referenced Inode %I64u is not in use.",
-                              RefInode);
-
-            free(Buffer2);
+        if ((file_record_header->flags_ & 1) != 1) {
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      Referenced Inode %I64u is not in use.",
+                            ref_inode);
 
             continue;
         }
 
-        /* If the BaseInode inside the Inode is not the same as the calling Inode then skip. */
-        BaseInode = (uint64_t) FileRecordHeader->base_file_record_.inode_number_low_part_ +
-                    ((uint64_t) FileRecordHeader->base_file_record_.inode_number_high_part_ << 32);
+        /* If the base_inode inside the Inode is not the same as the calling Inode then skip. */
+        base_inode = (uint64_t) file_record_header->base_file_record_.inode_number_low_part_ +
+                     ((uint64_t) file_record_header->base_file_record_.inode_number_high_part_ << 32);
 
-        if (InodeData->inode_ != BaseInode) {
-            jkGui->show_debug(
+        if (inode_data->inode_ != base_inode) {
+            gui->show_debug(
                     DebugLevel::DetailedGapFinding, nullptr,
                     L"      Warning: Inode %I64u is an extension of Inode %I64u, but thinks it's an extension of Inode %I64u.",
-                    RefInode, InodeData->inode_, BaseInode);
-
-            free(Buffer2);
+                    ref_inode, inode_data->inode_, base_inode);
 
             continue;
         }
 
         /* Process the list of attributes in the Inode, by recursively calling the process_attributes() subroutine. */
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      Processing Inode %I64u Instance %u",
-                          RefInode,
-                          Attribute->instance_);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      Processing Inode %I64u Instance %u",
+                        ref_inode,
+                        attribute->instance_);
 
-        Result = process_attributes(Data, DiskInfo, InodeData,
-                                    &Buffer2[FileRecordHeader->attribute_offset_],
-                                    DiskInfo->bytes_per_mft_record_ - FileRecordHeader->attribute_offset_,
-                                    Attribute->instance_, Depth + 1);
+        result = process_attributes(data, disk_info, inode_data,
+                                    &buffer_2[file_record_header->attribute_offset_],
+                                    disk_info->bytes_per_mft_record_ - file_record_header->attribute_offset_,
+                                    attribute->instance_, depth + 1);
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      Finished processing Inode %I64u Instance %u",
-                          RefInode,
-                          Attribute->instance_);
-
-        free(Buffer2);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"      Finished processing Inode %I64u Instance %u",
+                        ref_inode,
+                        attribute->instance_);
     }
 }
 
 /* Process a list of attributes and store the gathered information in the Item
 struct. Return FALSE if an error occurred. */
-BOOL ScanNTFS::process_attributes(
-        DefragDataStruct *Data,
-        NtfsDiskInfoStruct *DiskInfo,
-        InodeDataStruct *InodeData,
-        BYTE *Buffer,
-        uint64_t BufLength,
-        USHORT Instance,
-        int Depth) {
-    BYTE *Buffer2;
+bool ScanNTFS::process_attributes(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info,
+                                  InodeDataStruct *inode_data, BYTE *buffer, uint64_t buf_length,
+                                  USHORT instance, int depth) {
+    std::unique_ptr<BYTE[]> buffer_2;
 
     uint64_t Buffer2Length;
     ULONG AttributeOffset;
@@ -869,29 +811,29 @@ BOOL ScanNTFS::process_attributes(
 
     wchar_t *p1;
 
-    DefragGui *jkGui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     /* Walk through all the attributes and gather information. AttributeLists are
     skipped and interpreted later. */
-    for (AttributeOffset = 0; AttributeOffset < BufLength; AttributeOffset = AttributeOffset + Attribute->length_) {
-        Attribute = (ATTRIBUTE *) &Buffer[AttributeOffset];
+    for (AttributeOffset = 0; AttributeOffset < buf_length; AttributeOffset = AttributeOffset + Attribute->length_) {
+        Attribute = (ATTRIBUTE *) &buffer[AttributeOffset];
 
         /* Exit the loop if end-marker. */
-        if (AttributeOffset + 4 <= BufLength && *(ULONG *) Attribute == 0xFFFFFFFF) break;
+        if (AttributeOffset + 4 <= buf_length && *(ULONG *) Attribute == 0xFFFFFFFF) break;
 
         /* Sanity check. */
-        if (AttributeOffset + 4 > BufLength ||
+        if (AttributeOffset + 4 > buf_length ||
             Attribute->length_ < 3 ||
-            AttributeOffset + Attribute->length_ > BufLength) {
-            jkGui->show_debug(
+            AttributeOffset + Attribute->length_ > buf_length) {
+            gui->show_debug(
                     DebugLevel::Progress, nullptr,
                     L"Error: attribute in Inode %I64u is bigger than the data, the MFT may be corrupt.",
-                    InodeData->inode_);
-            jkGui->show_debug(DebugLevel::Progress, nullptr,
-                              L"  BufLength=%I64u, AttributeOffset=%lu, AttributeLength=%u(%X)",
-                              BufLength, AttributeOffset, Attribute->length_, Attribute->length_);
+                    inode_data->inode_);
+            gui->show_debug(DebugLevel::Progress, nullptr,
+                            L"  buf_length=%I64u, AttributeOffset=%lu, AttributeLength=%u(%X)",
+                            buf_length, AttributeOffset, Attribute->length_, Attribute->length_);
 
-            defrag_lib_->show_hex(Data, Buffer, BufLength);
+            DefragLib::show_hex(data, buffer, buf_length);
 
             return FALSE;
         }
@@ -899,36 +841,30 @@ BOOL ScanNTFS::process_attributes(
         /* Skip AttributeList's for now. */
         if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeAttributeList) continue;
 
-        /* If the Instance does not equal the AttributeNumber then ignore the attribute.
+        /* If the instance does not equal the AttributeNumber then ignore the attribute.
         This is used when an AttributeList is being processed and we only want a specific
         instance. */
-        if (Instance != 65535 && Instance != Attribute->attribute_number_) continue;
+        if (instance != 65535 && instance != Attribute->attribute_number_) continue;
 
         /* Show debug message. */
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"  Attribute %u: %s", Attribute->attribute_number_,
-                          stream_type_names(Attribute->attribute_type_));
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"  Attribute %u: %s", Attribute->attribute_number_,
+                        stream_type_names(Attribute->attribute_type_));
 
         if (Attribute->nonresident_ == 0) {
             ResidentAttribute = (RESIDENT_ATTRIBUTE *) Attribute;
 
             /* The AttributeFileName (0x30) contains the filename and the link to the parent directory. */
             if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeFileName) {
-                FileNameAttribute = (FILENAME_ATTRIBUTE *) &Buffer[AttributeOffset + ResidentAttribute->
+                FileNameAttribute = (FILENAME_ATTRIBUTE *) &buffer[AttributeOffset + ResidentAttribute->
                         value_offset_];
 
-                InodeData->parent_inode_ = FileNameAttribute->parent_directory_.inode_number_low_part_ +
-                                           ((uint64_t) FileNameAttribute->parent_directory_.inode_number_high_part_
-                                                   << 32);
+                inode_data->parent_inode_ = FileNameAttribute->parent_directory_.inode_number_low_part_ +
+                                            ((uint64_t) FileNameAttribute->parent_directory_.inode_number_high_part_
+                                                    << 32);
 
                 if (FileNameAttribute->name_length_ > 0) {
                     /* Extract the filename. */
-                    p1 = (wchar_t *) malloc(sizeof(wchar_t) * (FileNameAttribute->name_length_ + 1));
-
-                    if (p1 == nullptr) {
-                        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-                        return FALSE;
-                    }
+                    p1 = new wchar_t[FileNameAttribute->name_length_ + 1];
 
                     wcsncpy_s(p1, FileNameAttribute->name_length_ + 1, FileNameAttribute->name_,
                               FileNameAttribute->name_length_);
@@ -941,21 +877,21 @@ BOOL ScanNTFS::process_attributes(
                     but which of the hardlinked names should it sort? So we only store the
                     first filename. */
                     if (FileNameAttribute->name_type_ == 2) {
-                        if (InodeData->short_filename_ != nullptr) {
-                            free(p1);
+                        if (inode_data->short_filename_ != nullptr) {
+                            delete p1;
                         } else {
-                            InodeData->short_filename_ = p1;
+                            inode_data->short_filename_ = p1;
 
-                            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"    Short filename = '%s'",
-                                              p1);
+                            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"    Short filename = '%s'",
+                                            p1);
                         }
                     } else {
-                        if (InodeData->long_filename_ != nullptr) {
-                            free(p1);
+                        if (inode_data->long_filename_ != nullptr) {
+                            delete p1;
                         } else {
-                            InodeData->long_filename_ = p1;
+                            inode_data->long_filename_ = p1;
 
-                            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"    Long filename = '%s'", p1);
+                            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"    Long filename = '%s'", p1);
                         }
                     }
                 }
@@ -964,67 +900,61 @@ BOOL ScanNTFS::process_attributes(
             /* The AttributeStandardInformation (0x10) contains the CreationTime, LastAccessTime,
             the MftChangeTime, and the file attributes. */
             if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeStandardInformation) {
-                StandardInformation = (STANDARD_INFORMATION *) &Buffer[AttributeOffset + ResidentAttribute->
+                StandardInformation = (STANDARD_INFORMATION *) &buffer[AttributeOffset + ResidentAttribute->
                         value_offset_];
 
-                InodeData->creation_time_ = StandardInformation->creation_time_;
-                InodeData->mft_change_time_ = StandardInformation->mft_change_time_;
-                InodeData->last_access_time_ = StandardInformation->last_access_time_;
+                inode_data->creation_time_ = StandardInformation->creation_time_;
+                inode_data->mft_change_time_ = StandardInformation->mft_change_time_;
+                inode_data->last_access_time_ = StandardInformation->last_access_time_;
             }
 
             /* The value of the AttributeData (0x80) is the actual data of the file. */
             if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData) {
-                InodeData->bytes_ = ResidentAttribute->value_length_;
+                inode_data->bytes_ = ResidentAttribute->value_length_;
             }
         } else {
             NonResidentAttribute = (NONRESIDENT_ATTRIBUTE *) Attribute;
 
             /* Save the length (number of bytes) of the data. */
-            if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData && InodeData->bytes_ == 0) {
-                InodeData->bytes_ = NonResidentAttribute->data_size_;
+            if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData && inode_data->bytes_ == 0) {
+                inode_data->bytes_ = NonResidentAttribute->data_size_;
             }
 
             /* Extract the streamname. */
             p1 = nullptr;
 
             if (Attribute->name_length_ > 0) {
-                p1 = (wchar_t *) malloc(sizeof(wchar_t) * (Attribute->name_length_ + 1));
-
-                if (p1 == nullptr) {
-                    jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-                    return FALSE;
-                }
+                p1 = new wchar_t[Attribute->name_length_ + 1];
 
                 wcsncpy_s(p1, Attribute->name_length_ + 1,
-                          (wchar_t *) &Buffer[AttributeOffset + Attribute->name_offset_],
+                          (wchar_t *) &buffer[AttributeOffset + Attribute->name_offset_],
                           Attribute->name_length_);
 
                 p1[Attribute->name_length_] = 0;
             }
 
             /* Create a new stream with a list of fragments for this data. */
-            translate_rundata_to_fragmentlist(Data, InodeData, p1, Attribute->attribute_type_,
-                                              (BYTE *) &Buffer[AttributeOffset +
+            translate_rundata_to_fragmentlist(data, inode_data, p1, Attribute->attribute_type_,
+                                              (BYTE *) &buffer[AttributeOffset +
                                                                NonResidentAttribute->run_array_offset_],
                                               Attribute->length_ - NonResidentAttribute->run_array_offset_,
                                               NonResidentAttribute->starting_vcn_, NonResidentAttribute->data_size_);
 
-            /* Cleanup the streamname. */
-            if (p1 != nullptr) free(p1);
+            // Cleanup the streamname
+            delete p1;
 
             /* Special case: If this is the $MFT then save data. */
-            if (InodeData->inode_ == 0) {
-                if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData && InodeData->mft_data_fragments_ ==
+            if (inode_data->inode_ == 0) {
+                if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData && inode_data->mft_data_fragments_ ==
                                                                                    nullptr) {
-                    InodeData->mft_data_fragments_ = InodeData->streams_->fragments_;
-                    InodeData->mft_data_bytes_ = NonResidentAttribute->data_size_;
+                    inode_data->mft_data_fragments_ = inode_data->streams_->fragments_;
+                    inode_data->mft_data_bytes_ = NonResidentAttribute->data_size_;
                 }
 
-                if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeBitmap && InodeData->mft_bitmap_fragments_
+                if (Attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeBitmap && inode_data->mft_bitmap_fragments_
                                                                                      == nullptr) {
-                    InodeData->mft_bitmap_fragments_ = InodeData->streams_->fragments_;
-                    InodeData->mft_bitmap_bytes_ = NonResidentAttribute->data_size_;
+                    inode_data->mft_bitmap_fragments_ = inode_data->streams_->fragments_;
+                    inode_data->mft_bitmap_bytes_ = NonResidentAttribute->data_size_;
                 }
             }
         }
@@ -1035,41 +965,40 @@ BOOL ScanNTFS::process_attributes(
     some MFT's have an AttributeList that is stored in fragments that are
     defined in the DATA attribute, and/or contain a continuation of the DATA or
     BITMAP attributes. */
-    for (AttributeOffset = 0; AttributeOffset < BufLength; AttributeOffset = AttributeOffset + Attribute->length_) {
-        Attribute = (ATTRIBUTE *) &Buffer[AttributeOffset];
+    for (AttributeOffset = 0; AttributeOffset < buf_length; AttributeOffset = AttributeOffset + Attribute->length_) {
+        Attribute = (ATTRIBUTE *) &buffer[AttributeOffset];
 
         if (*(ULONG *) Attribute == 0xFFFFFFFF) break;
         if (Attribute->attribute_type_ != ATTRIBUTE_TYPE::AttributeAttributeList) continue;
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"  Attribute %u: %s", Attribute->attribute_number_,
-                          stream_type_names(Attribute->attribute_type_));
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"  Attribute %u: %s", Attribute->attribute_number_,
+                        stream_type_names(Attribute->attribute_type_));
 
         if (Attribute->nonresident_ == 0) {
             ResidentAttribute = (RESIDENT_ATTRIBUTE *) Attribute;
 
-            process_attribute_list(Data, DiskInfo, InodeData,
-                                   (BYTE *) &Buffer[AttributeOffset + ResidentAttribute->value_offset_],
-                                   ResidentAttribute->value_length_, Depth);
+            process_attribute_list(data, disk_info, inode_data,
+                                   (BYTE *) &buffer[AttributeOffset + ResidentAttribute->value_offset_],
+                                   ResidentAttribute->value_length_, depth);
         } else {
             NonResidentAttribute = (NONRESIDENT_ATTRIBUTE *) Attribute;
             Buffer2Length = NonResidentAttribute->data_size_;
 
-            Buffer2 = read_non_resident_data(Data, DiskInfo,
-                                             (BYTE *) &Buffer[AttributeOffset +
-                                                              NonResidentAttribute->run_array_offset_],
-                                             Attribute->length_ - NonResidentAttribute->run_array_offset_, 0,
-                                             Buffer2Length);
+            buffer_2.reset(
+                    read_non_resident_data(data, disk_info,
+                                           (BYTE *) &buffer[AttributeOffset +
+                                                            NonResidentAttribute->run_array_offset_],
+                                           Attribute->length_ - NonResidentAttribute->run_array_offset_, 0,
+                                           Buffer2Length));
 
-            process_attribute_list(Data, DiskInfo, InodeData, Buffer2, Buffer2Length, Depth);
-
-            free(Buffer2);
+            process_attribute_list(data, disk_info, inode_data, buffer_2.get(), Buffer2Length, depth);
         }
     }
 
-    return TRUE;
+    return true;
 }
 
-BOOL ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
+bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
                                     uint64_t inode_number, uint64_t max_inode,
                                     FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
                                     FragmentListStruct **mft_bitmap_fragments, uint64_t *MftBitmapBytes,
@@ -1183,23 +1112,10 @@ BOOL ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
         /* Create and fill a new item record in memory. */
         item = new ItemStruct();
 
-        if (item == nullptr) {
-            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-            if (inode_data.long_filename_ != nullptr) free(inode_data.long_filename_);
-            if (inode_data.short_filename_ != nullptr) free(inode_data.short_filename_);
-
-            cleanup_streams(&inode_data, TRUE);
-
-            return FALSE;
-        }
-
-//        item->long_filename_ = construct_stream_name(inode_data.long_filename_, inode_data.short_filename_, stream);
-//        item->long_path_ = nullptr;
-//        item->short_filename_ = construct_stream_name(inode_data.short_filename_, inode_data.long_filename_, stream);
-//        item->short_path_ = nullptr;
-        item->set_names(L"", construct_stream_name(inode_data.long_filename_, inode_data.short_filename_, stream),
-                        nullptr, construct_stream_name(inode_data.short_filename_, inode_data.long_filename_, stream));
+        item->set_names(L"",
+                        construct_stream_name(inode_data.long_filename_, inode_data.short_filename_, stream).c_str(),
+                        nullptr,
+                        construct_stream_name(inode_data.short_filename_, inode_data.long_filename_, stream).c_str());
 
         item->bytes_ = inode_data.bytes_;
 
@@ -1269,18 +1185,18 @@ BOOL ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
     } while (stream != nullptr);
 
     /* Cleanup and return TRUE. */
-    if (inode_data.long_filename_ != nullptr) free(inode_data.long_filename_);
-    if (inode_data.short_filename_ != nullptr) free(inode_data.short_filename_);
+    delete inode_data.long_filename_;
+    delete inode_data.short_filename_;
 
     cleanup_streams(&inode_data, FALSE);
 
-    return TRUE;
+    return true;
 }
 
 /* Load the MFT into a list of ItemStruct records in memory. */
-BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
+bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     NtfsDiskInfoStruct disk_info{};
-    BYTE *buffer;
+    std::unique_ptr<BYTE[]> buffer;
     OVERLAPPED g_overlapped;
     ULARGE_INTEGER trans;
     DWORD bytes_read;
@@ -1302,7 +1218,7 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
 
     BYTE BitmapMasks[8] = {1, 2, 4, 8, 16, 32, 64, 128};
 
-    int result;
+    bool result;
     ULONG clusters_per_mft_record;
     __timeb64 time{};
     int64_t start_time;
@@ -1312,37 +1228,24 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     DefragGui *gui = DefragGui::get_instance();
 
     /* Read the boot block from the disk. */
-    buffer = (BYTE *) malloc(mftbuffersize);
-
-    if (buffer == nullptr) {
-        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-        return FALSE;
-    }
+    buffer = std::make_unique<BYTE[]>(mftbuffersize);
 
     g_overlapped.Offset = 0;
     g_overlapped.OffsetHigh = 0;
     g_overlapped.hEvent = nullptr;
 
-    result = ReadFile(data->disk_.volume_handle_, buffer, (uint32_t) 512, &bytes_read, &g_overlapped);
+    result = ReadFile(data->disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
 
     if (result == 0 || bytes_read != 512) {
-        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
-
+        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
         gui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading bootblock: %s", s1);
-
-        free(buffer);
-
-        return FALSE;
+        return false;
     }
 
     /* Test if the boot block is an NTFS boot block. */
-    if (*(ULONGLONG *) &buffer[3] != 0x202020205346544E) {
+    if (*(ULONGLONG *) &buffer.get()[3] != 0x202020205346544E) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"This is not an NTFS disk (different cookie).");
-
-        free(buffer);
-
-        return FALSE;
+        return false;
     }
 
     /* Extract data from the bootblock. */
@@ -1398,24 +1301,19 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     g_overlapped.Offset = trans.LowPart;
     g_overlapped.OffsetHigh = trans.HighPart;
     g_overlapped.hEvent = nullptr;
-    result = ReadFile(data->disk_.volume_handle_, buffer, (uint32_t) disk_info.bytes_per_mft_record_, &bytes_read,
+    result = ReadFile(data->disk_.volume_handle_, buffer.get(),
+                      (uint32_t) disk_info.bytes_per_mft_record_, &bytes_read,
                       &g_overlapped);
 
     if (result == 0 || bytes_read != disk_info.bytes_per_mft_record_) {
-        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
-
+        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
         gui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading first MFT record: %s", s1);
-
-        free(buffer);
-
-        return FALSE;
+        return false;
     }
 
     /* Fixup the raw data from disk. This will also test if it's a valid $MFT record. */
-    if (fixup_raw_mftdata(data, &disk_info, buffer, disk_info.bytes_per_mft_record_) == FALSE) {
-        free(buffer);
-
-        return FALSE;
+    if (fixup_raw_mftdata(data, &disk_info, buffer.get(), disk_info.bytes_per_mft_record_) == FALSE) {
+        return false;
     }
 
     /* Extract data from the MFT record and put into an Item struct in memory. If
@@ -1426,20 +1324,16 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     mft_bitmap_fragments = nullptr;
 
     result = interpret_mft_record(data, &disk_info, nullptr, 0, 0, &mft_data_fragments, &mft_data_bytes,
-                                  &mft_bitmap_fragments, &mft_bitmap_bytes, buffer, disk_info.bytes_per_mft_record_);
+                                  &mft_bitmap_fragments, &mft_bitmap_bytes, buffer.get(),
+                                  disk_info.bytes_per_mft_record_);
 
-    if (result == FALSE ||
+    if (!result ||
         mft_data_fragments == nullptr || mft_data_bytes == 0 ||
         mft_bitmap_fragments == nullptr || mft_bitmap_bytes == 0) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"Fatal error, cannot process this disk.");
-
-        free(buffer);
-
         DefragLib::delete_item_tree(data->item_tree_);
-
         data->item_tree_ = nullptr;
-
-        return FALSE;
+        return false;
     }
 
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"MftDataBytes = %I64u, MftBitmapBytes = %I64u",
@@ -1465,21 +1359,8 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
 
     if (max_mft_bitmap_bytes < mft_bitmap_bytes) max_mft_bitmap_bytes = (size_t) mft_bitmap_bytes;
 
-    mft_bitmap = (BYTE *) malloc((size_t) max_mft_bitmap_bytes);
-
-    if (mft_bitmap == nullptr) {
-        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-        free(buffer);
-
-        DefragLib::delete_item_tree(data->item_tree_);
-
-        data->item_tree_ = nullptr;
-
-        return FALSE;
-    }
-
-    memset(mft_bitmap, 0, (size_t) mft_bitmap_bytes);
+    mft_bitmap = new BYTE[max_mft_bitmap_bytes];
+    std::memset(mft_bitmap, 0, (size_t) mft_bitmap_bytes);
 
     vcn = 0;
     real_vcn = 0;
@@ -1511,18 +1392,12 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
 
             if (result == 0 || bytes_read != (fragment->next_vcn_ - vcn) * disk_info.bytes_per_sector_ * disk_info.
                     sectors_per_cluster_) {
-                defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
-
+                DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
                 gui->show_debug(DebugLevel::Progress, nullptr, L"  %s", s1);
-
-                free(mft_bitmap);
-                free(buffer);
-
+                delete mft_bitmap;
                 DefragLib::delete_item_tree(data->item_tree_);
-
                 data->item_tree_ = nullptr;
-
-                return FALSE;
+                return false;
             }
 
             real_vcn = real_vcn + fragment->next_vcn_ - vcn;
@@ -1540,20 +1415,7 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
         max_inode = mft_data_bytes / disk_info.bytes_per_mft_record_;
     }
 
-    inode_array = (ItemStruct **) malloc((size_t) (max_inode * sizeof(ItemStruct *)));
-
-    if (inode_array == nullptr) {
-        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-        free(buffer);
-
-        DefragLib::delete_item_tree(data->item_tree_);
-
-        data->item_tree_ = nullptr;
-
-        return FALSE;
-    }
-
+    inode_array = new ItemStruct *[(size_t) max_inode];
     inode_array[0] = data->item_tree_;
 
     for (inode_number = 1; inode_number < max_inode; inode_number++) {
@@ -1641,19 +1503,18 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
                             (uint32_t) ((BlockEnd - BlockStart) * disk_info.bytes_per_mft_record_),
                             trans.QuadPart / (disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_));
 
-            result = ReadFile(data->disk_.volume_handle_, buffer,
+            result = ReadFile(data->disk_.volume_handle_, buffer.get(),
                               (uint32_t) ((BlockEnd - BlockStart) * disk_info.bytes_per_mft_record_), &bytes_read,
                               &g_overlapped);
 
             if (result == 0 || bytes_read != (BlockEnd - BlockStart) * disk_info.bytes_per_mft_record_) {
-                defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
+                DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
 
                 gui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading Inodes %I64u to %I64u: %s",
                                 inode_number,
                                 BlockEnd - 1, s1);
 
-                free(buffer);
-                free(inode_array);
+                delete inode_array;
 
                 DefragLib::delete_item_tree(data->item_tree_);
 
@@ -1689,28 +1550,24 @@ BOOL ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
                         max_inode * 1000 / (end_time - start_time));
     }
 
-    free(buffer);
-
-    if (mft_bitmap != nullptr) free(mft_bitmap);
+    delete mft_bitmap;
 
     if (*data->running_ != RunningState::RUNNING) {
-        free(inode_array);
-
+        delete inode_array;
         DefragLib::delete_item_tree(data->item_tree_);
-
         data->item_tree_ = nullptr;
 
-        return FALSE;
+        return false;
     }
 
-    /* Setup the ParentDirectory in all the items with the info in the InodeArray. */
+    // Setup the ParentDirectory in all the items with the info in the InodeArray
     for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
         item->parent_directory_ = inode_array[item->parent_inode_];
 
         if (item->parent_inode_ == 5) item->parent_directory_ = nullptr;
     }
 
-    free(inode_array);
+    delete inode_array;
 
-    return TRUE;
+    return true;
 }

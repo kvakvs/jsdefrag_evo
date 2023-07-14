@@ -328,10 +328,10 @@ void DefragLib::delete_item_tree(ItemStruct *top) {
 
     while (top->fragments_ != nullptr) {
         FragmentListStruct *fragment = top->fragments_->next_;
-        free(top->fragments_);
+        delete top->fragments_;
 
         top->fragments_ = fragment;
     }
 
-    std::free(top);
+    delete top;
 }

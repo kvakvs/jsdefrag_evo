@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "std_afx.h"
 #include "defrag_data_struct.h"
 
@@ -17,7 +19,7 @@ ScanFAT::~ScanFAT() = default;
 
 ScanFAT *ScanFAT::get_instance() {
     if (instance_ == nullptr) {
-        instance_.reset(new ScanFAT());
+        instance_ = std::make_unique<ScanFAT>();
     }
 
     return instance_.get();
@@ -104,12 +106,7 @@ void ScanFAT::make_fragment_list(const DefragDataStruct *data, const FatDiskInfo
         /* If this is a new fragment then create a record for the previous fragment. If not then
             add the cluster to the counters and continue. */
         if (cluster != last_cluster + 1 && last_cluster != 0) {
-            new_fragment = (FragmentListStruct *) malloc(sizeof(FragmentListStruct));
-
-            if (new_fragment == nullptr) {
-                gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-                return;
-            }
+            new_fragment = new FragmentListStruct();
 
             new_fragment->lcn_ = first_cluster - 2;
             vcn = vcn + last_cluster - first_cluster + 1;
@@ -158,13 +155,7 @@ void ScanFAT::make_fragment_list(const DefragDataStruct *data, const FatDiskInfo
 
     /* Create the last fragment. */
     if (last_cluster != 0) {
-        new_fragment = (FragmentListStruct *) malloc(sizeof(FragmentListStruct));
-
-        if (new_fragment == nullptr) {
-            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-            return;
-        }
+        new_fragment = new FragmentListStruct();
 
         new_fragment->lcn_ = first_cluster - 2;
         vcn = vcn + last_cluster - first_cluster + 1;
@@ -251,15 +242,9 @@ BYTE *ScanFAT::load_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInf
         return nullptr;
     }
 
-    buffer = (BYTE *) malloc((size_t) buffer_length);
+    buffer = new BYTE[buffer_length];
 
-    if (buffer == nullptr) {
-        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-
-        return nullptr;
-    }
-
-    /* Loop through the FAT cluster list and load all fragments from disk into the buffer. */
+    // Loop through the FAT cluster list and load all fragments from disk into the buffer.
     uint64_t buffer_offset = 0;
     cluster = StartCluster;
     uint64_t first_cluster = cluster;
@@ -301,7 +286,7 @@ BYTE *ScanFAT::load_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInf
 
                 gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
-                free(buffer);
+                delete buffer;
 
                 return nullptr;
             }
@@ -354,7 +339,7 @@ BYTE *ScanFAT::load_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInf
 
             gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
-            free(buffer);
+            delete buffer;
 
             return nullptr;
         }
@@ -531,11 +516,6 @@ void ScanFAT::analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *d
         /* Create and fill a new item record in memory. */
         item = new ItemStruct();
 
-        if (item == nullptr) {
-            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-            break;
-        }
-
         if (wcscmp(short_name, L".") == 0) {
             item->clear_short_fn();
         } else {
@@ -610,7 +590,7 @@ void ScanFAT::analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *d
 
             analyze_fat_directory(data, disk_info, sub_dir_buf, sub_dir_length, item);
 
-            free(sub_dir_buf);
+            delete sub_dir_buf;
 
             gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Finished with subdirectory.");
         }
@@ -652,237 +632,220 @@ case FAT32: if (FATContent == 0x0FFFFFF7) IsBadCluster = TRUE; break;
 }
 */
 BOOL ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
-    FatBootSectorStruct BootSector;
-    FatDiskInfoStruct DiskInfo;
-
-    ULARGE_INTEGER Trans;
-
-    OVERLAPPED gOverlapped;
-
-    DWORD BytesRead;
-
-    size_t FatSize;
-
-    BYTE *RootDirectory;
-
-    uint64_t RootStart;
-    uint64_t RootLength;
-
-    int Result;
-
+    FatBootSectorStruct boot_sector{};
+    FatDiskInfoStruct disk_info{};
+    ULARGE_INTEGER trans;
+    OVERLAPPED g_overlapped;
+    DWORD bytes_read;
+    size_t fat_size;
+    BYTE *root_directory;
+    uint64_t root_start;
+    uint64_t root_length;
+    int result;
     wchar_t s1[BUFSIZ];
-
     char s2[BUFSIZ];
-
-    DefragGui *jkGui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     /* Read the boot block from the disk. */
-    gOverlapped.Offset = 0;
-    gOverlapped.OffsetHigh = 0;
-    gOverlapped.hEvent = nullptr;
+    g_overlapped.Offset = 0;
+    g_overlapped.OffsetHigh = 0;
+    g_overlapped.hEvent = nullptr;
 
-    Result = ReadFile(data->disk_.volume_handle_, &BootSector, sizeof(FatBootSectorStruct), &BytesRead,
-                      &gOverlapped);
+    result = ReadFile(data->disk_.volume_handle_, &boot_sector, sizeof(FatBootSectorStruct), &bytes_read,
+                      &g_overlapped);
 
-    if (Result == 0 || BytesRead != 512) {
-        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
-
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading bootblock: %s", s1);
+    if (result == 0 || bytes_read != 512) {
+        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading bootblock: %s", s1);
 
         return FALSE;
     }
 
     /* Test if the boot block is a FAT boot block. */
-    if (BootSector.Signature != 0xAA55 ||
-        ((BootSector.BS_jmpBoot[0] != 0xEB || BootSector.BS_jmpBoot[2] != 0x90) &&
-         BootSector.BS_jmpBoot[0] != 0xE9)) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (different cookie).");
+    if (boot_sector.Signature != 0xAA55 ||
+        ((boot_sector.BS_jmpBoot[0] != 0xEB || boot_sector.BS_jmpBoot[2] != 0x90) &&
+         boot_sector.BS_jmpBoot[0] != 0xE9)) {
+        gui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (different cookie).");
 
         return FALSE;
     }
 
     /* Fetch values from the bootblock and determine what FAT this is, FAT12, FAT16, or FAT32. */
-    DiskInfo.BytesPerSector = BootSector.BPB_BytsPerSec;
+    disk_info.BytesPerSector = boot_sector.BPB_BytsPerSec;
 
-    if (DiskInfo.BytesPerSector == 0) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (BytesPerSector is zero).");
-
-        return FALSE;
-    }
-
-    DiskInfo.SectorsPerCluster = BootSector.BPB_SecPerClus;
-
-    if (DiskInfo.SectorsPerCluster == 0) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (SectorsPerCluster is zero).");
+    if (disk_info.BytesPerSector == 0) {
+        gui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (BytesPerSector is zero).");
 
         return FALSE;
     }
 
-    DiskInfo.TotalSectors = BootSector.BPB_TotSec16;
+    disk_info.SectorsPerCluster = boot_sector.BPB_SecPerClus;
 
-    if (DiskInfo.TotalSectors == 0) DiskInfo.TotalSectors = BootSector.BPB_TotSec32;
+    if (disk_info.SectorsPerCluster == 0) {
+        gui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (SectorsPerCluster is zero).");
 
-    DiskInfo.RootDirSectors = (BootSector.BPB_RootEntCnt * 32 + (BootSector.BPB_BytsPerSec - 1)) / BootSector.
+        return FALSE;
+    }
+
+    disk_info.TotalSectors = boot_sector.BPB_TotSec16;
+
+    if (disk_info.TotalSectors == 0) disk_info.TotalSectors = boot_sector.BPB_TotSec32;
+
+    disk_info.RootDirSectors = (boot_sector.BPB_RootEntCnt * 32 + (boot_sector.BPB_BytsPerSec - 1)) / boot_sector.
             BPB_BytsPerSec;
 
-    DiskInfo.FATSz = BootSector.BPB_FATSz16;
+    disk_info.FATSz = boot_sector.BPB_FATSz16;
 
-    if (DiskInfo.FATSz == 0) DiskInfo.FATSz = BootSector.Fat32.BPB_FATSz32;
+    if (disk_info.FATSz == 0) disk_info.FATSz = boot_sector.Fat32.BPB_FATSz32;
 
-    DiskInfo.FirstDataSector = BootSector.BPB_RsvdSecCnt + BootSector.BPB_NumFATs * DiskInfo.FATSz + DiskInfo.
+    disk_info.FirstDataSector = boot_sector.BPB_RsvdSecCnt + boot_sector.BPB_NumFATs * disk_info.FATSz + disk_info.
             RootDirSectors;
 
-    DiskInfo.DataSec = DiskInfo.TotalSectors - (BootSector.BPB_RsvdSecCnt + BootSector.BPB_NumFATs * DiskInfo.FATSz +
-                                                DiskInfo.RootDirSectors);
+    disk_info.DataSec = disk_info.TotalSectors - (boot_sector.BPB_RsvdSecCnt + boot_sector.BPB_NumFATs * disk_info.FATSz +
+                                                  disk_info.RootDirSectors);
 
-    DiskInfo.CountofClusters = DiskInfo.DataSec / BootSector.BPB_SecPerClus;
+    disk_info.CountofClusters = disk_info.DataSec / boot_sector.BPB_SecPerClus;
 
-    if (DiskInfo.CountofClusters < 4085) {
+    if (disk_info.CountofClusters < 4085) {
         data->disk_.type_ = DiskType::FAT12;
 
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT12 disk.");
-    } else if (DiskInfo.CountofClusters < 65525) {
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT12 disk.");
+    } else if (disk_info.CountofClusters < 65525) {
         data->disk_.type_ = DiskType::FAT16;
 
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT16 disk.");
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT16 disk.");
     } else {
         data->disk_.type_ = DiskType::FAT32;
 
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT32 disk.");
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT32 disk.");
     }
 
-    data->bytes_per_cluster_ = DiskInfo.BytesPerSector * DiskInfo.SectorsPerCluster;
-    data->total_clusters_ = DiskInfo.CountofClusters;
+    data->bytes_per_cluster_ = disk_info.BytesPerSector * disk_info.SectorsPerCluster;
+    data->total_clusters_ = disk_info.CountofClusters;
 
     /* Output debug information. */
-    strncpy_s(s2, BUFSIZ, (char *) &BootSector.BS_OEMName[0], 8);
+    strncpy_s(s2, BUFSIZ, (char *) &boot_sector.BS_OEMName[0], 8);
 
     s2[8] = '\0';
 
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  OEMName: %S", s2);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BytesPerSector: %I64u", DiskInfo.BytesPerSector);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  TotalSectors: %I64u", DiskInfo.TotalSectors);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  SectorsPerCluster: %I64u", DiskInfo.SectorsPerCluster);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  RootDirSectors: %I64u", DiskInfo.RootDirSectors);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FATSz: %I64u", DiskInfo.FATSz);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FirstDataSector: %I64u", DiskInfo.FirstDataSector);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  DataSec: %I64u", DiskInfo.DataSec);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  CountofClusters: %I64u", DiskInfo.CountofClusters);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  ReservedSectors: %lu", BootSector.BPB_RsvdSecCnt);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  NumberFATs: %lu", BootSector.BPB_NumFATs);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  RootEntriesCount: %lu", BootSector.BPB_RootEntCnt);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  MediaType: %X", BootSector.BPB_Media);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  SectorsPerTrack: %lu", BootSector.BPB_SecPerTrk);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  NumberOfHeads: %lu", BootSector.BPB_NumHeads);
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"  HiddenSectors: %lu", BootSector.BPB_HiddSec);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  OEMName: %S", s2);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  BytesPerSector: %I64u", disk_info.BytesPerSector);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  TotalSectors: %I64u", disk_info.TotalSectors);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  SectorsPerCluster: %I64u", disk_info.SectorsPerCluster);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  RootDirSectors: %I64u", disk_info.RootDirSectors);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  FATSz: %I64u", disk_info.FATSz);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  FirstDataSector: %I64u", disk_info.FirstDataSector);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  DataSec: %I64u", disk_info.DataSec);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  CountofClusters: %I64u", disk_info.CountofClusters);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  ReservedSectors: %lu", boot_sector.BPB_RsvdSecCnt);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  NumberFATs: %lu", boot_sector.BPB_NumFATs);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  RootEntriesCount: %lu", boot_sector.BPB_RootEntCnt);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  MediaType: %X", boot_sector.BPB_Media);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  SectorsPerTrack: %lu", boot_sector.BPB_SecPerTrk);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  NumberOfHeads: %lu", boot_sector.BPB_NumHeads);
+    gui->show_debug(DebugLevel::Progress, nullptr, L"  HiddenSectors: %lu", boot_sector.BPB_HiddSec);
 
     if (data->disk_.type_ != DiskType::FAT32) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_DrvNum: %u", BootSector.Fat16.BS_DrvNum);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_BootSig: %u", BootSector.Fat16.BS_BootSig);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_VolID: %u", BootSector.Fat16.BS_VolID);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  BS_DrvNum: %u", boot_sector.Fat16.BS_DrvNum);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  BS_BootSig: %u", boot_sector.Fat16.BS_BootSig);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  BS_VolID: %u", boot_sector.Fat16.BS_VolID);
 
-        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat16.BS_VolLab[0], 11);
+        strncpy_s(s2, BUFSIZ, (char *) &boot_sector.Fat16.BS_VolLab[0], 11);
 
         s2[11] = '\0';
 
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  VolLab: %S", s2);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  VolLab: %S", s2);
 
-        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat16.BS_FilSysType[0], 8);
+        strncpy_s(s2, BUFSIZ, (char *) &boot_sector.Fat16.BS_FilSysType[0], 8);
 
         s2[8] = '\0';
 
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FilSysType: %S", s2);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  FilSysType: %S", s2);
     } else {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FATSz32: %lu", BootSector.Fat32.BPB_FATSz32);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  ExtFlags: %lu", BootSector.Fat32.BPB_ExtFlags);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FSVer: %lu", BootSector.Fat32.BPB_FSVer);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  RootClus: %lu", BootSector.Fat32.BPB_RootClus);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FSInfo: %lu", BootSector.Fat32.BPB_FSInfo);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BkBootSec: %lu", BootSector.Fat32.BPB_BkBootSec);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  DrvNum: %lu", BootSector.Fat32.BS_DrvNum);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BootSig: %lu", BootSector.Fat32.BS_BootSig);
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  VolID: %lu", BootSector.Fat32.BS_VolID);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  FATSz32: %lu", boot_sector.Fat32.BPB_FATSz32);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  ExtFlags: %lu", boot_sector.Fat32.BPB_ExtFlags);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  FSVer: %lu", boot_sector.Fat32.BPB_FSVer);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  RootClus: %lu", boot_sector.Fat32.BPB_RootClus);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  FSInfo: %lu", boot_sector.Fat32.BPB_FSInfo);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  BkBootSec: %lu", boot_sector.Fat32.BPB_BkBootSec);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  DrvNum: %lu", boot_sector.Fat32.BS_DrvNum);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  BootSig: %lu", boot_sector.Fat32.BS_BootSig);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  VolID: %lu", boot_sector.Fat32.BS_VolID);
 
-        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat32.BS_VolLab[0], 11);
+        strncpy_s(s2, BUFSIZ, (char *) &boot_sector.Fat32.BS_VolLab[0], 11);
 
         s2[11] = '\0';
 
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  VolLab: %S", s2);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  VolLab: %S", s2);
 
-        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat32.BS_FilSysType[0], 8);
+        strncpy_s(s2, BUFSIZ, (char *) &boot_sector.Fat32.BS_FilSysType[0], 8);
 
         s2[8] = '\0';
 
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FilSysType: %S", s2);
+        gui->show_debug(DebugLevel::Progress, nullptr, L"  FilSysType: %S", s2);
     }
 
     /* Read the FAT from disk into memory. */
     switch (data->disk_.type_) {
         case DiskType::FAT12:
-            FatSize = (size_t) (DiskInfo.CountofClusters + 1 + (DiskInfo.CountofClusters + 1) / 2);
+            fat_size = (size_t) (disk_info.CountofClusters + 1 + (disk_info.CountofClusters + 1) / 2);
             break;
         case DiskType::FAT16:
-            FatSize = (size_t) ((DiskInfo.CountofClusters + 1) * 2);
+            fat_size = (size_t) ((disk_info.CountofClusters + 1) * 2);
             break;
         case DiskType::FAT32:
-            FatSize = (size_t) ((DiskInfo.CountofClusters + 1) * 4);
+            fat_size = (size_t) ((disk_info.CountofClusters + 1) * 4);
             break;
     }
 
-    if (FatSize % DiskInfo.BytesPerSector > 0) {
-        FatSize = (size_t) (FatSize + DiskInfo.BytesPerSector - FatSize % DiskInfo.BytesPerSector);
+    if (fat_size % disk_info.BytesPerSector > 0) {
+        fat_size = (size_t) (fat_size + disk_info.BytesPerSector - fat_size % disk_info.BytesPerSector);
     }
 
-    DiskInfo.FatData.FAT12 = (BYTE *) malloc(FatSize);
+    disk_info.FatData.FAT12 = new BYTE[fat_size];
 
-    if (DiskInfo.FatData.FAT12 == nullptr) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
+    trans.QuadPart = boot_sector.BPB_RsvdSecCnt * disk_info.BytesPerSector;
+    g_overlapped.Offset = trans.LowPart;
+    g_overlapped.OffsetHigh = trans.HighPart;
+    g_overlapped.hEvent = nullptr;
+
+    gui->show_debug(DebugLevel::Progress, nullptr, L"Reading FAT, %lu bytes at offset=%I64u", fat_size,
+                    trans.QuadPart);
+
+    result = ReadFile(data->disk_.volume_handle_, disk_info.FatData.FAT12, (uint32_t) fat_size, &bytes_read, &g_overlapped);
+
+    if (result == 0) {
+        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
+
+        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
         return FALSE;
     }
 
-    Trans.QuadPart = BootSector.BPB_RsvdSecCnt * DiskInfo.BytesPerSector;
-    gOverlapped.Offset = Trans.LowPart;
-    gOverlapped.OffsetHigh = Trans.HighPart;
-    gOverlapped.hEvent = nullptr;
-
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"Reading FAT, %lu bytes at offset=%I64u", FatSize,
-                      Trans.QuadPart);
-
-    Result = ReadFile(data->disk_.volume_handle_, DiskInfo.FatData.FAT12, (uint32_t) FatSize, &BytesRead, &gOverlapped);
-
-    if (Result == 0) {
-        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
-
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
-
-        return FALSE;
-    }
-
-    //ShowHex(Data,DiskInfo.FatData.FAT12,32);
+    //ShowHex(Data,disk_info.FatData.FAT12,32);
 
     /* Read the root directory from disk into memory. */
     if (data->disk_.type_ == DiskType::FAT32) {
-        RootDirectory = load_directory(data, &DiskInfo, BootSector.Fat32.BPB_RootClus, &RootLength);
+        root_directory = load_directory(data, &disk_info, boot_sector.Fat32.BPB_RootClus, &root_length);
     } else {
-        RootStart = (BootSector.BPB_RsvdSecCnt + BootSector.BPB_NumFATs * DiskInfo.FATSz) * DiskInfo.BytesPerSector;
-        RootLength = BootSector.BPB_RootEntCnt * 32;
+        root_start = (boot_sector.BPB_RsvdSecCnt + boot_sector.BPB_NumFATs * disk_info.FATSz) * disk_info.BytesPerSector;
+        root_length = boot_sector.BPB_RootEntCnt * 32;
 
         /* Sanity check. */
-        if (RootLength > UINT_MAX) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Root directory is too big, %I64u bytes", RootLength);
+        if (root_length > UINT_MAX) {
+            gui->show_debug(DebugLevel::Progress, nullptr, L"Root directory is too big, %I64u bytes", root_length);
 
-            free(DiskInfo.FatData.FAT12);
+            delete disk_info.FatData.FAT12;
 
             return FALSE;
         }
 
-        if (RootStart > (DiskInfo.CountofClusters + 1) * DiskInfo.SectorsPerCluster * DiskInfo.BytesPerSector) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Trying to access %I64u, but the last sector is at %I64u",
-                              RootStart,
-                              (DiskInfo.CountofClusters + 1) * DiskInfo.SectorsPerCluster * DiskInfo.BytesPerSector);
+        if (root_start > (disk_info.CountofClusters + 1) * disk_info.SectorsPerCluster * disk_info.BytesPerSector) {
+            gui->show_debug(DebugLevel::Progress, nullptr, L"Trying to access %I64u, but the last sector is at %I64u",
+                            root_start,
+                              (disk_info.CountofClusters + 1) * disk_info.SectorsPerCluster * disk_info.BytesPerSector);
 
-            free(DiskInfo.FatData.FAT12);
+            delete disk_info.FatData.FAT12;
 
             return FALSE;
         }
@@ -890,50 +853,45 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
         /* We have to round up the Length to the nearest sector. For some reason or other
         Microsoft has decided that raw reading from disk can only be done by whole sector,
         even though ReadFile() accepts it's parameters in bytes. */
-        BytesRead = (uint32_t) RootLength;
+        bytes_read = (uint32_t) root_length;
 
-        if (RootLength % DiskInfo.BytesPerSector > 0) {
-            BytesRead = (uint32_t) (RootLength + DiskInfo.BytesPerSector - RootLength % DiskInfo.BytesPerSector);
+        if (root_length % disk_info.BytesPerSector > 0) {
+            bytes_read = (uint32_t) (root_length + disk_info.BytesPerSector - root_length % disk_info.BytesPerSector);
         }
 
         /* Allocate buffer. */
-        RootDirectory = (BYTE *) malloc(BytesRead);
-        if (RootDirectory == nullptr) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
-            free(DiskInfo.FatData.FAT12);
-            return FALSE;
-        }
+        root_directory = new BYTE[bytes_read];
 
         /* Read data from disk. */
-        Trans.QuadPart = RootStart;
+        trans.QuadPart = root_start;
 
-        gOverlapped.Offset = Trans.LowPart;
-        gOverlapped.OffsetHigh = Trans.HighPart;
-        gOverlapped.hEvent = nullptr;
+        g_overlapped.Offset = trans.LowPart;
+        g_overlapped.OffsetHigh = trans.HighPart;
+        g_overlapped.hEvent = nullptr;
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                          L"Reading root directory, %lu bytes at offset=%I64u.", BytesRead, Trans.QuadPart);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                        L"Reading root directory, %lu bytes at offset=%I64u.", bytes_read, trans.QuadPart);
 
-        Result = ReadFile(data->disk_.volume_handle_, RootDirectory, BytesRead, &BytesRead, &gOverlapped);
+        result = ReadFile(data->disk_.volume_handle_, root_directory, bytes_read, &bytes_read, &g_overlapped);
 
-        if (Result == 0) {
-            defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
+        if (result == 0) {
+            DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
 
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
+            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
-            free(DiskInfo.FatData.FAT12);
-            free(RootDirectory);
+            delete disk_info.FatData.FAT12;
+            delete root_directory;
 
             return FALSE;
         }
     }
 
     /* Analyze all the items in the root directory and add to the item tree. */
-    analyze_fat_directory(data, &DiskInfo, RootDirectory, RootLength, nullptr);
+    analyze_fat_directory(data, &disk_info, root_directory, root_length, nullptr);
 
     /* Cleanup. */
-    free(RootDirectory);
-    free(DiskInfo.FatData.FAT12);
+    delete root_directory;
+    delete disk_info.FatData.FAT12;
 
     return TRUE;
 }
