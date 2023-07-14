@@ -1,20 +1,26 @@
 #pragma once
 
-class DefragLog
-{
+class DefragLog {
 public:
-	DefragLog();
-	void log_message(const wchar_t* format, ...) const;
-	void set_log_filename(const wchar_t* file_name);
+    DefragLog();
 
-	wchar_t my_name_[MAX_PATH];
-	wchar_t my_short_name_[MAX_PATH];
+    void log_message(const wchar_t *format, ...) const;
+    void log_string(const wchar_t *line) const;
 
-	wchar_t *get_log_filename();
+    void set_log_filename(const wchar_t *file_name);
 
-protected:
+    std::wstring my_name_;
+    std::wstring my_short_name_;
+
+    const wchar_t *get_log_filename();
+
 private:
-	wchar_t log_file_[MAX_PATH];
+    std::wstring log_file_;
+    DefragLib *defrag_lib_;
 
-	DefragLib *defrag_lib_;
+    errno_t open_log_append(FILE *&fout) const;
+
+    static int write_timestamp(FILE *fout);
+
+    static void flush_close_log(FILE *fout);
 };

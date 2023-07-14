@@ -1,6 +1,9 @@
 #include "std_afx.h"
 #include "defrag_data_struct.h"
 
+#include <cstdarg>
+#include <memory>
+
 DefragGui::DefragGui(): debug_level_() {
     defrag_lib_ = DefragLib::get_instance();
 
@@ -33,7 +36,7 @@ DefragGui::~DefragGui() = default;
 
 DefragGui* DefragGui::get_instance() {
     if (instance_ == nullptr) {
-        instance_.reset(new DefragGui());
+        instance_ = std::make_unique<DefragGui>();
     }
 
     return instance_.get();
@@ -174,7 +177,7 @@ void DefragGui::clear_screen(const wchar_t* format, ...) {
 
     /* Save the message in Messages 0. */
     va_start(var_args, format);
-    vswprintf_s(messages_[0], 50000, format, var_args);
+    vswprintf_s(messages_[0], MESSAGES_BUF_SIZE, format, var_args);
 
     /* If there is no logfile then return. */
     if (log_ != nullptr) {
@@ -192,16 +195,16 @@ void DefragGui::show_move(const ItemStruct* item, const uint64_t clusters, const
                           const uint64_t to_lcn, const uint64_t from_vcn) {
     /* Save the message in Messages 3. */
     if (clusters == 1) {
-        swprintf_s(messages_[3], 50000, L"Moving 1 cluster from %I64d to %I64d.", from_lcn, to_lcn);
+        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Moving 1 cluster from %I64d to %I64d.", from_lcn, to_lcn);
     }
     else {
-        swprintf_s(messages_[3], 50000, L"Moving %I64d clusters from %I64d to %I64d.",
+        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Moving %I64d clusters from %I64d to %I64d.",
                    clusters, from_lcn, to_lcn);
     }
 
     /* Save the name of the file in Messages 4. */
     if (item != nullptr && item->long_path_ != nullptr) {
-        swprintf_s(messages_[4], 50000, L"%s", item->long_path_);
+        swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"%s", item->long_path_);
     }
     else {
         *messages_[4] = '\0';
@@ -238,16 +241,16 @@ void DefragGui::show_move(const ItemStruct* item, const uint64_t clusters, const
 This subroutine is called one last time with Item=nullptr when analysis has finished. */
 void DefragGui::show_analyze(const DefragDataStruct* data, const ItemStruct* item) {
     if (data != nullptr && data->count_all_files_ != 0) {
-        swprintf_s(messages_[3], 50000, L"Files %I64d, Directories %I64d, Clusters %I64d",
+        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Files %I64d, Directories %I64d, Clusters %I64d",
                    data->count_all_files_, data->count_directories_, data->count_all_clusters_);
     }
     else {
-        swprintf_s(messages_[3], 50000, L"Applying Exclude and SpaceHogs masks....");
+        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Applying Exclude and SpaceHogs masks....");
     }
 
     /* Save the name of the file in Messages 4. */
     if (item != nullptr && item->long_path_ != nullptr) {
-        swprintf_s(messages_[4], 50000, L"%s", item->long_path_);
+        swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"%ws", item->long_path_);
     }
     else {
         *messages_[4] = '\0';
@@ -257,23 +260,24 @@ void DefragGui::show_analyze(const DefragDataStruct* data, const ItemStruct* ite
 
 /* Callback: show a debug message. */
 void DefragGui::show_debug(const DebugLevel level, const ItemStruct* item, const wchar_t* format, ...) {
-    va_list var_args;
-
     if (debug_level_ < level) return;
 
-    /* Save the name of the file in Messages 4. */
+    // Save the name of the file in Messages 4.
     if (item != nullptr && item->long_path_ != nullptr) {
-        swprintf_s(messages_[4], 50000, L"%s", item->long_path_);
+        swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"%ws", item->long_path_);
     }
 
-    /* If there is no message then return. */
+    // If there is no message then return.
     if (format == nullptr) return;
 
-    /* Save the debug message in Messages 5. */
+    // Save the debug message in Messages 5.
+    std::va_list var_args;
     va_start(var_args, format);
-    vswprintf_s(messages_[5], 50000, format, var_args);
-    log_->log_message(format, var_args);
+    vswprintf_s(messages_[5], MESSAGES_BUF_SIZE, format, var_args);
+//    log_->log_message(format, var_args);
     va_end(var_args);
+
+    log_->log_string(messages_[5]);
     paint_image(dc_);
 }
 
@@ -292,6 +296,15 @@ void DefragGui::draw_cluster(const DefragDataStruct* data, const uint64_t cluste
         progress_todo_ = data->phase_todo_;
     }
 
+#ifndef _WIN64
+    // 32-bit drive is too big check
+    if (data->total_clusters_ > 0x7FFFFFFF) {
+        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Drive is too big for the 32-bit version");
+        paint_image(dc_);
+        return;
+    }
+#endif
+
     /* Sanity check. */
     if (data->total_clusters_ == 0) return;
     if (dc_ == nullptr) return;
@@ -303,25 +316,20 @@ void DefragGui::draw_cluster(const DefragDataStruct* data, const uint64_t cluste
     display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
     if (num_clusters_ != data->total_clusters_ || cluster_info_ == nullptr) {
-        if (cluster_info_ != nullptr) {
-            free(cluster_info_);
-
-            cluster_info_ = nullptr;
-        }
-
         num_clusters_ = data->total_clusters_;
+        cluster_info_.reset(new uint8_t[num_clusters_]);
 
-        cluster_info_ = (byte*)malloc((size_t)num_clusters_);
-
-        for (int ii = 0; ii <= num_clusters_; ii++) {
-            cluster_info_[ii] = DefragStruct::COLOREMPTY;
+        auto ci_mem = cluster_info_.get();
+        for (uint64_t ii = 0; ii <= num_clusters_; ii++) {
+            ci_mem[ii] = DefragStruct::COLOREMPTY;
         }
 
         return;
     }
 
+    auto ci_mem = cluster_info_.get();
     for (uint64_t ii = cluster_start; ii <= cluster_end; ii++) {
-        cluster_info_[ii] = color;
+        ci_mem[ii] = color;
     }
 
     const auto cluster_per_square = (float)(num_clusters_ / num_disk_squares_);
@@ -353,26 +361,26 @@ void DefragGui::show_status(const DefragDataStruct* data) {
 
     /* Update Message 0 and 1. */
     if (data != nullptr) {
-        swprintf_s(messages_[0], 50000, L"%s", data->disk_.mount_point_);
+        swprintf_s(messages_[0], MESSAGES_BUF_SIZE, L"%s", data->disk_.mount_point_);
 
         switch (data->phase_) {
-        case 1: wcscpy_s(messages_[1], 50000, L"Phase 1: Analyze");
+        case 1: wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 1: Analyze");
             break;
-        case 2: wcscpy_s(messages_[1], 50000, L"Phase 2: Defragment");
+        case 2: wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 2: Defragment");
             break;
-        case 3: wcscpy_s(messages_[1], 50000, L"Phase 3: ForcedFill");
+        case 3: wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 3: ForcedFill");
             break;
-        case 4: swprintf_s(messages_[1], 50000, L"Zone %u: Sort", data->zone_ + 1);
+        case 4: swprintf_s(messages_[1], MESSAGES_BUF_SIZE, L"Zone %u: Sort", data->zone_ + 1);
             break;
-        case 5: swprintf_s(messages_[1], 50000, L"Zone %u: Fast Optimize", data->zone_ + 1);
+        case 5: swprintf_s(messages_[1], MESSAGES_BUF_SIZE, L"Zone %u: Fast Optimize", data->zone_ + 1);
             break;
-        case 6: wcscpy_s(messages_[1], 50000, L"Phase 3: Move Up");
+        case 6: wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 3: Move Up");
             break;
         case 7:
-            wcscpy_s(messages_[1], 50000, L"Finished.");
-            swprintf_s(messages_[4], 50000, L"Logfile: %s", log_->get_log_filename());
+            wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Finished.");
+            swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"Logfile: %s", log_->get_log_filename());
             break;
-        case 8: wcscpy_s(messages_[1], 50000, L"Phase 3: Fixup");
+        case 8: wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 3: Fixup");
             break;
         }
 
@@ -673,7 +681,7 @@ void DefragGui::paint_image(HDC dc) {
 
         if (done > 1) done = 1;
 
-        swprintf_s(messages_[2], 50000, L"%.4f%%", 100 * done);
+        swprintf_s(messages_[2], MESSAGES_BUF_SIZE, L"%.4f%%", 100 * done);
     }
 
     Color back_color1;
@@ -689,7 +697,7 @@ void DefragGui::paint_image(HDC dc) {
     draw_area.Height = top_height_ + 1;
 
     Color busy_color;
-    busy_color.SetFromCOLORREF(Colors[DefragStruct::COLORBUSY]);
+    busy_color.SetFromCOLORREF(display_colors[DefragStruct::COLORBUSY]);
 
     SolidBrush busy_brush(busy_color);
 
@@ -781,7 +789,7 @@ void DefragGui::paint_image(HDC dc) {
     graphics->DrawLine(&pen2, xx2 + 1, yy1 - 1, xx2 + 1, yy2 + 1);
     graphics->DrawLine(&pen2, xx2 + 1, yy2 + 1, xx1 - 1, yy2 + 1);
 
-    COLORREF color_empty_ref = Colors[DefragStruct::COLOREMPTY];
+    COLORREF color_empty_ref = display_colors[DefragStruct::COLOREMPTY];
     Color color_empty;
     color_empty.SetFromCOLORREF(color_empty_ref);
 
@@ -810,32 +818,32 @@ void DefragGui::paint_image(HDC dc) {
         byte cluster_mft = (cluster_squares_[jj].color_ & 1 << 1) >> 1;
         byte cluster_spacehog = cluster_squares_[jj].color_ & 1;
 
-        COLORREF col = Colors[DefragStruct::COLOREMPTY];
+        COLORREF col = display_colors[DefragStruct::COLOREMPTY];
 
         int empty_cluster = true;
 
         if (cluster_busy == 1) {
-            col = Colors[DefragStruct::COLORBUSY];
+            col = display_colors[DefragStruct::COLORBUSY];
             empty_cluster = false;
         }
         else if (cluster_unmovable == 1) {
-            col = Colors[DefragStruct::COLORUNMOVABLE];
+            col = display_colors[DefragStruct::COLORUNMOVABLE];
             empty_cluster = false;
         }
         else if (cluster_fragmented == 1) {
-            col = Colors[DefragStruct::COLORFRAGMENTED];
+            col = display_colors[DefragStruct::COLORFRAGMENTED];
             empty_cluster = false;
         }
         else if (cluster_mft == 1) {
-            col = Colors[DefragStruct::COLORMFT];
+            col = display_colors[DefragStruct::COLORMFT];
             empty_cluster = false;
         }
         else if (cluster_unfragmented == 1) {
-            col = Colors[DefragStruct::COLORUNFRAGMENTED];
+            col = display_colors[DefragStruct::COLORUNFRAGMENTED];
             empty_cluster = false;
         }
         else if (cluster_spacehog == 1) {
-            col = Colors[DefragStruct::COLORSPACEHOG];
+            col = display_colors[DefragStruct::COLORSPACEHOG];
             empty_cluster = false;
         }
 
@@ -1041,46 +1049,48 @@ LRESULT CALLBACK DefragGui::process_messagefn(const HWND wnd, const UINT message
 }
 
 void DefragGui::fill_squares(int clusterStartSquareNum, int clusterEndSquareNum) {
-    float clusterPerSquare = (float)(num_clusters_ / num_disk_squares_);
+    const float cluster_per_square = (float)(num_clusters_ / num_disk_squares_);
 
     for (int ii = clusterStartSquareNum; ii <= clusterEndSquareNum; ii++) {
-        byte currentColor = DefragStruct::COLOREMPTY;
+        [[maybe_unused]] byte currentColor = DefragStruct::COLOREMPTY;
 
-        byte clusterEmpty = 0;
-        byte clusterAllocated = 0;
-        byte clusterUnfragmented = 0;
-        byte clusterUnmovable = 0;
-        byte clusterFragmented = 0;
-        byte clusterBusy = 0;
-        byte clusterMft = 0;
-        byte clusterSpacehog = 0;
+        byte cluster_empty = 0;
+        byte cluster_allocated = 0;
+        byte cluster_unfragmented = 0;
+        byte cluster_unmovable = 0;
+        byte cluster_fragmented = 0;
+        byte cluster_busy = 0;
+        byte cluster_mft = 0;
+        byte cluster_spacehog = 0;
+        auto ci_mem = cluster_info_.get();
 
-        for (int kk = (int)(ii * clusterPerSquare); kk < num_clusters_ && kk < (int)((ii + 1) * clusterPerSquare);
+        for (int kk = (int)(ii * cluster_per_square); 
+             kk < num_clusters_ && kk < (int)((ii + 1) * cluster_per_square);
              kk++) {
-            switch (cluster_info_[kk]) {
+            switch (ci_mem[kk]) {
             case DefragStruct::COLOREMPTY:
-                clusterEmpty = 1;
+                cluster_empty = 1;
                 break;
             case DefragStruct::COLORALLOCATED:
-                clusterAllocated = 1;
+                cluster_allocated = 1;
                 break;
             case DefragStruct::COLORUNFRAGMENTED:
-                clusterUnfragmented = 1;
+                cluster_unfragmented = 1;
                 break;
             case DefragStruct::COLORUNMOVABLE:
-                clusterUnmovable = 1;
+                cluster_unmovable = 1;
                 break;
             case DefragStruct::COLORFRAGMENTED:
-                clusterFragmented = 1;
+                cluster_fragmented = 1;
                 break;
             case DefragStruct::COLORBUSY:
-                clusterBusy = 1;
+                cluster_busy = 1;
                 break;
             case DefragStruct::COLORMFT:
-                clusterMft = 1;
+                cluster_mft = 1;
                 break;
             case DefragStruct::COLORSPACEHOG:
-                clusterSpacehog = 1;
+                cluster_spacehog = 1;
                 break;
             }
         }
@@ -1088,14 +1098,14 @@ void DefragGui::fill_squares(int clusterStartSquareNum, int clusterEndSquareNum)
         if (ii < num_disk_squares_) {
             cluster_squares_[ii].dirty_ = true;
             cluster_squares_[ii].color_ = //maxColor;
-                    clusterEmpty << 7 |
-                    clusterAllocated << 6 |
-                    clusterUnfragmented << 5 |
-                    clusterUnmovable << 4 |
-                    clusterFragmented << 3 |
-                    clusterBusy << 2 |
-                    clusterMft << 1 |
-                    clusterSpacehog;
+                    cluster_empty << 7 |
+                    cluster_allocated << 6 |
+                    cluster_unfragmented << 5 |
+                    cluster_unmovable << 4 |
+                    cluster_fragmented << 3 |
+                    cluster_busy << 2 |
+                    cluster_mft << 1 |
+                    cluster_spacehog;
         }
     }
 }

@@ -20,13 +20,14 @@ http://www.kessels.com/
 
 #include "std_afx.h"
 #include "defrag.h"
-
 #include "types.h"
 
+#include <ctime>
+
 Defrag::Defrag()
-    : running_state_(RunningState::STOPPED),
-      i_am_running_(RunningState::STOPPED),
-      debug_level_(DebugLevel::Warning) {
+        : running_state_(RunningState::STOPPED),
+          i_am_running_(RunningState::STOPPED),
+          debug_level_(DebugLevel::Warning) {
     gui_ = DefragGui::get_instance();
     defrag_lib_ = DefragLib::get_instance();
     log_.reset(new DefragLog());
@@ -35,7 +36,7 @@ Defrag::Defrag()
 
 Defrag::~Defrag() = default;
 
-Defrag* Defrag::get_instance() {
+Defrag *Defrag::get_instance() {
     if (instance_ == nullptr) {
         instance_.reset(new Defrag());
     }
@@ -71,7 +72,7 @@ WPARAM Defrag::start_program(const HINSTANCE instance,
     /* If the defragger is still running then ask & wait for it to stop. */
     i_am_running_ = RunningState::STOPPED;
 
-    defrag_lib_->StopJkDefrag(&running_state_, 0);
+    defrag_lib_->stop_jk_defrag(&running_state_, 0);
 
     return w_param;
 }
@@ -89,15 +90,15 @@ p1 = 0;
 
 */
 
-LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
+LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
     IMAGEHLP_LINE64 source_line;
     DWORD line_displacement;
     STACKFRAME64 stack_frame;
     uint32_t image_type;
     char s1[BUFSIZ];
 
-    DefragLog* log = instance_->log_.get();
-    const DefragLib* defrag_lib = instance_->defrag_lib_;
+    DefragLog *log = instance_->log_.get();
+    const DefragLib *defrag_lib = instance_->defrag_lib_;
 
     /* Exit if we're running inside a debugger. */
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
@@ -107,66 +108,94 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
 
     /* Show the type of exception. */
     switch (exception_info->ExceptionRecord->ExceptionCode) {
-    case EXCEPTION_ACCESS_VIOLATION: strcpy_s(s1, BUFSIZ, "ACCESS_VIOLATION (the memory could not be read or written)");
-        break;
-    case EXCEPTION_DATATYPE_MISALIGNMENT: strcpy_s(
-            s1, BUFSIZ,
-            "DATATYPE_MISALIGNMENT (a datatype misalignment error was detected in a load or store instruction)");
-        break;
-    case EXCEPTION_BREAKPOINT: strcpy_s(s1, BUFSIZ, "BREAKPOINT");
-        break;
-    case EXCEPTION_SINGLE_STEP: strcpy_s(s1, BUFSIZ, "SINGLE_STEP");
-        break;
-    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: strcpy_s(s1, BUFSIZ, "ARRAY_BOUNDS_EXCEEDED");
-        break;
-    case EXCEPTION_FLT_DENORMAL_OPERAND: strcpy_s(s1, BUFSIZ, "FLT_DENORMAL_OPERAND");
-        break;
-    case EXCEPTION_FLT_DIVIDE_BY_ZERO: strcpy_s(s1, BUFSIZ, "FLT_DIVIDE_BY_ZERO");
-        break;
-    case EXCEPTION_FLT_INEXACT_RESULT: strcpy_s(s1, BUFSIZ, "FLT_INEXACT_RESULT");
-        break;
-    case EXCEPTION_FLT_INVALID_OPERATION: strcpy_s(s1, BUFSIZ, "FLT_INVALID_OPERATION");
-        break;
-    case EXCEPTION_FLT_OVERFLOW: strcpy_s(s1, BUFSIZ, "FLT_OVERFLOW");
-        break;
-    case EXCEPTION_FLT_STACK_CHECK: strcpy_s(s1, BUFSIZ, "FLT_STACK_CHECK");
-        break;
-    case EXCEPTION_FLT_UNDERFLOW: strcpy_s(s1, BUFSIZ, "FLT_UNDERFLOW");
-        break;
-    case EXCEPTION_INT_DIVIDE_BY_ZERO: strcpy_s(s1, BUFSIZ, "INT_DIVIDE_BY_ZERO");
-        break;
-    case EXCEPTION_INT_OVERFLOW: strcpy_s(s1, BUFSIZ, "INT_OVERFLOW");
-        break;
-    case EXCEPTION_PRIV_INSTRUCTION: strcpy_s(s1, BUFSIZ, "PRIV_INSTRUCTION");
-        break;
-    case EXCEPTION_IN_PAGE_ERROR: strcpy_s(s1, BUFSIZ, "IN_PAGE_ERROR");
-        break;
-    case EXCEPTION_ILLEGAL_INSTRUCTION: strcpy_s(s1, BUFSIZ, "ILLEGAL_INSTRUCTION");
-        break;
-    case EXCEPTION_NONCONTINUABLE_EXCEPTION: strcpy_s(s1, BUFSIZ, "NONCONTINUABLE_EXCEPTION");
-        break;
-    case EXCEPTION_STACK_OVERFLOW: strcpy_s(s1, BUFSIZ, "STACK_OVERFLOW");
-        break;
-    case EXCEPTION_INVALID_DISPOSITION: strcpy_s(s1, BUFSIZ, "INVALID_DISPOSITION");
-        break;
-    case EXCEPTION_GUARD_PAGE: strcpy_s(s1, BUFSIZ, "GUARD_PAGE");
-        break;
-    case EXCEPTION_INVALID_HANDLE: strcpy_s(s1, BUFSIZ, "INVALID_HANDLE");
-        break;
-    case CONTROL_C_EXIT: strcpy_s(s1, BUFSIZ, "STATUS_CONTROL_C_EXIT");
-        break;
-    case DBG_TERMINATE_THREAD: strcpy_s(s1, BUFSIZ, "DBG_TERMINATE_THREAD (Debugger terminated thread)");
-        break;
-    case DBG_TERMINATE_PROCESS: strcpy_s(s1, BUFSIZ, "DBG_TERMINATE_PROCESS (Debugger terminated process)");
-        break;
-    case DBG_CONTROL_C: strcpy_s(s1, BUFSIZ, "DBG_CONTROL_C (Debugger got control C)");
-        break;
-    case DBG_CONTROL_BREAK: strcpy_s(s1, BUFSIZ, "DBG_CONTROL_BREAK (Debugger received control break)");
-        break;
-    case DBG_COMMAND_EXCEPTION:
-        strcpy_s(s1, BUFSIZ, "DBG_COMMAND_EXCEPTION (Debugger command communication exception)");
-        break;
-    default: strcpy_s(s1, BUFSIZ, "(unknown exception)");
+        case EXCEPTION_ACCESS_VIOLATION:
+            strcpy_s(s1, BUFSIZ, "ACCESS_VIOLATION (the memory could not be read or written)");
+            break;
+        case EXCEPTION_DATATYPE_MISALIGNMENT:
+            strcpy_s(
+                    s1, BUFSIZ,
+                    "DATATYPE_MISALIGNMENT (a datatype misalignment error was detected in a load or store instruction)");
+            break;
+        case EXCEPTION_BREAKPOINT:
+            strcpy_s(s1, BUFSIZ, "BREAKPOINT");
+            break;
+        case EXCEPTION_SINGLE_STEP:
+            strcpy_s(s1, BUFSIZ, "SINGLE_STEP");
+            break;
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+            strcpy_s(s1, BUFSIZ, "ARRAY_BOUNDS_EXCEEDED");
+            break;
+        case EXCEPTION_FLT_DENORMAL_OPERAND:
+            strcpy_s(s1, BUFSIZ, "FLT_DENORMAL_OPERAND");
+            break;
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+            strcpy_s(s1, BUFSIZ, "FLT_DIVIDE_BY_ZERO");
+            break;
+        case EXCEPTION_FLT_INEXACT_RESULT:
+            strcpy_s(s1, BUFSIZ, "FLT_INEXACT_RESULT");
+            break;
+        case EXCEPTION_FLT_INVALID_OPERATION:
+            strcpy_s(s1, BUFSIZ, "FLT_INVALID_OPERATION");
+            break;
+        case EXCEPTION_FLT_OVERFLOW:
+            strcpy_s(s1, BUFSIZ, "FLT_OVERFLOW");
+            break;
+        case EXCEPTION_FLT_STACK_CHECK:
+            strcpy_s(s1, BUFSIZ, "FLT_STACK_CHECK");
+            break;
+        case EXCEPTION_FLT_UNDERFLOW:
+            strcpy_s(s1, BUFSIZ, "FLT_UNDERFLOW");
+            break;
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:
+            strcpy_s(s1, BUFSIZ, "INT_DIVIDE_BY_ZERO");
+            break;
+        case EXCEPTION_INT_OVERFLOW:
+            strcpy_s(s1, BUFSIZ, "INT_OVERFLOW");
+            break;
+        case EXCEPTION_PRIV_INSTRUCTION:
+            strcpy_s(s1, BUFSIZ, "PRIV_INSTRUCTION");
+            break;
+        case EXCEPTION_IN_PAGE_ERROR:
+            strcpy_s(s1, BUFSIZ, "IN_PAGE_ERROR");
+            break;
+        case EXCEPTION_ILLEGAL_INSTRUCTION:
+            strcpy_s(s1, BUFSIZ, "ILLEGAL_INSTRUCTION");
+            break;
+        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+            strcpy_s(s1, BUFSIZ, "NONCONTINUABLE_EXCEPTION");
+            break;
+        case EXCEPTION_STACK_OVERFLOW:
+            strcpy_s(s1, BUFSIZ, "STACK_OVERFLOW");
+            break;
+        case EXCEPTION_INVALID_DISPOSITION:
+            strcpy_s(s1, BUFSIZ, "INVALID_DISPOSITION");
+            break;
+        case EXCEPTION_GUARD_PAGE:
+            strcpy_s(s1, BUFSIZ, "GUARD_PAGE");
+            break;
+        case EXCEPTION_INVALID_HANDLE:
+            strcpy_s(s1, BUFSIZ, "INVALID_HANDLE");
+            break;
+        case CONTROL_C_EXIT:
+            strcpy_s(s1, BUFSIZ, "STATUS_CONTROL_C_EXIT");
+            break;
+        case DBG_TERMINATE_THREAD:
+            strcpy_s(s1, BUFSIZ, "DBG_TERMINATE_THREAD (Debugger terminated thread)");
+            break;
+        case DBG_TERMINATE_PROCESS:
+            strcpy_s(s1, BUFSIZ, "DBG_TERMINATE_PROCESS (Debugger terminated process)");
+            break;
+        case DBG_CONTROL_C:
+            strcpy_s(s1, BUFSIZ, "DBG_CONTROL_C (Debugger got control C)");
+            break;
+        case DBG_CONTROL_BREAK:
+            strcpy_s(s1, BUFSIZ, "DBG_CONTROL_BREAK (Debugger received control break)");
+            break;
+        case DBG_COMMAND_EXCEPTION:
+            strcpy_s(s1, BUFSIZ, "DBG_COMMAND_EXCEPTION (Debugger command communication exception)");
+            break;
+        default:
+            strcpy_s(s1, BUFSIZ, "(unknown exception)");
     }
 
     log->log_message(L"  Exception: %S", s1);
@@ -196,24 +225,24 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
     stack_frame.AddrStack.Mode = AddrModeFlat;
 #elif _M_X64
     image_type = IMAGE_FILE_MACHINE_AMD64;
-    stack_frame.AddrPC.Offset = ExceptionInfo->ContextRecord->Rip;
+    stack_frame.AddrPC.Offset = exception_info->ContextRecord->Rip;
     stack_frame.AddrPC.Mode = AddrModeFlat;
-    stack_frame.AddrFrame.Offset = ExceptionInfo->ContextRecord->Rsp;
+    stack_frame.AddrFrame.Offset = exception_info->ContextRecord->Rsp;
     stack_frame.AddrFrame.Mode = AddrModeFlat;
-    stack_frame.AddrStack.Offset = ExceptionInfo->ContextRecord->Rsp;
+    stack_frame.AddrStack.Offset = exception_info->ContextRecord->Rsp;
     stack_frame.AddrStack.Mode = AddrModeFlat;
 #elif _M_IA64
     image_type = IMAGE_FILE_MACHINE_IA64;
-    stack_frame.AddrPC.Offset = ExceptionInfo->ContextRecord->StIIP;
+    stack_frame.AddrPC.Offset = exception_info->ContextRecord->StIIP;
     stack_frame.AddrPC.Mode = AddrModeFlat;
-    stack_frame.AddrFrame.Offset = ExceptionInfo->ContextRecord->IntSp;
+    stack_frame.AddrFrame.Offset = exception_info->ContextRecord->IntSp;
     stack_frame.AddrFrame.Mode = AddrModeFlat;
-    stack_frame.AddrBStore.Offset = ExceptionInfo->ContextRecord->RsBSP;
+    stack_frame.AddrBStore.Offset = exception_info->ContextRecord->RsBSP;
     stack_frame.AddrBStore.Mode = AddrModeFlat;
-    stack_frame.AddrStack.Offset = ExceptionInfo->ContextRecord->IntSp;
+    stack_frame.AddrStack.Offset = exception_info->ContextRecord->IntSp;
     stack_frame.AddrStack.Mode = AddrModeFlat;
 #endif
-    for (int frame_number = 1; ; frame_number++) {
+    for (int frame_number = 1;; frame_number++) {
         result = StackWalk64(image_type, GetCurrentProcess(), GetCurrentThread(), &stack_frame,
                              exception_info->ContextRecord, nullptr, SymFunctionTableAccess64, SymGetModuleBase64,
                              nullptr);
@@ -228,8 +257,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
             if (result == TRUE) {
                 log->log_message(L"  %i. At line %d in '%S'", frame_number, source_line.LineNumber,
                                  source_line.FileName);
-            }
-            else {
+            } else {
                 log->log_message(L"  %i. At line (unknown) in (unknown)", frame_number);
                 /*
                 SystemErrorStr(GetLastError(),s2,BUFSIZ);
@@ -246,6 +274,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
     */
     return EXCEPTION_EXECUTE_HANDLER;
 }
+
 #endif
 
 /*
@@ -256,17 +285,17 @@ parameters and call the defragger library.
 */
 DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     OptimizeMode optimize_mode = {}; /* 1...11 */
-    LPWSTR* argv;
+    LPWSTR *argv;
     int argc;
-    time_t now;
-    tm now_tm{};
+    std::time_t now;
+    std::tm now_tm{};
     OSVERSIONINFO os_version;
     int i;
 
-    DefragLog* log = instance_->log_.get();
-    DefragStruct* defrag_struct = instance_->defrag_struct_.get();
-    DefragGui* gui = instance_->gui_;
-    DefragLib* defrag_lib = instance_->defrag_lib_;
+    DefragLog *log = instance_->log_.get();
+    DefragStruct *defrag_struct = instance_->defrag_struct_.get();
+    DefragGui *gui = instance_->gui_;
+    DefragLib *defrag_lib = instance_->defrag_lib_;
 
     // Setup the defaults
     optimize_mode.mode_ = OptimizeMode::AnalyzeFixupFastopt;
@@ -322,13 +351,13 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a number after the \"-a\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a number after the \"-a\" commandline argument.");
 
                     continue;
                 }
 
-                optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum)_wtol(argv[i]);
+                optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum) _wtol(argv[i]);
 
                 if (optimize_mode.mode_ < OptimizeMode::AnalyzeOnly || optimize_mode.mode_ >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
@@ -346,7 +375,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-a", 2) == 0) {
-                optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum)_wtol(&argv[i][2]);
+                optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum) _wtol(&argv[i][2]);
 
                 if (optimize_mode.mode_ < OptimizeMode::AnalyzeOnly || optimize_mode.mode_ >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
@@ -368,8 +397,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a number after the \"-s\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a number after the \"-s\" commandline argument.");
 
                     continue;
                 }
@@ -408,8 +437,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a number after the \"-f\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a number after the \"-f\" commandline argument.");
 
                     continue;
                 }
@@ -451,15 +480,16 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a number after the \"-d\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a number after the \"-d\" commandline argument.");
 
                     continue;
                 }
 
-                instance_->debug_level_ = (DebugLevel)_wtol(argv[i]);
+                instance_->debug_level_ = (DebugLevel) _wtol(argv[i]);
 
-                if (instance_->debug_level_ < DebugLevel::Fatal || instance_->debug_level_ > DebugLevel::DetailedGapFinding) {
+                if (instance_->debug_level_ < DebugLevel::Fatal ||
+                    instance_->debug_level_ > DebugLevel::DetailedGapFinding) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-d\" commandline argument is invalid.");
 
@@ -474,7 +504,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
             if (wcsncmp(argv[i], L"-d", 2) == 0 && wcslen(argv[i]) == 3 &&
                 argv[i][2] >= '0' && argv[i][2] <= '6') {
-                instance_->debug_level_ = (DebugLevel)_wtol(&argv[i][2]);
+                instance_->debug_level_ = (DebugLevel) _wtol(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-d' accepted, debug = %u",
                                 instance_->debug_level_);
@@ -487,19 +517,18 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a filename after the \"-l\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a filename after the \"-l\" commandline argument.");
 
                     continue;
                 }
 
-                wchar_t* LogFile = log->get_log_filename();
+                auto log_file = log->get_log_filename();
 
-                if (*LogFile != '\0') {
+                if (*log_file != '\0') {
                     gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-l' accepted, logfile = %s",
-                                    LogFile);
-                }
-                else {
+                                    log_file);
+                } else {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Commandline argument '-l' accepted, logfile turned off");
                 }
@@ -508,13 +537,12 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-l", 2) == 0 && wcslen(argv[i]) >= 3) {
-                wchar_t* LogFile = log->get_log_filename();
+                auto log_file = log->get_log_filename();
 
-                if (*LogFile != '\0') {
+                if (*log_file != '\0') {
                     gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-l' accepted, logfile = %s",
-                                    LogFile);
-                }
-                else {
+                                    log_file);
+                } else {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Commandline argument '-l' accepted, logfile turned off");
                 }
@@ -527,13 +555,13 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a mask after the \"-e\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a mask after the \"-e\" commandline argument.");
 
                     continue;
                 }
 
-                excludes.push_back(argv[i]);
+                excludes.emplace_back(argv[i]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-e' accepted, added '%s' to the excludes", argv[i]);
@@ -542,7 +570,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-e", 2) == 0 && wcslen(argv[i]) >= 3) {
-                excludes.push_back(&argv[i][2]);
+                excludes.emplace_back(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-e' accepted, added '%s' to the excludes",
@@ -556,13 +584,13 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 if (i >= argc) {
                     gui->show_debug(
-                        DebugLevel::Fatal, nullptr,
-                        L"Error: you have not specified a mask after the \"-u\" commandline argument.");
+                            DebugLevel::Fatal, nullptr,
+                            L"Error: you have not specified a mask after the \"-u\" commandline argument.");
 
                     continue;
                 }
 
-                space_hogs.push_back(argv[i]);
+                space_hogs.emplace_back(argv[i]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-u' accepted, added '%s' to the spacehogs", argv[i]);
@@ -571,7 +599,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (wcsncmp(argv[i], L"-u", 2) == 0 && wcslen(argv[i]) >= 3) {
-                space_hogs.push_back(&argv[i][2]);
+                space_hogs.emplace_back(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
                                 L"Commandline argument '-u' accepted, added '%s' to the spacehogs",
@@ -616,20 +644,20 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             if (*argv[i] == '\0') continue;
 
             defrag_lib->run_jk_defrag(argv[i], optimize_mode, speed, free_space, excludes, space_hogs,
-                                 &instance_->running_state_, std::nullopt);
+                                      &instance_->running_state_, std::nullopt);
 
             do_all_volumes = false;
         }
     }
 
     /* If no paths are specified on the commandline then defrag all fixed harddisks. */
-    if (do_all_volumes == true && instance_->i_am_running_ == RunningState::RUNNING) {
+    if (do_all_volumes && instance_->i_am_running_ == RunningState::RUNNING) {
         defrag_lib->run_jk_defrag(nullptr, optimize_mode, speed, free_space, excludes, space_hogs,
-                             &instance_->running_state_, std::nullopt);
+                                  &instance_->running_state_, std::nullopt);
     }
 
     /* If the "-q" command line argument was specified then exit the program. */
-    if (quit_on_finish == true) exit(EXIT_SUCCESS);
+    if (quit_on_finish) exit(EXIT_SUCCESS);
 
     /* End of this thread. */
     return 0;
@@ -673,13 +701,12 @@ bool Defrag::is_already_running(void) const {
                 strcpy_s(my_name, MAX_PATH, pe32.szExeFile);
                 break;
             }
-        }
-        while (Process32Next(snapshot, &pe32));
+        } while (Process32Next(snapshot, &pe32));
     }
 
     if (*my_name == '\0') {
         /* "Cannot find my own name in the process list: %s" */
-        swprintf_s(s1, BUFSIZ, L"Cannot find my own name in the process list: %s", my_name);
+        swprintf_s(s1, BUFSIZ, L"Cannot find my own name in the process list: %hs", my_name);
 
         gui_->show_debug(DebugLevel::Fatal, nullptr, s1);
 
@@ -705,8 +732,7 @@ bool Defrag::is_already_running(void) const {
 
             return true;
         }
-    }
-    while (Process32Next(snapshot, &pe32));
+    } while (Process32Next(snapshot, &pe32));
 
     /* Return false, not yet running. */
     CloseHandle(snapshot);
@@ -715,7 +741,7 @@ bool Defrag::is_already_running(void) const {
 
 
 int __stdcall WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show) {
-    Defrag* defrag = Defrag::get_instance();
+    Defrag *defrag = Defrag::get_instance();
     WPARAM ret_value = 0;
 
     if (defrag != nullptr) {
@@ -724,5 +750,5 @@ int __stdcall WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_lin
         Defrag::release_instance();
     }
 
-    return (int)ret_value;
+    return (int) ret_value;
 }

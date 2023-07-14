@@ -357,7 +357,7 @@ public:
     BOOL analyze_ntfs_volume(DefragDataStruct* data);
 
 private:
-    static wchar_t* stream_type_names(ATTRIBUTE_TYPE stream_type);
+    static const wchar_t * stream_type_names(const ATTRIBUTE_TYPE stream_type);
 
     bool fixup_raw_mftdata(DefragDataStruct* data, const NtfsDiskInfoStruct* disk_info, BYTE* buffer,
                            uint64_t buf_length) const;
@@ -375,11 +375,11 @@ private:
         uint64_t starting_vcn,
         uint64_t bytes);
 
-    void CleanupStreams(InodeDataStruct* InodeData, BOOL CleanupFragments);
+    void cleanup_streams(InodeDataStruct* InodeData, BOOL CleanupFragments);
 
-    wchar_t* ConstructStreamName(wchar_t* FileName1, wchar_t* FileName2, StreamStruct* Stream);
+    wchar_t* construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, StreamStruct* stream);
 
-    BOOL ProcessAttributes(
+    BOOL process_attributes(
         DefragDataStruct* Data,
         NtfsDiskInfoStruct* DiskInfo,
         InodeDataStruct* InodeData,
@@ -388,7 +388,7 @@ private:
         USHORT Instance,
         int Depth);
 
-    void ProcessAttributeList(
+    void process_attribute_list(
         DefragDataStruct* Data,
         NtfsDiskInfoStruct* DiskInfo,
         InodeDataStruct* InodeData,
@@ -396,7 +396,7 @@ private:
         uint64_t BufLength,
         int Depth);
 
-    BOOL InterpretMftRecord(
+    BOOL interpret_mft_record(
         DefragDataStruct* Data,
         NtfsDiskInfoStruct* DiskInfo,
         ItemStruct** InodeArray,

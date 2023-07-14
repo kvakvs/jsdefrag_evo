@@ -4,3 +4,4 @@ Debug
 Release
 x64
 /enc_temp_folder
+/cmake-build*
