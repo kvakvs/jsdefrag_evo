@@ -2,15 +2,16 @@
 
 #include <memory>
 
-#include "Constants.h"
+#include "constants.h"
 
 class Defrag {
 public:
     Defrag();
     ~Defrag();
 
-    // Get instance of the class
+    // Return non-owning pointer to instance of the class
     static Defrag* get_instance();
+    // Reset the owning instance pointer
     static void release_instance();
 
     WPARAM start_program(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show);
@@ -35,5 +36,5 @@ private:
     std::unique_ptr<DefragStruct> defrag_struct_;
 
     // static member that is an instance of itself
-    inline static Defrag* instance_ = nullptr;
+    inline static std::unique_ptr<Defrag> instance_;
 };

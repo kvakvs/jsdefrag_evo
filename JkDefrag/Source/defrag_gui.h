@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Constants.h"
+#include "constants.h"
 
 const COLORREF Colors[9] = {
 	RGB(150,150,150),     /* 0 COLOREMPTY         Empty diskspace. */
@@ -30,14 +30,14 @@ public:
 	static DefragGui *get_instance();
 
 	void clear_screen(WCHAR *format, ...);
-	void draw_cluster(struct DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int color);
+	void draw_cluster(DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int color);
 
 	void fill_squares( int clusterStartSquareNum, int clusterEndSquareNum );
-	void show_debug(DebugLevel level, const struct ItemStruct *item, WCHAR *format, ...);
-	void show_status(const struct DefragDataStruct *data);
-	void show_analyze(const struct DefragDataStruct *data, const struct ItemStruct *item);
-	void show_move(const struct ItemStruct *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
-	void ShowDiskmap(struct DefragDataStruct *Data);
+	void show_debug(DebugLevel level, const ItemStruct *item, WCHAR *format, ...);
+	void show_status(const DefragDataStruct *data);
+	void show_analyze(const DefragDataStruct *data, const ItemStruct *item);
+	void show_move(const ItemStruct *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
+	void ShowDiskmap(DefragDataStruct *Data);
 
 	int initialize(HINSTANCE instance, int cmd_show, DefragLog *log, DebugLevel debug_level);
 	void set_display_data(HDC dc);
@@ -92,7 +92,7 @@ private:
 	int num_disk_squares_;
 
 	// Color of each square in disk area and status if it is "dirty"
-	struct ClusterSquareStruct cluster_squares_[1000000]{};
+    ClusterSquareStruct cluster_squares_[1000000]{};
 
 	// Color of each disk cluster
 	byte *cluster_info_;
@@ -113,7 +113,7 @@ private:
 	HDC dc_{};
 
 	// Bitmap used for double buffering
-	Bitmap *bmp_;
+	std::unique_ptr<Bitmap> bmp_;
 
 	// pointer to logger
 	DefragLog *log_{};
@@ -122,5 +122,5 @@ private:
 	DefragLib *defrag_lib_;
 
 	// static member that is an instance of itself
-	static DefragGui *gui_;
+	inline static std::unique_ptr<DefragGui> gui_;
 };

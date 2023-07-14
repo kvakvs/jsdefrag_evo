@@ -94,6 +94,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <PrecompiledHeaderFile>std_afx.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <AdditionalDependencies>DbgHelp.lib;GdiPlus.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -162,14 +163,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Defrag.cpp" />
-    <ClCompile Include="Source\JkDefragGui.cpp" />
-    <ClCompile Include="Source\JkDefragLib.cpp" />
-    <ClCompile Include="Source\JKDefragLog.cpp" />
-    <ClCompile Include="Source\DefragStruct.cpp" />
-    <ClCompile Include="Source\ScanFat.cpp" />
-    <ClCompile Include="Source\ScanNtfs.cpp" />
-    <ClCompile Include="Source\StdAfx.cpp">
+    <ClCompile Include="Source\defrag.cpp" />
+    <ClCompile Include="Source\defrag_gui.cpp" />
+    <ClCompile Include="Source\defrag_lib.cpp" />
+    <ClCompile Include="Source\defrag_log.cpp" />
+    <ClCompile Include="Source\defrag_struct.cpp" />
+    <ClCompile Include="Source\scan_fat.cpp" />
+    <ClCompile Include="Source\scan_ntfs.cpp" />
+    <ClCompile Include="Source\std_afx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -177,15 +178,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Constants.h" />
-    <ClInclude Include="Source\Defrag.h" />
-    <ClInclude Include="Source\DefragGui.h" />
-    <ClInclude Include="Source\DefragLib.h" />
-    <ClInclude Include="Source\DefragLog.h" />
-    <ClInclude Include="Source\DefragStruct.h" />
-    <ClInclude Include="Source\ScanFat.h" />
-    <ClInclude Include="Source\ScanNtfs.h" />
-    <ClInclude Include="Source\StdAfx.h" />
+    <ClInclude Include="Source\defrag_data_struct.h" />
+    <ClInclude Include="Source\constants.h" />
+    <ClInclude Include="Source\defrag.h" />
+    <ClInclude Include="Source\defrag_gui.h" />
+    <ClInclude Include="Source\defrag_lib.h" />
+    <ClInclude Include="Source\defrag_log.h" />
+    <ClInclude Include="Source\defrag_struct.h" />
+    <ClInclude Include="Source\scan_fat.h" />
+    <ClInclude Include="Source\scan_ntfs.h" />
+    <ClInclude Include="Source\std_afx.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resource\JkDefrag.ico" />

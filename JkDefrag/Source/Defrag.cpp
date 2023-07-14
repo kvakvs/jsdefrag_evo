@@ -18,9 +18,8 @@ Internet Engineer
 http://www.kessels.com/
 */
 
-#include "StdAfx.h"
-
-#include "Defrag.h"
+#include "std_afx.h"
+#include "defrag.h"
 
 Defrag::Defrag()
     : running_state_(RunningState::STOPPED),
@@ -36,14 +35,14 @@ Defrag::~Defrag() = default;
 
 Defrag* Defrag::get_instance() {
     if (instance_ == nullptr) {
-        instance_ = new Defrag();
+        instance_.reset(new Defrag());
     }
 
-    return instance_;
+    return instance_.get();
 }
 
 void Defrag::release_instance() {
-    delete instance_;
+    instance_.reset();
 }
 
 WPARAM Defrag::start_program(const HINSTANCE instance,
@@ -53,7 +52,7 @@ WPARAM Defrag::start_program(const HINSTANCE instance,
     i_am_running_ = RunningState::RUNNING;
 
     /* Test if another instance is already running. */
-    if (this->is_already_running()) return (0);
+    if (this->is_already_running()) return 0;
 
 #ifdef _DEBUG
     /* Setup crash report handler. */
@@ -63,7 +62,7 @@ WPARAM Defrag::start_program(const HINSTANCE instance,
     gui_->initialize(instance, cmd_show, log_.get(), debug_level_);
 
     /* Start up the defragmentation and timer threads. */
-    if (CreateThread(nullptr, 0, &Defrag::defrag_thread, nullptr, 0, nullptr) == nullptr) return (0);
+    if (CreateThread(nullptr, 0, &Defrag::defrag_thread, nullptr, 0, nullptr) == nullptr) return 0;
 
     const WPARAM w_param = gui_->do_modal();
 
@@ -180,10 +179,10 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
 
         log->log_message(L"  Failed to initialize SymInitialize(): %s", s2);
 
-        return (EXCEPTION_EXECUTE_HANDLER);
+        return EXCEPTION_EXECUTE_HANDLER;
     }
 
-    ZeroMemory(&stack_frame, sizeof(stack_frame));
+    ZeroMemory(&stack_frame, sizeof stack_frame);
 
 #ifdef _M_IX86
     image_type = IMAGE_FILE_MACHINE_I386;
@@ -220,8 +219,8 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
         if (stack_frame.AddrPC.Offset == stack_frame.AddrReturn.Offset) break;
         if (stack_frame.AddrPC.Offset != 0) {
             line_displacement = 0;
-            ZeroMemory(&source_line, sizeof(source_line));
-            source_line.SizeOfStruct = sizeof(source_line);
+            ZeroMemory(&source_line, sizeof source_line);
+            source_line.SizeOfStruct = sizeof source_line;
             result = SymGetLineFromAddr64(GetCurrentProcess(), stack_frame.AddrPC.Offset,
                                           &line_displacement, &source_line);
             if (result == TRUE) {
@@ -243,7 +242,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
     EXCEPTION_CONTINUE_EXECUTION = infinite loop
     EXCEPTION_EXECUTE_HANDLER    = stop program, do not run debugger
     */
-    return (EXCEPTION_EXECUTE_HANDLER);
+    return EXCEPTION_EXECUTE_HANDLER;
 }
 #endif
 
@@ -258,7 +257,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     LPWSTR* argv;
     int argc;
     time_t now;
-    struct tm now_tm{};
+    tm now_tm{};
     OSVERSIONINFO os_version;
     int i;
 
@@ -290,7 +289,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 continue;
             }
-            if ((wcsncmp(argv[i], L"-l", 2) == 0) && (wcslen(argv[i]) >= 3)) {
+            if (wcsncmp(argv[i], L"-l", 2) == 0 && wcslen(argv[i]) >= 3) {
                 log->set_log_filename(&argv[i][2]);
 
                 continue;
@@ -329,7 +328,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum)_wtol(argv[i]);
 
-                if ((optimize_mode.mode_ < OptimizeMode::AnalyzeFixup) || (optimize_mode.mode_ >= OptimizeMode::Max)) {
+                if (optimize_mode.mode_ < OptimizeMode::AnalyzeFixup || optimize_mode.mode_ >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
@@ -347,7 +346,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             if (wcsncmp(argv[i], L"-a", 2) == 0) {
                 optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum)_wtol(&argv[i][2]);
 
-                if ((optimize_mode.mode_ < 1) || (optimize_mode.mode_ > 11)) {
+                if (optimize_mode.mode_ < 1 || optimize_mode.mode_ > 11) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
@@ -375,7 +374,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 speed = _wtol(argv[i]);
 
-                if ((speed < 1) || (speed > 100)) {
+                if (speed < 1 || speed > 100) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-s\" commandline argument is invalid.");
 
@@ -387,10 +386,10 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 continue;
             }
 
-            if ((wcsncmp(argv[i], L"-s", 2) == 0) && (wcslen(argv[i]) >= 3)) {
+            if (wcsncmp(argv[i], L"-s", 2) == 0 && wcslen(argv[i]) >= 3) {
                 speed = _wtol(&argv[i][2]);
 
-                if ((speed < 1) || (speed > 100)) {
+                if (speed < 1 || speed > 100) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-s\" commandline argument is invalid.");
 
@@ -415,7 +414,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 free_space = _wtof(argv[i]);
 
-                if ((free_space < 0) || (free_space > 100)) {
+                if (free_space < 0 || free_space > 100) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-f\" commandline argument is invalid.");
 
@@ -428,10 +427,10 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 continue;
             }
 
-            if ((wcsncmp(argv[i], L"-f", 2) == 0) && (wcslen(argv[i]) >= 3)) {
+            if (wcsncmp(argv[i], L"-f", 2) == 0 && wcslen(argv[i]) >= 3) {
                 free_space = _wtof(&argv[i][2]);
 
-                if ((free_space < 0) || (free_space > 100)) {
+                if (free_space < 0 || free_space > 100) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-f\" command line argument is invalid.");
 
@@ -458,7 +457,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
                 instance_->debug_level_ = (DebugLevel)_wtol(argv[i]);
 
-                if ((instance_->debug_level_ < DebugLevel::Fatal) || (instance_->debug_level_ > DebugLevel::DetailedGapFinding)) {
+                if (instance_->debug_level_ < DebugLevel::Fatal || instance_->debug_level_ > DebugLevel::DetailedGapFinding) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-d\" commandline argument is invalid.");
 
@@ -471,8 +470,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 continue;
             }
 
-            if ((wcsncmp(argv[i], L"-d", 2) == 0) && (wcslen(argv[i]) == 3) &&
-                (argv[i][2] >= '0') && (argv[i][2] <= '6')) {
+            if (wcsncmp(argv[i], L"-d", 2) == 0 && wcslen(argv[i]) == 3 &&
+                argv[i][2] >= '0' && argv[i][2] <= '6') {
                 instance_->debug_level_ = (DebugLevel)_wtol(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-d' accepted, debug = %u",
@@ -506,7 +505,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 continue;
             }
 
-            if ((wcsncmp(argv[i], L"-l", 2) == 0) && (wcslen(argv[i]) >= 3)) {
+            if (wcsncmp(argv[i], L"-l", 2) == 0 && wcslen(argv[i]) >= 3) {
                 WCHAR* LogFile = log->get_log_filename();
 
                 if (*LogFile != '\0') {
@@ -540,7 +539,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 continue;
             }
 
-            if ((wcsncmp(argv[i], L"-e", 2) == 0) && (wcslen(argv[i]) >= 3)) {
+            if (wcsncmp(argv[i], L"-e", 2) == 0 && wcslen(argv[i]) >= 3) {
                 excludes = defrag_lib->add_array_string(excludes, &argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
@@ -569,7 +568,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 continue;
             }
 
-            if ((wcsncmp(argv[i], L"-u", 2) == 0) && (wcslen(argv[i]) >= 3)) {
+            if (wcsncmp(argv[i], L"-u", 2) == 0 && wcslen(argv[i]) >= 3) {
                 space_hogs = defrag_lib->add_array_string(space_hogs, &argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
@@ -600,13 +599,13 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
         for (i = 1; i < argc; i++) {
             if (instance_->i_am_running_ != RunningState::RUNNING) break;
 
-            if ((wcscmp(argv[i], L"-a") == 0) ||
-                (wcscmp(argv[i], L"-e") == 0) ||
-                (wcscmp(argv[i], L"-u") == 0) ||
-                (wcscmp(argv[i], L"-s") == 0) ||
-                (wcscmp(argv[i], L"-f") == 0) ||
-                (wcscmp(argv[i], L"-d") == 0) ||
-                (wcscmp(argv[i], L"-l") == 0)) {
+            if (wcscmp(argv[i], L"-a") == 0 ||
+                wcscmp(argv[i], L"-e") == 0 ||
+                wcscmp(argv[i], L"-u") == 0 ||
+                wcscmp(argv[i], L"-s") == 0 ||
+                wcscmp(argv[i], L"-f") == 0 ||
+                wcscmp(argv[i], L"-d") == 0 ||
+                wcscmp(argv[i], L"-l") == 0) {
                 i++;
                 continue;
             }
@@ -623,7 +622,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     }
 
     /* If no paths are specified on the commandline then defrag all fixed harddisks. */
-    if ((do_all_volumes == true) && (instance_->i_am_running_ == RunningState::RUNNING)) {
+    if (do_all_volumes == true && instance_->i_am_running_ == RunningState::RUNNING) {
         defrag_lib->run_jk_defrag(nullptr, optimize_mode, speed, free_space, excludes, space_hogs,
                              &instance_->running_state_,
                              /*&JKDefragGui::getInstance()->RedrawScreen,*/nullptr);
@@ -633,7 +632,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     if (quit_on_finish == true) exit(EXIT_SUCCESS);
 
     /* End of this thread. */
-    return (0);
+    return 0;
 }
 
 /*
@@ -659,7 +658,7 @@ bool Defrag::is_already_running(void) const {
 
         gui_->show_debug(DebugLevel::Fatal, nullptr, s2);
 
-        return (true);
+        return true;
     }
 
     pe32.dwSize = sizeof(PROCESSENTRY32);
@@ -684,7 +683,7 @@ bool Defrag::is_already_running(void) const {
 
         gui_->show_debug(DebugLevel::Fatal, nullptr, s1);
 
-        return (true);
+        return true;
     }
 
     /* Search for any other process with the same executable name as
@@ -694,24 +693,24 @@ bool Defrag::is_already_running(void) const {
     do {
         if (my_pid == pe32.th32ProcessID) continue; /* Ignore myself. */
 
-        if ((_stricmp(pe32.szExeFile, my_name) == 0) ||
-            (_stricmp(pe32.szExeFile, "jkdefrag.exe") == 0) ||
-            (_stricmp(pe32.szExeFile, "jkdefragscreensaver.exe") == 0) ||
-            (_stricmp(pe32.szExeFile, "jkdefragcmd.exe") == 0)) {
+        if (_stricmp(pe32.szExeFile, my_name) == 0 ||
+            _stricmp(pe32.szExeFile, "jkdefrag.exe") == 0 ||
+            _stricmp(pe32.szExeFile, "jkdefragscreensaver.exe") == 0 ||
+            _stricmp(pe32.szExeFile, "jkdefragcmd.exe") == 0) {
             CloseHandle(snapshot);
 
             swprintf_s(s1, BUFSIZ, L"I am already running: %S", pe32.szExeFile);
 
             gui_->show_debug(DebugLevel::Fatal, nullptr, s1);
 
-            return (true);
+            return true;
         }
     }
     while (Process32Next(snapshot, &pe32));
 
     /* Return false, not yet running. */
     CloseHandle(snapshot);
-    return (false);
+    return false;
 }
 
 

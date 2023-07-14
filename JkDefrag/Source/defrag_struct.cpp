@@ -1,6 +1,6 @@
-#include "StdAfx.h"
+#include "std_afx.h"
+#include "defrag_struct.h"
 
-#include "DefragStruct.h"
 
 DefragStruct::DefragStruct()
 {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tchar.h>
+
 /* The colors used by the defragger. */
 //#define COLOREMPTY        0     /* Empty diskspace. */
 //#define COLORALLOCATED    1     /* Used diskspace / system files. */

@@ -14,57 +14,60 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Defrag.cpp">
+    <ClCompile Include="Source\defrag.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\JkDefragGui.cpp">
+    <ClCompile Include="Source\defrag_gui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\JkDefragLib.cpp">
+    <ClCompile Include="Source\defrag_lib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\JKDefragLog.cpp">
+    <ClCompile Include="Source\defrag_log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DefragStruct.cpp">
+    <ClCompile Include="Source\defrag_struct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ScanFat.cpp">
+    <ClCompile Include="Source\scan_fat.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ScanNtfs.cpp">
+    <ClCompile Include="Source\scan_ntfs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\StdAfx.cpp">
+    <ClCompile Include="Source\std_afx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Defrag.h">
+    <ClInclude Include="Source\defrag.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DefragGui.h">
+    <ClInclude Include="Source\defrag_gui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DefragLib.h">
+    <ClInclude Include="Source\defrag_lib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DefragLog.h">
+    <ClInclude Include="Source\defrag_log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DefragStruct.h">
+    <ClInclude Include="Source\defrag_struct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ScanFat.h">
+    <ClInclude Include="Source\scan_fat.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ScanNtfs.h">
+    <ClInclude Include="Source\scan_ntfs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\StdAfx.h">
+    <ClInclude Include="Source\std_afx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Constants.h">
+    <ClInclude Include="Source\constants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\defrag_data_struct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
