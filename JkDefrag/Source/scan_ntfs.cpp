@@ -1239,7 +1239,7 @@ BOOL ScanNtfs::InterpretMftRecord(
 
         if (Stream != nullptr) Data->count_all_clusters_ = Data->count_all_clusters_ + Stream->clusters_;
 
-        if (defrag_lib_->fragment_count(Item) > 1) {
+        if (defrag_lib_->get_fragment_count(Item) > 1) {
             Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
             Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + inode_data.bytes_;
 

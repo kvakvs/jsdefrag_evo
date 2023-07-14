@@ -25,6 +25,7 @@ http://www.kessels.com/
 
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <tchar.h>
 
 constexpr uint64_t VIRTUALFRAGMENT = 18446744073709551615UL; /* _UI64_MAX - 1 */
@@ -146,7 +147,8 @@ public:
     DefragLib& operator=(const DefragLib& other) = default;
     DefragLib& operator=(DefragLib&& other) noexcept = default;
 
-    static DefragLib* getInstance();
+    // Get a non-ownint pointer to unique instance
+    static DefragLib* get_instance();
 
     /* Run the defragger/optimizer.
     
@@ -268,41 +270,41 @@ public:
     static __declspec(dllexport) bool match_mask(WCHAR* string, WCHAR* mask);
 
     static __declspec(dllexport) WCHAR** add_array_string(WCHAR** array, const WCHAR* new_string);
-    __declspec(dllexport) WCHAR* get_short_path(const DefragDataStruct* data, ItemStruct* item);
-    __declspec(dllexport) WCHAR* get_long_path(const DefragDataStruct* data, ItemStruct* item);
+    __declspec(dllexport) WCHAR* get_short_path(const DefragDataStruct* data, const ItemStruct* item);
+    __declspec(dllexport) WCHAR* get_long_path(const DefragDataStruct* data, const ItemStruct* item);
 
-    static __declspec(dllexport) void slow_down(DefragDataStruct* Data);
+    static __declspec(dllexport) void slow_down(DefragDataStruct* data);
 
     static __declspec(dllexport) uint64_t get_item_lcn(const ItemStruct* item);
 
     static __declspec(dllexport) ItemStruct* tree_smallest(ItemStruct* top);
-    __declspec(dllexport) ItemStruct* tree_biggest(ItemStruct* Top);
-    __declspec(dllexport) ItemStruct* tree_first(ItemStruct* Top, int Direction);
-    __declspec(dllexport) ItemStruct* tree_prev(ItemStruct* Here);
-    __declspec(dllexport) ItemStruct* tree_next(ItemStruct* Here);
-    __declspec(dllexport) ItemStruct* tree_next_prev(ItemStruct* Here, int Direction);
+    static __declspec(dllexport) ItemStruct* tree_biggest(ItemStruct* top);
+    static __declspec(dllexport) ItemStruct* tree_first(ItemStruct* top, int direction);
+    static __declspec(dllexport) ItemStruct* tree_prev(ItemStruct* here);
+    static __declspec(dllexport) ItemStruct* tree_next(ItemStruct* here);
+    static __declspec(dllexport) ItemStruct* tree_next_prev(ItemStruct* here, const bool reverse);
 
-    __declspec(dllexport) void tree_insert(DefragDataStruct* Data, ItemStruct* New);
-    __declspec(dllexport) void tree_detach(DefragDataStruct* Data, ItemStruct* Item);
-    __declspec(dllexport) void delete_item_tree(ItemStruct* Top);
-    __declspec(dllexport) int fragment_count(ItemStruct* Item);
-    __declspec(dllexport) bool is_fragmented(ItemStruct* Item, uint64_t Offset, uint64_t Size);
-    __declspec(dllexport) void colorize_item(DefragDataStruct* data, ItemStruct* item,
-                                             uint64_t busy_offset, uint64_t busy_size, int un_draw);
-    __declspec(dllexport) void call_show_status(DefragDataStruct* Data, int Phase, int Zone);
+    static __declspec(dllexport) void tree_insert(DefragDataStruct* data, ItemStruct* new_item);
+    static __declspec(dllexport) void tree_detach(DefragDataStruct* data, const ItemStruct* item);
+    static __declspec(dllexport) void delete_item_tree(ItemStruct* top);
+    static __declspec(dllexport) int get_fragment_count(const ItemStruct* item);
+    static __declspec(dllexport) bool is_fragmented(const ItemStruct* item, uint64_t offset, uint64_t size);
+    __declspec(dllexport) void colorize_item(DefragDataStruct* data, const ItemStruct* item,
+                                             uint64_t busy_offset, uint64_t busy_size, int un_draw) const;
+    static __declspec(dllexport) void call_show_status(DefragDataStruct* data, int phase, int zone);
 
 private:
     static WCHAR lower_case(WCHAR c);
 
     void append_to_short_path(const ItemStruct* item, WCHAR* path, size_t length);
     void append_to_long_path(const ItemStruct* item, WCHAR* path, size_t length);
-    uint64_t find_fragment_begin(ItemStruct* Item, uint64_t Lcn);
+    static uint64_t find_fragment_begin(const ItemStruct* item, uint64_t lcn);
 
-    ItemStruct* find_item_at_lcn(DefragDataStruct* Data, uint64_t Lcn);
-    HANDLE open_item_handle(DefragDataStruct* Data, ItemStruct* Item);
-    int get_fragments(DefragDataStruct* Data, ItemStruct* Item, HANDLE FileHandle);
+    static ItemStruct* find_item_at_lcn(const DefragDataStruct* data, uint64_t lcn);
+    HANDLE open_item_handle(const DefragDataStruct* data, const ItemStruct* item) const;
+    int get_fragments(const DefragDataStruct* data, ItemStruct* item, HANDLE file_handle) const;
 
-    bool find_gap(DefragDataStruct* data,
+    bool find_gap(const DefragDataStruct* data,
                   uint64_t minimum_lcn,
                   /* Gap must be at or above this LCN. */
                   uint64_t maximum_lcn,
@@ -319,72 +321,72 @@ private:
                   /* Result, LCN of end of cluster. */
                   BOOL ignore_mft_excludes) const;
 
-    void calculate_zones(DefragDataStruct* Data);
+    static void calculate_zones(DefragDataStruct* data);
 
-    uint32_t move_item1(DefragDataStruct* Data,
-                        HANDLE FileHandle,
-                        ItemStruct* Item,
-                        uint64_t NewLcn, /* Where to move to. */
-                        uint64_t Offset, /* Number of first cluster to be moved. */
-                        uint64_t Size); /* Number of clusters to be moved. */
+    uint32_t move_item1(DefragDataStruct* data,
+                        HANDLE file_handle,
+                        const ItemStruct* item,
+                        uint64_t new_lcn, /* Where to move to. */
+                        uint64_t offset, /* Number of first cluster to be moved. */
+                        uint64_t size) const; /* Number of clusters to be moved. */
 
-    uint32_t move_item2(DefragDataStruct* Data,
-                        HANDLE FileHandle,
-                        ItemStruct* Item,
-                        uint64_t NewLcn, /* Where to move to. */
-                        uint64_t Offset, /* Number of first cluster to be moved. */
-                        uint64_t Size); /* Number of clusters to be moved. */
+    uint32_t move_item2(DefragDataStruct* data,
+                        HANDLE file_handle,
+                        const ItemStruct* item,
+                        uint64_t new_lcn, /* Where to move to. */
+                        uint64_t offset, /* Number of first cluster to be moved. */
+                        uint64_t size) const; /* Number of clusters to be moved. */
 
-    int MoveItem3(DefragDataStruct* Data,
-                  ItemStruct* Item,
-                  HANDLE FileHandle,
-                  uint64_t NewLcn, /* Where to move to. */
-                  uint64_t Offset, /* Number of first cluster to be moved. */
-                  uint64_t Size, /* Number of clusters to be moved. */
-                  int Strategy); /* 0: move in one part, 1: move individual fragments. */
+    int move_item3(DefragDataStruct* data,
+                  ItemStruct* item,
+                  HANDLE file_handle,
+                  uint64_t new_lcn, /* Where to move to. */
+                  uint64_t offset, /* Number of first cluster to be moved. */
+                  uint64_t size, /* Number of clusters to be moved. */
+                  int strategy) const; /* 0: move in one part, 1: move individual fragments. */
 
-    int MoveItem4(DefragDataStruct* Data,
-                  ItemStruct* Item,
-                  HANDLE FileHandle,
-                  uint64_t NewLcn, /* Where to move to. */
-                  uint64_t Offset, /* Number of first cluster to be moved. */
-                  uint64_t Size, /* Number of clusters to be moved. */
-                  int Direction); /* 0: move up, 1: move down. */
+    int move_item4(DefragDataStruct* data,
+                  ItemStruct* item,
+                  HANDLE file_handle,
+                  uint64_t new_lcn, /* Where to move to. */
+                  uint64_t offset, /* Number of first cluster to be moved. */
+                  uint64_t size, /* Number of clusters to be moved. */
+                  int direction) const; /* 0: move up, 1: move down. */
 
-    int MoveItem(DefragDataStruct* Data,
-                 ItemStruct* Item,
-                 uint64_t NewLcn, /* Where to move to. */
-                 uint64_t Offset, /* Number of first cluster to be moved. */
-                 uint64_t Size, /* Number of clusters to be moved. */
-                 int Direction); /* 0: move up, 1: move down. */
+    int move_item(DefragDataStruct* data,
+                 ItemStruct* item,
+                 uint64_t new_lcn, /* Where to move to. */
+                 uint64_t offset, /* Number of first cluster to be moved. */
+                 uint64_t size, /* Number of clusters to be moved. */
+                 int direction) const; /* 0: move up, 1: move down. */
 
-    ItemStruct* FindHighestItem(const DefragDataStruct* data,
-                                uint64_t ClusterStart,
-                                uint64_t ClusterEnd,
-                                int Direction,
-                                int Zone);
+    static ItemStruct* find_highest_item(const DefragDataStruct* data,
+                                         uint64_t cluster_start,
+                                         uint64_t cluster_end,
+                                         int direction,
+                                         int zone);
 
-    ItemStruct* FindBestItem(const DefragDataStruct* data,
-                             uint64_t ClusterStart,
-                             uint64_t ClusterEnd,
-                             int Direction,
-                             int Zone);
+    static ItemStruct* find_best_item(const DefragDataStruct* data,
+                                      uint64_t cluster_start,
+                                      uint64_t cluster_end,
+                                      int direction,
+                                      int zone);
 
-    void CompareItems(DefragDataStruct* Data, ItemStruct* Item);
+    void compare_items(DefragDataStruct* data, const ItemStruct* item) const;
 
-    int CompareItems(ItemStruct* Item1, ItemStruct* Item2, int SortField);
+    int compare_items(ItemStruct* Item1, ItemStruct* Item2, int SortField);
 
-    void ScanDir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentDirectory);
+    void scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentDirectory);
 
-    void AnalyzeVolume(DefragDataStruct* Data);
+    void analyze_volume(DefragDataStruct* Data);
 
     void fixup(DefragDataStruct* data);
 
-    void Defragment(DefragDataStruct* Data);
+    void defragment(DefragDataStruct* Data);
 
-    void ForcedFill(DefragDataStruct* Data);
+    void forced_fill(DefragDataStruct* Data);
 
-    void Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, BOOL IgnoreMftExcludes);
+    void vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, BOOL IgnoreMftExcludes);
 
     void move_mft_to_begin_of_disk(DefragDataStruct* data);
 
@@ -399,5 +401,5 @@ private:
     void defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, OptimizeMode opt_mode);
 
     // static member that is an instance of itself
-    inline static DefragLib* instance_ = nullptr;
+    inline static std::unique_ptr<DefragLib> instance_;
 };

@@ -25,8 +25,8 @@ Defrag::Defrag()
     : running_state_(RunningState::STOPPED),
       i_am_running_(RunningState::STOPPED),
       debug_level_(DebugLevel::Warning) {
-    gui_.reset(DefragGui::get_instance());
-    defrag_lib_.reset(DefragLib::getInstance());
+    gui_ = DefragGui::get_instance();
+    defrag_lib_ = DefragLib::get_instance();
     log_.reset(new DefragLog());
     defrag_struct_.reset(new DefragStruct());
 }
@@ -95,7 +95,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS* exception_info) {
     char s1[BUFSIZ];
 
     DefragLog* log = instance_->log_.get();
-    const DefragLib* defrag_lib = instance_->defrag_lib_.get();
+    const DefragLib* defrag_lib = instance_->defrag_lib_;
 
     /* Exit if we're running inside a debugger. */
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
@@ -263,8 +263,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 
     DefragLog* log = instance_->log_.get();
     DefragStruct* defrag_struct = instance_->defrag_struct_.get();
-    DefragGui* gui = instance_->gui_.get();
-    DefragLib* defrag_lib = instance_->defrag_lib_.get();
+    DefragGui* gui = instance_->gui_;
+    DefragLib* defrag_lib = instance_->defrag_lib_;
 
     /* Setup the defaults. */
     optimize_mode.mode_ = OptimizeMode::AnalyzeFixupFastopt;

@@ -2,7 +2,7 @@
 #include "defrag_data_struct.h"
 
 DefragGui::DefragGui(): debug_level_() {
-    defrag_lib_ = DefragLib::getInstance();
+    defrag_lib_ = DefragLib::get_instance();
 
     bmp_ = nullptr;
 
@@ -32,11 +32,11 @@ DefragGui::DefragGui(): debug_level_() {
 DefragGui::~DefragGui() = default;
 
 DefragGui* DefragGui::get_instance() {
-    if (gui_ == nullptr) {
-        gui_.reset(new DefragGui());
+    if (instance_ == nullptr) {
+        instance_.reset(new DefragGui());
     }
 
-    return gui_.get();
+    return instance_.get();
 }
 
 int DefragGui::initialize(const HINSTANCE instance, const int cmd_show, DefragLog* log, const DebugLevel debug_level) {
@@ -509,7 +509,8 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             log_->log_message(L"- Average end-begin distance: %.0f clusters", data->average_distance_);
         }
 
-        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->tree_next(item)) {
+        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
+             tree_next(item)) {
             if (item->is_unmovable_ != true) continue;
             if (item->is_excluded_ == true) continue;
             if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
@@ -534,7 +535,7 @@ void DefragGui::show_status(const DefragDataStruct* data) {
                         _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0))
                     continue;
 
-                fragments = defrag_lib_->fragment_count(item);
+                fragments = defrag_lib_->get_fragment_count(item);
 
                 if (item->long_path_ == nullptr) {
                     log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->bytes_,
@@ -555,11 +556,12 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             log_->log_message(L"  %9I64u %11I64u %9I64u Total", total_fragments, total_bytes, total_clusters);
         }
 
-        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->tree_next(item)) {
+        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
+             tree_next(item)) {
             if (item->is_excluded_ == true) continue;
             if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
 
-            fragments = defrag_lib_->fragment_count(item);
+            fragments = defrag_lib_->get_fragment_count(item);
 
             if (fragments <= 1) continue;
 
@@ -579,7 +581,7 @@ void DefragGui::show_status(const DefragDataStruct* data) {
                 if (item->is_excluded_ == true) continue;
                 if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
 
-                fragments = defrag_lib_->fragment_count(item);
+                fragments = defrag_lib_->get_fragment_count(item);
 
                 if (fragments <= 1) continue;
 
@@ -604,7 +606,8 @@ void DefragGui::show_status(const DefragDataStruct* data) {
 
         int last_largest = 0;
 
-        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->tree_next(item)) {
+        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
+             tree_next(item)) {
             if (item->long_filename_ != nullptr &&
                 (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
                     _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
@@ -644,13 +647,14 @@ void DefragGui::show_status(const DefragDataStruct* data) {
             for (i = 0; i < last_largest; i++) {
                 if (largest_items[i]->long_path_ == nullptr) {
                     log_->log_message(L"  %9u %11I64u %9I64u [at cluster %I64u]",
-                                      defrag_lib_->fragment_count(largest_items[i]),
+                                      defrag_lib_->get_fragment_count(largest_items[i]),
                                       largest_items[i]->bytes_, largest_items[i]->clusters_count_,
                                       defrag_lib_->get_item_lcn(largest_items[i]));
                 }
                 else {
-                    log_->log_message(L"  %9u %11I64u %9I64u %s", defrag_lib_->fragment_count(largest_items[i]),
-                                      largest_items[i]->bytes_, largest_items[i]->clusters_count_, largest_items[i]->long_path_);
+                    log_->log_message(L"  %9u %11I64u %9I64u %s", defrag_lib_->get_fragment_count(largest_items[i]),
+                                      largest_items[i]->bytes_, largest_items[i]->clusters_count_,
+                                      largest_items[i]->long_path_);
                 }
             }
         }
@@ -659,7 +663,7 @@ void DefragGui::show_status(const DefragDataStruct* data) {
 
 
 void DefragGui::paint_image(HDC dc) {
-    Graphics* graphics = Graphics::FromImage(bmp_.get());
+    std::unique_ptr<Graphics> graphics(Graphics::FromImage(bmp_.get()));
     Rect window_size = client_window_size_;
     Rect draw_area;
 
@@ -892,15 +896,13 @@ void DefragGui::paint_image(HDC dc) {
             graphics->DrawLine(&pen, line_x2, line_y2, line_x3, line_y3);
         }
     }
-
-    delete graphics;
 }
 
 void DefragGui::on_paint(HDC dc) const {
     /*
         Bitmap bmp(m_clientWindowSize.Width, m_clientWindowSize.Height);
     
-        Graphics *graphics2 = Graphics::FromImage(&bmp);
+        std::unique_ptr<Graphics> graphics2(Graphics::FromImage(&bmp));
     */
 
     Graphics graphics(dc);
@@ -932,10 +934,6 @@ void DefragGui::on_paint(HDC dc) const {
     */
 
     graphics.DrawImage(bmp_.get(), 0, 0);
-
-    /*
-        delete graphics2;
-    */
 
     return;
 }
@@ -982,19 +980,19 @@ LRESULT CALLBACK DefragGui::process_messagefn(const HWND wnd, const UINT message
 
     case WM_PAINT: {
         /* Grab the display mutex, to make sure that we are the only thread changing the window. */
-        WaitForSingleObject(gui_->display_mutex_, 100);
+        WaitForSingleObject(instance_->display_mutex_, 100);
 
-        gui_->display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
+        instance_->display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
         PAINTSTRUCT ps;
 
-        gui_->dc_ = BeginPaint(wnd, &ps);
+        instance_->dc_ = BeginPaint(wnd, &ps);
 
-        gui_->on_paint(gui_->dc_);
+        instance_->on_paint(instance_->dc_);
 
         EndPaint(wnd, &ps);
 
-        ReleaseMutex(gui_->display_mutex_);
+        ReleaseMutex(instance_->display_mutex_);
     }
 
         return 0;
@@ -1002,7 +1000,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(const HWND wnd, const UINT message
 
     case WM_ERASEBKGND: {
         //			m_jkDefragGui->RedrawScreen = 0;
-        InvalidateRect(gui_->wnd_, nullptr,FALSE);
+        InvalidateRect(instance_->wnd_, nullptr,FALSE);
     }
 
         return 0;
@@ -1024,21 +1022,21 @@ LRESULT CALLBACK DefragGui::process_messagefn(const HWND wnd, const UINT message
 
         PAINTSTRUCT ps;
 
-        WaitForSingleObject(gui_->display_mutex_, 100);
+        WaitForSingleObject(instance_->display_mutex_, 100);
 
-        gui_->display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
+        instance_->display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
-        gui_->dc_ = BeginPaint(wnd, &ps);
+        instance_->dc_ = BeginPaint(wnd, &ps);
 
-        gui_->set_display_data(gui_->dc_);
+        instance_->set_display_data(instance_->dc_);
 
-        gui_->fill_squares(0, gui_->num_disk_squares_);
+        instance_->fill_squares(0, instance_->num_disk_squares_);
 
-        gui_->paint_image(gui_->dc_);
+        instance_->paint_image(instance_->dc_);
 
         EndPaint(wnd, &ps);
 
-        ReleaseMutex(gui_->display_mutex_);
+        ReleaseMutex(instance_->display_mutex_);
     }
 
         return 0;

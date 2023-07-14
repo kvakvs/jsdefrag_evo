@@ -122,5 +122,5 @@ private:
 	DefragLib *defrag_lib_;
 
 	// static member that is an instance of itself
-	inline static std::unique_ptr<DefragGui> gui_;
+	inline static std::unique_ptr<DefragGui> instance_;
 };

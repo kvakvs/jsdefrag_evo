@@ -30,11 +30,14 @@ private:
     RunningState i_am_running_;
     DebugLevel debug_level_;
 
-    std::unique_ptr<DefragGui> gui_;
-    std::unique_ptr<DefragLib> defrag_lib_;
+    // Non-owning
+    DefragGui* gui_;
+    DefragLib* defrag_lib_;
+
+    // Owning
     std::unique_ptr<DefragLog> log_;
     std::unique_ptr<DefragStruct> defrag_struct_;
 
-    // static member that is an instance of itself
+    // Owning; singleton instance
     inline static std::unique_ptr<Defrag> instance_;
 };

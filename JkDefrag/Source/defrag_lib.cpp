@@ -27,12 +27,12 @@ http://www.kessels.com/
 DefragLib::DefragLib() = default;
 DefragLib::~DefragLib() = default;
 
-DefragLib* DefragLib::getInstance() {
+DefragLib* DefragLib::get_instance() {
     if (instance_ == nullptr) {
-        instance_ = new DefragLib();
+        instance_.reset(new DefragLib());
     }
 
-    return instance_;
+    return instance_.get();
 }
 
 /*
@@ -160,7 +160,7 @@ void DefragLib::system_error_str(const uint32_t error_code, WCHAR* out, const si
 }
 
 /* Translate character to lowercase. */
-WCHAR DefragLib::lower_case(WCHAR c) {
+WCHAR DefragLib::lower_case(const WCHAR c) {
     if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
 
     return c;
@@ -317,7 +317,7 @@ Return a string with the full path of an item, constructed from the short names.
 Return nullptr if error. The caller must free() the new string.
 
 */
-WCHAR* DefragLib::get_short_path(const DefragDataStruct* data, ItemStruct* item) {
+WCHAR* DefragLib::get_short_path(const DefragDataStruct* data, const ItemStruct* item) {
     /* Sanity check. */
     if (item == nullptr) return nullptr;
 
@@ -369,7 +369,7 @@ Return a string with the full path of an item, constructed from the long names.
 Return nullptr if error. The caller must free() the new string.
 
 */
-WCHAR* DefragLib::get_long_path(const DefragDataStruct* data, ItemStruct* item) {
+WCHAR* DefragLib::get_long_path(const DefragDataStruct* data, const ItemStruct* item) {
     /* Sanity check. */
     if (item == nullptr) return nullptr;
 
@@ -402,11 +402,11 @@ WCHAR* DefragLib::get_long_path(const DefragDataStruct* data, ItemStruct* item) 
 }
 
 /* Slow the program down. */
-void DefragLib::slow_down(DefragDataStruct* Data) {
+void DefragLib::slow_down(DefragDataStruct* data) {
     __timeb64 t{};
 
     /* Sanity check. */
-    if (Data->speed_ <= 0 || Data->speed_ >= 100) return;
+    if (data->speed_ <= 0 || data->speed_ >= 100) return;
 
     /* Calculate the time we have to sleep so that the wall time is 100% and the
     actual running time is the "-s" parameter percentage. */
@@ -414,15 +414,15 @@ void DefragLib::slow_down(DefragDataStruct* Data) {
 
     const int64_t now = t.time * 1000 + t.millitm;
 
-    if (now > Data->last_checkpoint_) {
-        Data->running_time_ = Data->running_time_ + now - Data->last_checkpoint_;
+    if (now > data->last_checkpoint_) {
+        data->running_time_ = data->running_time_ + now - data->last_checkpoint_;
     }
 
-    if (now < Data->start_time_) Data->start_time_ = now; /* Should never happen. */
+    if (now < data->start_time_) data->start_time_ = now; /* Should never happen. */
 
     /* Sleep. */
-    if (Data->running_time_ > 0) {
-        int64_t delay = Data->running_time_ * (int64_t)100 / (int64_t)Data->speed_ - (now - Data->start_time_);
+    if (data->running_time_ > 0) {
+        int64_t delay = data->running_time_ * (int64_t)100 / (int64_t)data->speed_ - (now - data->start_time_);
 
         if (delay > 30000) delay = 30000;
         if (delay > 0) Sleep((uint32_t)delay);
@@ -431,7 +431,7 @@ void DefragLib::slow_down(DefragDataStruct* Data) {
     /* Save the current wall time, so next time we can calculate the time spent in	the program. */
     _ftime64_s(&t);
 
-    Data->last_checkpoint_ = t.time * 1000 + t.millitm;
+    data->last_checkpoint_ = t.time * 1000 + t.millitm;
 }
 
 /* Return the location on disk (LCN, Logical Cluster Number) of an item. */
@@ -460,12 +460,12 @@ ItemStruct* DefragLib::tree_smallest(ItemStruct* top) {
 }
 
 /* Return pointer to the last item in the tree (the last file on the volume). */
-ItemStruct* DefragLib::tree_biggest(ItemStruct* Top) {
-    if (Top == nullptr) return nullptr;
+ItemStruct* DefragLib::tree_biggest(ItemStruct* top) {
+    if (top == nullptr) return nullptr;
 
-    while (Top->bigger_ != nullptr) Top = Top->bigger_;
+    while (top->bigger_ != nullptr) top = top->bigger_;
 
-    return Top;
+    return top;
 }
 
 /*
@@ -474,56 +474,56 @@ If Direction=0 then return a pointer to the first file on the volume,
 if Direction=1 then the last file.
 
 */
-ItemStruct* DefragLib::tree_first(ItemStruct* Top, int Direction) {
-    if (Direction == 0) return tree_smallest(Top);
+ItemStruct* DefragLib::tree_first(ItemStruct* top, const int direction) {
+    if (direction == 0) return tree_smallest(top);
 
-    return tree_biggest(Top);
+    return tree_biggest(top);
 }
 
 /* Return pointer to the previous item in the tree. */
-ItemStruct* DefragLib::tree_prev(ItemStruct* Here) {
-    ItemStruct* Temp;
+ItemStruct* DefragLib::tree_prev(ItemStruct* here) {
+    ItemStruct* temp;
 
-    if (Here == nullptr) return Here;
+    if (here == nullptr) return here;
 
-    if (Here->smaller_ != nullptr) {
-        Here = Here->smaller_;
+    if (here->smaller_ != nullptr) {
+        here = here->smaller_;
 
-        while (Here->bigger_ != nullptr) Here = Here->bigger_;
+        while (here->bigger_ != nullptr) here = here->bigger_;
 
-        return Here;
+        return here;
     }
 
     do {
-        Temp = Here;
-        Here = Here->parent_;
+        temp = here;
+        here = here->parent_;
     }
-    while (Here != nullptr && Here->smaller_ == Temp);
+    while (here != nullptr && here->smaller_ == temp);
 
-    return Here;
+    return here;
 }
 
 /* Return pointer to the next item in the tree. */
-ItemStruct* DefragLib::tree_next(ItemStruct* Here) {
-    ItemStruct* Temp;
+ItemStruct* DefragLib::tree_next(ItemStruct* here) {
+    ItemStruct* temp;
 
-    if (Here == nullptr) return nullptr;
+    if (here == nullptr) return nullptr;
 
-    if (Here->bigger_ != nullptr) {
-        Here = Here->bigger_;
+    if (here->bigger_ != nullptr) {
+        here = here->bigger_;
 
-        while (Here->smaller_ != nullptr) Here = Here->smaller_;
+        while (here->smaller_ != nullptr) here = here->smaller_;
 
-        return Here;
+        return here;
     }
 
     do {
-        Temp = Here;
-        Here = Here->parent_;
+        temp = here;
+        here = here->parent_;
     }
-    while (Here != nullptr && Here->bigger_ == Temp);
+    while (here != nullptr && here->bigger_ == temp);
 
-    return Here;
+    return here;
 }
 
 /*
@@ -532,76 +532,61 @@ If Direction=0 then return a pointer to the next file on the volume,
 if Direction=1 then the previous file.
 
 */
-ItemStruct* DefragLib::tree_next_prev(ItemStruct* Here, int Direction) {
-    if (Direction == 0) return tree_next(Here);
+ItemStruct* DefragLib::tree_next_prev(ItemStruct* here, const bool reverse) {
+    if (reverse == false) return tree_next(here);
 
-    return tree_prev(Here);
+    return tree_prev(here);
 }
 
 /* Insert a record into the tree. The tree is sorted by LCN (Logical Cluster Number). */
-void DefragLib::tree_insert(DefragDataStruct* Data, ItemStruct* New) {
-    ItemStruct* Here;
-    ItemStruct* Ins;
+void DefragLib::tree_insert(DefragDataStruct* data, ItemStruct* new_item) {
+    ItemStruct* b;
 
-    uint64_t HereLcn;
-    uint64_t NewLcn;
+    if (new_item == nullptr) return;
 
-    int Found;
-
-    ItemStruct* A;
-    ItemStruct* B;
-    ItemStruct* C;
-
-    long Count;
-    long Skip;
-
-    if (New == nullptr) return;
-
-    NewLcn = get_item_lcn(New);
+    const uint64_t new_lcn = get_item_lcn(new_item);
 
     /* Locate the place where the record should be inserted. */
-    Here = Data->item_tree_;
-    Ins = nullptr;
-    Found = 1;
+    ItemStruct* here = data->item_tree_;
+    ItemStruct* ins = nullptr;
+    int found = 1;
 
-    while (Here != nullptr) {
-        Ins = Here;
-        Found = 0;
+    while (here != nullptr) {
+        ins = here;
+        found = 0;
 
-        HereLcn = get_item_lcn(Here);
-
-        if (HereLcn > NewLcn) {
-            Found = 1;
-            Here = Here->smaller_;
+        if (const uint64_t here_lcn = get_item_lcn(here); here_lcn > new_lcn) {
+            found = 1;
+            here = here->smaller_;
         }
         else {
-            if (HereLcn < NewLcn) Found = -1;
+            if (here_lcn < new_lcn) found = -1;
 
-            Here = Here->bigger_;
+            here = here->bigger_;
         }
     }
 
     /* Insert the record. */
-    New->parent_ = Ins;
-    New->smaller_ = nullptr;
-    New->bigger_ = nullptr;
+    new_item->parent_ = ins;
+    new_item->smaller_ = nullptr;
+    new_item->bigger_ = nullptr;
 
-    if (Ins == nullptr) {
-        Data->item_tree_ = New;
+    if (ins == nullptr) {
+        data->item_tree_ = new_item;
     }
     else {
-        if (Found > 0) {
-            Ins->smaller_ = New;
+        if (found > 0) {
+            ins->smaller_ = new_item;
         }
         else {
-            Ins->bigger_ = New;
+            ins->bigger_ = new_item;
         }
     }
 
     /* If there have been less than 1000 inserts then return. */
-    Data->balance_count_ = Data->balance_count_ + 1;
+    data->balance_count_ = data->balance_count_ + 1;
 
-    if (Data->balance_count_ < 1000) return;
+    if (data->balance_count_ < 1000) return;
 
     /* Balance the tree.
     It's difficult to explain what exactly happens here. For an excellent
@@ -609,96 +594,96 @@ void DefragLib::tree_insert(DefragDataStruct* Data, ItemStruct* New) {
     http://www.stanford.edu/~blp/avl/libavl.html/Balancing-a-BST.html
     */
 
-    Data->balance_count_ = 0;
+    data->balance_count_ = 0;
 
     /* Convert the tree into a vine. */
-    A = Data->item_tree_;
-    C = A;
-    Count = 0;
+    ItemStruct* a = data->item_tree_;
+    ItemStruct* c = a;
+    long count = 0;
 
-    while (A != nullptr) {
+    while (a != nullptr) {
         /* If A has no Bigger child then move down the tree. */
-        if (A->bigger_ == nullptr) {
-            Count = Count + 1;
-            C = A;
-            A = A->smaller_;
+        if (a->bigger_ == nullptr) {
+            count = count + 1;
+            c = a;
+            a = a->smaller_;
 
             continue;
         }
 
         /* Rotate left at A. */
-        B = A->bigger_;
+        b = a->bigger_;
 
-        if (Data->item_tree_ == A) Data->item_tree_ = B;
+        if (data->item_tree_ == a) data->item_tree_ = b;
 
-        A->bigger_ = B->smaller_;
+        a->bigger_ = b->smaller_;
 
-        if (A->bigger_ != nullptr) A->bigger_->parent_ = A;
+        if (a->bigger_ != nullptr) a->bigger_->parent_ = a;
 
-        B->parent_ = A->parent_;
+        b->parent_ = a->parent_;
 
-        if (B->parent_ != nullptr) {
-            if (B->parent_->smaller_ == A) {
-                B->parent_->smaller_ = B;
+        if (b->parent_ != nullptr) {
+            if (b->parent_->smaller_ == a) {
+                b->parent_->smaller_ = b;
             }
             else {
-                A->parent_->bigger_ = B;
+                a->parent_->bigger_ = b;
             }
         }
 
-        B->smaller_ = A;
-        A->parent_ = B;
+        b->smaller_ = a;
+        a->parent_ = b;
 
         /* Do again. */
-        A = B;
+        a = b;
     }
 
     /* Calculate the number of skips. */
-    Skip = 1;
+    long skip = 1;
 
-    while (Skip < Count + 2) Skip = Skip << 1;
+    while (skip < count + 2) skip = skip << 1;
 
-    Skip = Count + 1 - (Skip >> 1);
+    skip = count + 1 - (skip >> 1);
 
     /* Compress the tree. */
-    while (C != nullptr) {
-        if (Skip <= 0) C = C->parent_;
+    while (c != nullptr) {
+        if (skip <= 0) c = c->parent_;
 
-        A = C;
+        a = c;
 
-        while (A != nullptr) {
-            B = A;
-            A = A->parent_;
+        while (a != nullptr) {
+            b = a;
+            a = a->parent_;
 
-            if (A == nullptr) break;
+            if (a == nullptr) break;
 
             /* Rotate right at A. */
-            if (Data->item_tree_ == A) Data->item_tree_ = B;
+            if (data->item_tree_ == a) data->item_tree_ = b;
 
-            A->smaller_ = B->bigger_;
+            a->smaller_ = b->bigger_;
 
-            if (A->smaller_ != nullptr) A->smaller_->parent_ = A;
+            if (a->smaller_ != nullptr) a->smaller_->parent_ = a;
 
-            B->parent_ = A->parent_;
+            b->parent_ = a->parent_;
 
-            if (B->parent_ != nullptr) {
-                if (B->parent_->smaller_ == A) {
-                    B->parent_->smaller_ = B;
+            if (b->parent_ != nullptr) {
+                if (b->parent_->smaller_ == a) {
+                    b->parent_->smaller_ = b;
                 }
                 else {
-                    B->parent_->bigger_ = B;
+                    b->parent_->bigger_ = b;
                 }
             }
 
-            A->parent_ = B;
-            B->bigger_ = A;
+            a->parent_ = b;
+            b->bigger_ = a;
 
             /* Next item. */
-            A = B->parent_;
+            a = b->parent_;
 
             /* If there were skips then leave if all done. */
-            Skip = Skip - 1;
-            if (Skip == 0) break;
+            skip = skip - 1;
+            if (skip == 0) break;
         }
     }
 }
@@ -709,50 +694,48 @@ Detach (unlink) a record from the tree. The record is not freed().
 See: http://www.stanford.edu/~blp/avl/libavl.html/Deleting-from-a-BST.html
 
 */
-void DefragLib::tree_detach(DefragDataStruct* Data, ItemStruct* Item) {
-    ItemStruct* B;
-
+void DefragLib::tree_detach(DefragDataStruct* data, const ItemStruct* item) {
     /* Sanity check. */
-    if (Data->item_tree_ == nullptr || Item == nullptr) return;
+    if (data->item_tree_ == nullptr || item == nullptr) return;
 
-    if (Item->bigger_ == nullptr) {
+    if (item->bigger_ == nullptr) {
         /* It is trivial to delete a node with no Bigger child. We replace
         the pointer leading to the node by it's Smaller child. In
         other words, we replace the deleted node by its Smaller child. */
-        if (Item->parent_ != nullptr) {
-            if (Item->parent_->smaller_ == Item) {
-                Item->parent_->smaller_ = Item->smaller_;
+        if (item->parent_ != nullptr) {
+            if (item->parent_->smaller_ == item) {
+                item->parent_->smaller_ = item->smaller_;
             }
             else {
-                Item->parent_->bigger_ = Item->smaller_;
+                item->parent_->bigger_ = item->smaller_;
             }
         }
         else {
-            Data->item_tree_ = Item->smaller_;
+            data->item_tree_ = item->smaller_;
         }
 
-        if (Item->smaller_ != nullptr) Item->smaller_->parent_ = Item->parent_;
+        if (item->smaller_ != nullptr) item->smaller_->parent_ = item->parent_;
     }
-    else if (Item->bigger_->smaller_ == nullptr) {
+    else if (item->bigger_->smaller_ == nullptr) {
         /* The Bigger child has no Smaller child. In this case, we move Bigger
         into the node's place, attaching the node's Smaller subtree as the
         new Smaller. */
-        if (Item->parent_ != nullptr) {
-            if (Item->parent_->smaller_ == Item) {
-                Item->parent_->smaller_ = Item->bigger_;
+        if (item->parent_ != nullptr) {
+            if (item->parent_->smaller_ == item) {
+                item->parent_->smaller_ = item->bigger_;
             }
             else {
-                Item->parent_->bigger_ = Item->bigger_;
+                item->parent_->bigger_ = item->bigger_;
             }
         }
         else {
-            Data->item_tree_ = Item->bigger_;
+            data->item_tree_ = item->bigger_;
         }
 
-        Item->bigger_->parent_ = Item->parent_;
-        Item->bigger_->smaller_ = Item->smaller_;
+        item->bigger_->parent_ = item->parent_;
+        item->bigger_->smaller_ = item->smaller_;
 
-        if (Item->smaller_ != nullptr) Item->smaller_->parent_ = Item->bigger_;
+        if (item->smaller_ != nullptr) item->smaller_->parent_ = item->bigger_;
     }
     else {
         /* Replace the node by it's inorder successor, that is, the node with
@@ -762,81 +745,79 @@ void DefragLib::tree_detach(DefragDataStruct* Data, ItemStruct* Item) {
         therefore be detached and can be used to replace the node. */
 
         /* Find the inorder successor. */
-        B = Item->bigger_;
-        while (B->smaller_ != nullptr) B = B->smaller_;
+        ItemStruct* b = item->bigger_;
+        while (b->smaller_ != nullptr) b = b->smaller_;
 
         /* Detach the successor. */
-        if (B->parent_ != nullptr) {
-            if (B->parent_->bigger_ == B) {
-                B->parent_->bigger_ = B->bigger_;
+        if (b->parent_ != nullptr) {
+            if (b->parent_->bigger_ == b) {
+                b->parent_->bigger_ = b->bigger_;
             }
             else {
-                B->parent_->smaller_ = B->bigger_;
+                b->parent_->smaller_ = b->bigger_;
             }
         }
 
-        if (B->bigger_ != nullptr) B->bigger_->parent_ = B->parent_;
+        if (b->bigger_ != nullptr) b->bigger_->parent_ = b->parent_;
 
         /* Replace the node with the successor. */
-        if (Item->parent_ != nullptr) {
-            if (Item->parent_->smaller_ == Item) {
-                Item->parent_->smaller_ = B;
+        if (item->parent_ != nullptr) {
+            if (item->parent_->smaller_ == item) {
+                item->parent_->smaller_ = b;
             }
             else {
-                Item->parent_->bigger_ = B;
+                item->parent_->bigger_ = b;
             }
         }
         else {
-            Data->item_tree_ = B;
+            data->item_tree_ = b;
         }
 
-        B->parent_ = Item->parent_;
-        B->smaller_ = Item->smaller_;
+        b->parent_ = item->parent_;
+        b->smaller_ = item->smaller_;
 
-        if (B->smaller_ != nullptr) B->smaller_->parent_ = B;
+        if (b->smaller_ != nullptr) b->smaller_->parent_ = b;
 
-        B->bigger_ = Item->bigger_;
+        b->bigger_ = item->bigger_;
 
-        if (B->bigger_ != nullptr) B->bigger_->parent_ = B;
+        if (b->bigger_ != nullptr) b->bigger_->parent_ = b;
     }
 }
 
 /* Delete the entire ItemTree. */
-void DefragLib::delete_item_tree(ItemStruct* Top) {
-    FragmentListStruct* Fragment;
+void DefragLib::delete_item_tree(ItemStruct* top) {
+    if (top == nullptr) return;
+    if (top->smaller_ != nullptr) delete_item_tree(top->smaller_);
+    if (top->bigger_ != nullptr) delete_item_tree(top->bigger_);
 
-    if (Top == nullptr) return;
-    if (Top->smaller_ != nullptr) delete_item_tree(Top->smaller_);
-    if (Top->bigger_ != nullptr) delete_item_tree(Top->bigger_);
+    if (top->short_path_ != nullptr &&
+        (top->long_path_ == nullptr ||
+            top->short_path_ != top->long_path_)) {
+        free(top->short_path_);
 
-    if (Top->short_path_ != nullptr &&
-        (Top->long_path_ == nullptr ||
-            Top->short_path_ != Top->long_path_)) {
-        free(Top->short_path_);
-
-        Top->short_path_ = nullptr;
+        top->short_path_ = nullptr;
     }
 
-    if (Top->short_filename_ != nullptr &&
-        (Top->long_filename_ == nullptr ||
-            Top->short_filename_ != Top->long_filename_)) {
-        free(Top->short_filename_);
+    if (top->short_filename_ != nullptr &&
+        (top->long_filename_ == nullptr ||
+            top->short_filename_ != top->long_filename_)) {
+        free(top->short_filename_);
 
-        Top->short_filename_ = nullptr;
+        top->short_filename_ = nullptr;
     }
 
-    if (Top->long_path_ != nullptr) free(Top->long_path_);
-    if (Top->long_filename_ != nullptr) free(Top->long_filename_);
+    if (top->long_path_ != nullptr) free(top->long_path_);
+    if (top->long_filename_ != nullptr) free(top->long_filename_);
 
-    while (Top->fragments_ != nullptr) {
-        Fragment = Top->fragments_->next_;
+    while (top->fragments_ != nullptr) {
+        FragmentListStruct* fragment = top->fragments_->next_;
 
-        free(Top->fragments_);
+        free(top->fragments_);
 
-        Top->fragments_ = Fragment;
+        top->fragments_ = fragment;
     }
 
-    free(Top);
+    free(top);
 }
 
 /*
@@ -845,25 +826,22 @@ Return the LCN of the fragment that contains a cluster at the LCN. If the
 item has no fragment that occupies the LCN then return zero.
 
 */
-uint64_t DefragLib::find_fragment_begin(ItemStruct* Item, uint64_t Lcn) {
-    FragmentListStruct* Fragment;
-    uint64_t Vcn;
-
+uint64_t DefragLib::find_fragment_begin(const ItemStruct* item, const uint64_t lcn) {
     /* Sanity check. */
-    if (Item == nullptr || Lcn == 0) return 0;
+    if (item == nullptr || lcn == 0) return 0;
 
     /* Walk through all the fragments of the item. If a fragment is found
     that contains the LCN then return the begin of that fragment. */
-    Vcn = 0;
-    for (Fragment = Item->fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
-        if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-            if (Lcn >= Fragment->lcn_ &&
-                Lcn < Fragment->lcn_ + Fragment->next_vcn_ - Vcn) {
-                return Fragment->lcn_;
+    uint64_t vcn = 0;
+    for (const FragmentListStruct* fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+        if (fragment->lcn_ != VIRTUALFRAGMENT) {
+            if (lcn >= fragment->lcn_ &&
+                lcn < fragment->lcn_ + fragment->next_vcn_ - vcn) {
+                return fragment->lcn_;
             }
         }
 
-        Vcn = Fragment->next_vcn_;
+        vcn = fragment->next_vcn_;
     }
 
     /* Not found: return zero. */
@@ -876,31 +854,28 @@ Search the list for the item that occupies the cluster at the LCN. Return a
 pointer to the item. If not found then return nullptr.
 
 */
-ItemStruct* DefragLib::find_item_at_lcn(DefragDataStruct* Data, uint64_t Lcn) {
-    ItemStruct* Item;
-    uint64_t ItemLcn;
-
+ItemStruct* DefragLib::find_item_at_lcn(const DefragDataStruct* data, const uint64_t lcn) {
     /* Locate the item by descending the sorted tree in memory. If found then
     return the item. */
-    Item = Data->item_tree_;
+    ItemStruct* item = data->item_tree_;
 
-    while (Item != nullptr) {
-        ItemLcn = get_item_lcn(Item);
+    while (item != nullptr) {
+        const uint64_t item_lcn = get_item_lcn(item);
 
-        if (ItemLcn == Lcn) return Item;
+        if (item_lcn == lcn) return item;
 
-        if (Lcn < ItemLcn) {
-            Item = Item->smaller_;
+        if (lcn < item_lcn) {
+            item = item->smaller_;
         }
         else {
-            Item = Item->bigger_;
+            item = item->bigger_;
         }
     }
 
     /* Walk through all the fragments of all the items in the sorted tree. If a
     fragment is found that occupies the LCN then return a pointer to the item. */
-    for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-        if (find_fragment_begin(Item, Lcn) != 0) return Item;
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        if (find_fragment_begin(item, lcn) != 0) return item;
     }
 
     /* LCN not found, return nullptr. */
@@ -913,41 +888,35 @@ Open the item as a file or as a directory. If the item could not be
 opened then show an error message and return nullptr.
 
 */
-HANDLE DefragLib::open_item_handle(DefragDataStruct* Data, ItemStruct* Item) {
-    HANDLE FileHandle;
+HANDLE DefragLib::open_item_handle(const DefragDataStruct* data, const ItemStruct* item) const {
+    HANDLE file_handle;
+    WCHAR error_string[BUFSIZ];
+    const size_t length = wcslen(item->long_path_) + 5;
+    auto path = (WCHAR*)malloc(sizeof(WCHAR) * length);
 
-    WCHAR ErrorString[BUFSIZ];
-    WCHAR* Path;
+    swprintf_s(path, length, L"\\\\?\\%s", item->long_path_);
 
-    size_t Length;
-
-    Length = wcslen(Item->long_path_) + 5;
-
-    Path = (WCHAR*)malloc(sizeof(WCHAR) * Length);
-
-    swprintf_s(Path, Length, L"\\\\?\\%s", Item->long_path_);
-
-    if (Item->is_dir_ == false) {
-        FileHandle = CreateFileW(Path,FILE_READ_ATTRIBUTES,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                 nullptr,OPEN_EXISTING,FILE_FLAG_NO_BUFFERING, nullptr);
+    if (item->is_dir_ == false) {
+        file_handle = CreateFileW(path,FILE_READ_ATTRIBUTES,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr,OPEN_EXISTING,FILE_FLAG_NO_BUFFERING, nullptr);
     }
     else {
-        FileHandle = CreateFileW(Path,GENERIC_READ,
-                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                 nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+        file_handle = CreateFileW(path,GENERIC_READ,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     }
 
-    free(Path);
+    free(path);
 
-    if (FileHandle != INVALID_HANDLE_VALUE) return FileHandle;
+    if (file_handle != INVALID_HANDLE_VALUE) return file_handle;
 
     /* Show error message: "Could not open '%s': %s" */
-    system_error_str(GetLastError(), ErrorString,BUFSIZ);
+    system_error_str(GetLastError(), error_string,BUFSIZ);
 
     DefragGui* jkGui = DefragGui::get_instance();
 
-    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, Data->debug_msg_[15], Item->long_path_, ErrorString);
+    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15], item->long_path_, error_string);
 
     return nullptr;
 }
@@ -960,79 +929,67 @@ Note: Very small files are stored by Windows in the MFT and have no
 clusters (zero) and no fragments (nullptr).
 
 */
-int DefragLib::get_fragments(DefragDataStruct* Data, ItemStruct* Item, HANDLE FileHandle) {
+int DefragLib::get_fragments(const DefragDataStruct* data, ItemStruct* item, const HANDLE file_handle) const {
     STARTING_VCN_INPUT_BUFFER RetrieveParam;
 
     struct {
-        uint32_t ExtentCount;
-        uint64_t StartingVcn;
+        uint32_t extent_count_;
+        uint64_t starting_vcn_;
 
         struct {
-            uint64_t NextVcn;
-            uint64_t Lcn;
-        } Extents[1000];
-    } ExtentData;
+            uint64_t next_vcn_;
+            uint64_t lcn_;
+        } extents_[1000];
+    } extent_data{};
 
-    BY_HANDLE_FILE_INFORMATION FileInformation;
-    uint64_t Vcn;
-
-    FragmentListStruct* NewFragment;
-    FragmentListStruct* LastFragment;
-
-    uint32_t ErrorCode;
-
-    WCHAR ErrorString[BUFSIZ];
-
-    int MaxLoop;
-
-    ULARGE_INTEGER u;
-
-    uint32_t i;
+    BY_HANDLE_FILE_INFORMATION file_information;
+    FragmentListStruct* last_fragment;
+    uint32_t error_code;
     DWORD w;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Initialize. If the item has an old list of fragments then delete it. */
-    Item->clusters_count_ = 0;
+    item->clusters_count_ = 0;
 
-    while (Item->fragments_ != nullptr) {
-        LastFragment = Item->fragments_->next_;
+    while (item->fragments_ != nullptr) {
+        last_fragment = item->fragments_->next_;
 
-        free(Item->fragments_);
+        free(item->fragments_);
 
-        Item->fragments_ = LastFragment;
+        item->fragments_ = last_fragment;
     }
 
     /* Fetch the date/times of the file. */
-    if (Item->creation_time_ == 0 &&
-        Item->last_access_time_ == 0 &&
-        Item->mft_change_time_ == 0 &&
-        GetFileInformationByHandle(FileHandle, &FileInformation) != 0) {
-        u.LowPart = FileInformation.ftCreationTime.dwLowDateTime;
-        u.HighPart = FileInformation.ftCreationTime.dwHighDateTime;
+    if (item->creation_time_ == 0 &&
+        item->last_access_time_ == 0 &&
+        item->mft_change_time_ == 0 &&
+        GetFileInformationByHandle(file_handle, &file_information) != 0) {
+        ULARGE_INTEGER u;
+        u.LowPart = file_information.ftCreationTime.dwLowDateTime;
+        u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
-        Item->creation_time_ = u.QuadPart;
+        item->creation_time_ = u.QuadPart;
 
-        u.LowPart = FileInformation.ftLastAccessTime.dwLowDateTime;
-        u.HighPart = FileInformation.ftLastAccessTime.dwHighDateTime;
+        u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
+        u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
-        Item->last_access_time_ = u.QuadPart;
+        item->last_access_time_ = u.QuadPart;
 
-        u.LowPart = FileInformation.ftLastWriteTime.dwLowDateTime;
-        u.HighPart = FileInformation.ftLastWriteTime.dwHighDateTime;
+        u.LowPart = file_information.ftLastWriteTime.dwLowDateTime;
+        u.HighPart = file_information.ftLastWriteTime.dwHighDateTime;
 
-        Item->mft_change_time_ = u.QuadPart;
+        item->mft_change_time_ = u.QuadPart;
     }
 
     /* Show debug message: "Getting cluster bitmap: %s" */
-    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, Data->debug_msg_[10], Item->long_path_);
+    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[10], item->long_path_);
 
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
     fixed size, so we may have to loop a couple of times. */
-    Vcn = 0;
-    MaxLoop = 1000;
-    LastFragment = nullptr;
+    uint64_t vcn = 0;
+    int max_loop = 1000;
+    last_fragment = nullptr;
 
     do {
         /* I strongly suspect that the FSCTL_GET_RETRIEVAL_POINTERS system call
@@ -1041,87 +998,89 @@ int DefragLib::get_fragments(DefragDataStruct* Data, ItemStruct* Item, HANDLE Fi
         therefore added a loop counter that will limit the loop to 1000
         iterations. This means the defragger cannot handle files with more
         than 100000 fragments, though. */
-        if (MaxLoop <= 0) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
+        if (max_loop <= 0) {
+            gui->show_debug(DebugLevel::Progress, nullptr, L"FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
 
             return false;
         }
 
-        MaxLoop = MaxLoop - 1;
+        max_loop = max_loop - 1;
 
         /* Ask Windows for the (next segment of the) clustermap of this file. If error
         then leave the loop. */
-        RetrieveParam.StartingVcn.QuadPart = Vcn;
+        RetrieveParam.StartingVcn.QuadPart = vcn;
 
-        ErrorCode = DeviceIoControl(FileHandle,FSCTL_GET_RETRIEVAL_POINTERS,
-                                    &RetrieveParam, sizeof RetrieveParam, &ExtentData, sizeof ExtentData, &w,
-                                    nullptr);
+        error_code = DeviceIoControl(file_handle,FSCTL_GET_RETRIEVAL_POINTERS,
+                                     &RetrieveParam, sizeof RetrieveParam, &extent_data, sizeof extent_data, &w,
+                                     nullptr);
 
-        if (ErrorCode != 0) {
-            ErrorCode = NO_ERROR;
+        if (error_code != 0) {
+            error_code = NO_ERROR;
         }
         else {
-            ErrorCode = GetLastError();
+            error_code = GetLastError();
         }
 
-        if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) break;
+        if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
         /* Walk through the clustermap, count the total number of clusters, and
         save all fragments in memory. */
-        for (i = 0; i < ExtentData.ExtentCount; i++) {
+        for (uint32_t i = 0; i < extent_data.extent_count_; i++) {
             /* Show debug message. */
-            if (ExtentData.Extents[i].Lcn != VIRTUALFRAGMENT) {
+            if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
                 /* "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u" */
-                jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, Data->debug_msg_[11], ExtentData.Extents[i].Lcn,
-                                 Vcn,
-                                 ExtentData.Extents[i].NextVcn);
+                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[11],
+                                extent_data.extents_[i].lcn_,
+                                vcn,
+                                extent_data.extents_[i].next_vcn_);
             }
             else {
                 /* "Extent (virtual): Vcn=%I64u, NextVcn=%I64u" */
-                jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, Data->debug_msg_[46], Vcn,
-                                 ExtentData.Extents[i].NextVcn);
+                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[46], vcn,
+                                extent_data.extents_[i].next_vcn_);
             }
 
             /* Add the size of the fragment to the total number of clusters.
             There are two kinds of fragments: real and virtual. The latter do not
             occupy clusters on disk, but are information used by compressed
             and sparse files. */
-            if (ExtentData.Extents[i].Lcn != VIRTUALFRAGMENT) {
-                Item->clusters_count_ = Item->clusters_count_ + ExtentData.Extents[i].NextVcn - Vcn;
+            if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
+                item->clusters_count_ = item->clusters_count_ + extent_data.extents_[i].next_vcn_ - vcn;
             }
 
             /* Add the fragment to the Fragments. */
-            NewFragment = (FragmentListStruct*)malloc(sizeof(FragmentListStruct));
 
-            if (NewFragment != nullptr) {
-                NewFragment->lcn_ = ExtentData.Extents[i].Lcn;
-                NewFragment->next_vcn_ = ExtentData.Extents[i].NextVcn;
-                NewFragment->next_ = nullptr;
+            if (const auto new_fragment = (FragmentListStruct*)malloc(sizeof(FragmentListStruct)); new_fragment !=
+                nullptr) {
+                new_fragment->lcn_ = extent_data.extents_[i].lcn_;
+                new_fragment->next_vcn_ = extent_data.extents_[i].next_vcn_;
+                new_fragment->next_ = nullptr;
 
-                if (Item->fragments_ == nullptr) {
-                    Item->fragments_ = NewFragment;
+                if (item->fragments_ == nullptr) {
+                    item->fragments_ = new_fragment;
                 }
                 else {
-                    if (LastFragment != nullptr) LastFragment->next_ = NewFragment;
+                    if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
                 }
 
-                LastFragment = NewFragment;
+                last_fragment = new_fragment;
             }
 
             /* The Vcn of the next fragment is the NextVcn field in this record. */
-            Vcn = ExtentData.Extents[i].NextVcn;
+            vcn = extent_data.extents_[i].next_vcn_;
         }
 
         /* Loop until we have processed the entire clustermap of the file. */
     }
-    while (ErrorCode == ERROR_MORE_DATA);
+    while (error_code == ERROR_MORE_DATA);
 
     /* If there was an error while reading the clustermap then return false. */
-    if (ErrorCode != NO_ERROR && ErrorCode != ERROR_HANDLE_EOF) {
+    if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
+        WCHAR error_string[BUFSIZ];
         /* Show debug message: "Cannot process clustermap of '%s': %s" */
-        system_error_str(ErrorCode, ErrorString,BUFSIZ);
+        system_error_str(error_code, error_string,BUFSIZ);
 
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, Data->debug_msg_[43], Item->long_path_, ErrorString);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[43], item->long_path_, error_string);
 
         return false;
     }
@@ -1130,31 +1089,24 @@ int DefragLib::get_fragments(DefragDataStruct* Data, ItemStruct* Item, HANDLE Fi
 }
 
 /* Return the number of fragments in the item. */
-int DefragLib::fragment_count(ItemStruct* Item) {
-    FragmentListStruct* Fragment;
+int DefragLib::get_fragment_count(const ItemStruct* item) {
+    int fragments = 0;
+    uint64_t vcn = 0;
+    uint64_t next_lcn = 0;
 
-    int Fragments;
+    for (auto fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+        if (fragment->lcn_ != VIRTUALFRAGMENT) {
+            if (next_lcn != 0 && fragment->lcn_ != next_lcn) fragments++;
 
-    uint64_t Vcn;
-    uint64_t NextLcn;
-
-    Fragments = 0;
-    Vcn = 0;
-    NextLcn = 0;
-
-    for (Fragment = Item->fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
-        if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-            if (NextLcn != 0 && Fragment->lcn_ != NextLcn) Fragments++;
-
-            NextLcn = Fragment->lcn_ + Fragment->next_vcn_ - Vcn;
+            next_lcn = fragment->lcn_ + fragment->next_vcn_ - vcn;
         }
 
-        Vcn = Fragment->next_vcn_;
+        vcn = fragment->next_vcn_;
     }
 
-    if (NextLcn != 0) Fragments++;
+    if (next_lcn != 0) fragments++;
 
-    return Fragments;
+    return fragments;
 }
 
 /*
@@ -1165,62 +1117,55 @@ Note: this function does not ask Windows for a fresh list of fragments,
 it only looks at cached information in memory.
 
 */
-bool DefragLib::is_fragmented(ItemStruct* Item, uint64_t Offset, uint64_t Size) {
-    FragmentListStruct* Fragment;
-
-    uint64_t FragmentBegin;
-    uint64_t FragmentEnd;
-    uint64_t Vcn;
-    uint64_t NextLcn;
-
+bool DefragLib::is_fragmented(const ItemStruct* item, const uint64_t offset, const uint64_t size) {
     /* Walk through all fragments. If a fragment is found where either the
     begin or the end of the fragment is inside the block then the file is
     fragmented and return true. */
-    FragmentBegin = 0;
-    FragmentEnd = 0;
-    Vcn = 0;
-    NextLcn = 0;
-    Fragment = Item->fragments_;
+    uint64_t fragment_begin = 0;
+    uint64_t fragment_end = 0;
+    uint64_t vcn = 0;
+    uint64_t next_lcn = 0;
+    const FragmentListStruct* fragment = item->fragments_;
 
-    while (Fragment != nullptr) {
+    while (fragment != nullptr) {
         /* Virtual fragments do not occupy space on disk and do not count as fragments. */
-        if (Fragment->lcn_ != VIRTUALFRAGMENT) {
+        if (fragment->lcn_ != VIRTUALFRAGMENT) {
             /* Treat aligned fragments as a single fragment. Windows will frequently
             split files in fragments even though they are perfectly aligned on disk,
             especially system files and very large files. The defragger treats these
             files as unfragmented. */
-            if (NextLcn != 0 && Fragment->lcn_ != NextLcn) {
+            if (next_lcn != 0 && fragment->lcn_ != next_lcn) {
                 /* If the fragment is above the block then return false, the block is
                 not fragmented and we don't have to scan any further. */
-                if (FragmentBegin >= Offset + Size) return false;
+                if (fragment_begin >= offset + size) return false;
 
                 /* If the first cluster of the fragment is above the first cluster of
                 the block, or the last cluster of the fragment is before the last
                 cluster of the block, then the block is fragmented, return true. */
-                if (FragmentBegin > Offset ||
-                    (FragmentEnd - 1 >= Offset &&
-                        FragmentEnd - 1 < Offset + Size - 1)) {
+                if (fragment_begin > offset ||
+                    (fragment_end - 1 >= offset &&
+                        fragment_end - 1 < offset + size - 1)) {
                     return true;
                 }
 
-                FragmentBegin = FragmentEnd;
+                fragment_begin = fragment_end;
             }
 
-            FragmentEnd = FragmentEnd + Fragment->next_vcn_ - Vcn;
-            NextLcn = Fragment->lcn_ + Fragment->next_vcn_ - Vcn;
+            fragment_end = fragment_end + fragment->next_vcn_ - vcn;
+            next_lcn = fragment->lcn_ + fragment->next_vcn_ - vcn;
         }
 
         /* Next fragment. */
-        Vcn = Fragment->next_vcn_;
-        Fragment = Fragment->next_;
+        vcn = fragment->next_vcn_;
+        fragment = fragment->next_;
     }
 
     /* Handle the last fragment. */
-    if (FragmentBegin >= Offset + Size) return false;
+    if (fragment_begin >= offset + size) return false;
 
-    if (FragmentBegin > Offset ||
-        (FragmentEnd - 1 >= Offset &&
-            FragmentEnd - 1 < Offset + Size - 1)) {
+    if (fragment_begin > offset ||
+        (fragment_end - 1 >= offset &&
+            fragment_end - 1 < offset + size - 1)) {
         return true;
     }
 
@@ -1228,38 +1173,29 @@ bool DefragLib::is_fragmented(ItemStruct* Item, uint64_t Offset, uint64_t Size) 
     return false;
 }
 
-/*
+/**
+ * \brief Colorize an item (file, directory) on the screen in the proper color
+ * (fragmented, unfragmented, unmovable, empty). If specified then highlight
+ * part of the item. If Undraw=true then remove the item from the screen.
+ * Note: the offset and size of the highlight block is in absolute clusters, not virtual clusters.
+ * \param data 
+ * \param item 
+ * \param busy_offset Number of first cluster to be highlighted. 
+ * \param busy_size Number of clusters to be highlighted.
+ * \param un_draw true to undraw the file from the screen.
+ */
+void DefragLib::colorize_item(DefragDataStruct* data, const ItemStruct* item, const uint64_t busy_offset,
+                              const uint64_t busy_size, const int un_draw) const {
+    int color;
 
-Colorize an item (file, directory) on the screen in the proper color
-(fragmented, unfragmented, unmovable, empty). If specified then highlight
-part of the item. If Undraw=true then remove the item from the screen.
-Note: the offset and size of the highlight block is in absolute clusters,
-not virtual clusters.
-
-*/
-void DefragLib::colorize_item(DefragDataStruct* data,
-                              ItemStruct* item,
-                              uint64_t busy_offset, /* Number of first cluster to be highlighted. */
-                              uint64_t busy_size, /* Number of clusters to be highlighted. */
-                              int un_draw) /* true to undraw the file from the screen. */
-{
-    uint64_t Vcn;
-    uint64_t RealVcn;
-
-    uint64_t SegmentBegin;
-    uint64_t SegmentEnd;
-
-    int Color;
-    int i;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Determine if the item is fragmented. */
-    bool is_fragmented = this->is_fragmented(item, 0, item->clusters_count_);
+    const bool is_fragmented = this->is_fragmented(item, 0, item->clusters_count_);
 
     /* Walk through all the fragments of the file. */
-    Vcn = 0;
-    RealVcn = 0;
+    uint64_t vcn = 0;
+    uint64_t real_vcn = 0;
 
     const FragmentListStruct* fragment = item->fragments_;
 
@@ -1268,7 +1204,7 @@ void DefragLib::colorize_item(DefragDataStruct* data,
         Ignore virtual fragments. They do not occupy space on disk and do not require colorization.
         */
         if (fragment->lcn_ == VIRTUALFRAGMENT) {
-            Vcn = fragment->next_vcn_;
+            vcn = fragment->next_vcn_;
             fragment = fragment->next_;
 
             continue;
@@ -1281,66 +1217,66 @@ void DefragLib::colorize_item(DefragDataStruct* data,
         individually. So we pretend the fragment is divided into segments
         at the various possible boundaries.
         */
-        SegmentBegin = RealVcn;
+        uint64_t segment_begin = real_vcn;
 
-        while (SegmentBegin < RealVcn + fragment->next_vcn_ - Vcn) {
-            SegmentEnd = RealVcn + fragment->next_vcn_ - Vcn;
+        while (segment_begin < real_vcn + fragment->next_vcn_ - vcn) {
+            uint64_t segment_end = real_vcn + fragment->next_vcn_ - vcn;
 
             /* Determine the color with which to draw this segment. */
             if (un_draw == false) {
-                Color = DefragStruct::COLORUNFRAGMENTED;
+                color = DefragStruct::COLORUNFRAGMENTED;
 
-                if (item->is_hog_ == true) Color = DefragStruct::COLORSPACEHOG;
-                if (is_fragmented == true) Color = DefragStruct::COLORFRAGMENTED;
-                if (item->is_unmovable_ == true) Color = DefragStruct::COLORUNMOVABLE;
-                if (item->is_excluded_ == true) Color = DefragStruct::COLORUNMOVABLE;
+                if (item->is_hog_ == true) color = DefragStruct::COLORSPACEHOG;
+                if (is_fragmented == true) color = DefragStruct::COLORFRAGMENTED;
+                if (item->is_unmovable_ == true) color = DefragStruct::COLORUNMOVABLE;
+                if (item->is_excluded_ == true) color = DefragStruct::COLORUNMOVABLE;
 
-                if (Vcn + SegmentBegin - RealVcn < busy_offset &&
-                    Vcn + SegmentEnd - RealVcn > busy_offset) {
-                    SegmentEnd = RealVcn + busy_offset - Vcn;
+                if (vcn + segment_begin - real_vcn < busy_offset &&
+                    vcn + segment_end - real_vcn > busy_offset) {
+                    segment_end = real_vcn + busy_offset - vcn;
                 }
 
-                if (Vcn + SegmentBegin - RealVcn >= busy_offset &&
-                    Vcn + SegmentBegin - RealVcn < busy_offset + busy_size) {
-                    if (Vcn + SegmentEnd - RealVcn > busy_offset + busy_size) {
-                        SegmentEnd = RealVcn + busy_offset + busy_size - Vcn;
+                if (vcn + segment_begin - real_vcn >= busy_offset &&
+                    vcn + segment_begin - real_vcn < busy_offset + busy_size) {
+                    if (vcn + segment_end - real_vcn > busy_offset + busy_size) {
+                        segment_end = real_vcn + busy_offset + busy_size - vcn;
                     }
 
-                    Color = DefragStruct::COLORBUSY;
+                    color = DefragStruct::COLORBUSY;
                 }
             }
             else {
-                Color = DefragStruct::COLOREMPTY;
+                color = DefragStruct::COLOREMPTY;
 
-                for (i = 0; i < 3; i++) {
-                    if (fragment->lcn_ + SegmentBegin - RealVcn < data->mft_excludes_[i].start_ &&
-                        fragment->lcn_ + SegmentEnd - RealVcn > data->mft_excludes_[i].start_) {
-                        SegmentEnd = RealVcn + data->mft_excludes_[i].start_ - fragment->lcn_;
+                for (int i = 0; i < 3; i++) {
+                    if (fragment->lcn_ + segment_begin - real_vcn < data->mft_excludes_[i].start_ &&
+                        fragment->lcn_ + segment_end - real_vcn > data->mft_excludes_[i].start_) {
+                        segment_end = real_vcn + data->mft_excludes_[i].start_ - fragment->lcn_;
                     }
 
-                    if (fragment->lcn_ + SegmentBegin - RealVcn >= data->mft_excludes_[i].start_ &&
-                        fragment->lcn_ + SegmentBegin - RealVcn < data->mft_excludes_[i].end_) {
-                        if (fragment->lcn_ + SegmentEnd - RealVcn > data->mft_excludes_[i].end_) {
-                            SegmentEnd = RealVcn + data->mft_excludes_[i].end_ - fragment->lcn_;
+                    if (fragment->lcn_ + segment_begin - real_vcn >= data->mft_excludes_[i].start_ &&
+                        fragment->lcn_ + segment_begin - real_vcn < data->mft_excludes_[i].end_) {
+                        if (fragment->lcn_ + segment_end - real_vcn > data->mft_excludes_[i].end_) {
+                            segment_end = real_vcn + data->mft_excludes_[i].end_ - fragment->lcn_;
                         }
 
-                        Color = DefragStruct::COLORMFT;
+                        color = DefragStruct::COLORMFT;
                     }
                 }
             }
 
             /* Colorize the segment. */
-            jkGui->draw_cluster(data, fragment->lcn_ + SegmentBegin - RealVcn, fragment->lcn_ + SegmentEnd - RealVcn,
-                               Color);
+            gui->draw_cluster(data, fragment->lcn_ + segment_begin - real_vcn, fragment->lcn_ + segment_end - real_vcn,
+                              color);
 
             /* Next segment. */
-            SegmentBegin = SegmentEnd;
+            segment_begin = segment_end;
         }
 
         /* Next fragment. */
-        RealVcn = RealVcn + fragment->next_vcn_ - Vcn;
+        real_vcn = real_vcn + fragment->next_vcn_ - vcn;
 
-        Vcn = fragment->next_vcn_;
+        vcn = fragment->next_vcn_;
         fragment = fragment->next_;
     }
 }
@@ -1490,214 +1426,180 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 }
 */
 
-/*
-
-Look for a gap, a block of empty clusters on the volume.
-MinimumLcn: Start scanning for gaps at this location. If there is a gap
-at this location then return it. Zero is the begin of the disk.
-MaximumLcn: Stop scanning for gaps at this location. Zero is the end of
-the disk.
-MinimumSize: The gap must have at least this many contiguous free clusters.
-Zero will match any gap, so will return the first gap at or above
-MinimumLcn.
-MustFit: if true then only return a gap that is bigger/equal than the
-MinimumSize. If false then return a gap bigger/equal than MinimumSize,
-or if no such gap is found return the largest gap on the volume (above
-MinimumLcn).
-FindHighestGap: if false then return the lowest gap that is bigger/equal
-than the MinimumSize. If true then return the highest gap.
-Return true if succes, false if no gap was found or an error occurred.
-The routine asks Windows for the cluster bitmap every time. It would be
-faster to cache the bitmap in memory, but that would cause more fails
-because of stale information.
-
-*/
-bool DefragLib::find_gap(DefragDataStruct* data,
-                         uint64_t minimum_lcn, /* Gap must be at or above this LCN. */
-                         uint64_t maximum_lcn, /* Gap must be below this LCN. */
-                         uint64_t minimum_size, /* Gap must be at least this big. */
-                         int must_fit, /* true: gap must be at least MinimumSize. */
-                         bool find_highest_gap, /* true: return the last gap that fits. */
-                         uint64_t* begin_lcn, /* Result, LCN of begin of cluster. */
-                         uint64_t* end_lcn, /* Result, LCN of end of cluster. */
-                         BOOL ignore_mft_excludes) const {
-    STARTING_LCN_INPUT_BUFFER BitmapParam;
-
+/**
+ * \brief Look for a gap, a block of empty clusters on the volume.
+ * \param minimum_lcn Start scanning for gaps at this location. If there is a gap at this location then return it. Zero is the begin of the disk.
+ * \param maximum_lcn Stop scanning for gaps at this location. Zero is the end of the disk.
+ * \param minimum_size The gap must have at least this many contiguous free clusters. Zero will match any gap, so will return the first gap at or above MinimumLcn.
+ * \param must_fit if true then only return a gap that is bigger/equal than the MinimumSize. If false then return a gap bigger/equal than MinimumSize,
+ *      or if no such gap is found return the largest gap on the volume (above MinimumLcn).
+ * \param find_highest_gap if false then return the lowest gap that is bigger/equal than the MinimumSize. If true then return the highest gap.
+ * \param begin_lcn out: LCN of begin of cluster
+ * \param end_lcn out: LCN of end of cluster
+ * \param ignore_mft_excludes 
+ * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
+ *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
+ */
+bool DefragLib::find_gap(const DefragDataStruct* data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
+                         const uint64_t minimum_size,
+                         const int must_fit, const bool find_highest_gap, uint64_t* begin_lcn, uint64_t* end_lcn,
+                         const BOOL ignore_mft_excludes) const {
+    STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
-        uint64_t StartingLcn;
-        uint64_t BitmapSize;
+        uint64_t starting_lcn_;
+        uint64_t bitmap_size_;
+        BYTE buffer_[65536]; /* Most efficient if binary multiple. */
+    } bitmap_data{};
 
-        BYTE Buffer[65536]; /* Most efficient if binary multiple. */
-    } BitmapData;
-
-    uint64_t Lcn;
-    uint64_t ClusterStart;
-    uint64_t HighestBeginLcn;
-    uint64_t HighestEndLcn;
-    uint64_t LargestBeginLcn;
-    uint64_t LargestEndLcn;
-
-    int Index;
-    int IndexMax;
-
-    BYTE Mask;
-
-    int InUse;
-    int PrevInUse;
-
-    uint32_t ErrorCode;
-
-    WCHAR s1[BUFSIZ];
-
+    uint32_t error_code;
     DWORD w;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Sanity check. */
     if (minimum_lcn >= data->total_clusters_) return false;
 
     /* Main loop to walk through the entire clustermap. */
-    Lcn = minimum_lcn;
-    ClusterStart = 0;
-    PrevInUse = 1;
-    HighestBeginLcn = 0;
-    HighestEndLcn = 0;
-    LargestBeginLcn = 0;
-    LargestEndLcn = 0;
+    uint64_t lcn = minimum_lcn;
+    uint64_t cluster_start = 0;
+    int prev_in_use = 1;
+    uint64_t highest_begin_lcn = 0;
+    uint64_t highest_end_lcn = 0;
+    uint64_t largest_begin_lcn = 0;
+    uint64_t largest_end_lcn = 0;
 
     do {
         /* Fetch a block of cluster data. If error then return false. */
-        BitmapParam.StartingLcn.QuadPart = Lcn;
-        ErrorCode = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
-                                    &BitmapParam, sizeof BitmapParam, &BitmapData, sizeof BitmapData, &w, nullptr);
+        bitmap_param.StartingLcn.QuadPart = lcn;
+        error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
+                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
 
-        if (ErrorCode != 0) {
-            ErrorCode = NO_ERROR;
+        if (error_code != 0) {
+            error_code = NO_ERROR;
         }
         else {
-            ErrorCode = GetLastError();
+            error_code = GetLastError();
         }
 
-        if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) {
+        if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
+            WCHAR s1[BUFSIZ];
             /* Show debug message: "ERROR: could not get volume bitmap: %s" */
             system_error_str(GetLastError(), s1,BUFSIZ);
 
-            jkGui->show_debug(DebugLevel::Warning, nullptr, data->debug_msg_[12], s1);
+            gui->show_debug(DebugLevel::Warning, nullptr, data->debug_msg_[12], s1);
 
             return false;
         }
 
         /* Sanity check. */
-        if (Lcn >= BitmapData.StartingLcn + BitmapData.BitmapSize) return false;
-        if (maximum_lcn == 0) maximum_lcn = BitmapData.StartingLcn + BitmapData.BitmapSize;
+        if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) return false;
+        if (maximum_lcn == 0) maximum_lcn = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
-        /* Analyze the clusterdata. We resume where the previous block left
-        off. If a cluster is found that matches the criteria then return
-        it's LCN (Logical Cluster Number). */
-        Lcn = BitmapData.StartingLcn;
-        Index = 0;
-        Mask = 1;
+        /* Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the criteria then return it's LCN (Logical Cluster Number). */
+        lcn = bitmap_data.starting_lcn_;
+        int index = 0;
+        BYTE mask = 1;
 
-        IndexMax = sizeof BitmapData.Buffer;
+        int index_max = sizeof bitmap_data.buffer_;
 
-        if (BitmapData.BitmapSize / 8 < IndexMax) IndexMax = (int)(BitmapData.BitmapSize / 8);
+        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int)(bitmap_data.bitmap_size_ / 8);
 
-        while (Index < IndexMax && Lcn < maximum_lcn) {
-            if (Lcn >= minimum_lcn) {
-                InUse = BitmapData.Buffer[Index] & Mask;
+        while (index < index_max && lcn < maximum_lcn) {
+            if (lcn >= minimum_lcn) {
+                int in_use = bitmap_data.buffer_[index] & mask;
 
-                if ((Lcn >= data->mft_excludes_[0].start_ && Lcn < data->mft_excludes_[0].end_) ||
-                    (Lcn >= data->mft_excludes_[1].start_ && Lcn < data->mft_excludes_[1].end_) ||
-                    (Lcn >= data->mft_excludes_[2].start_ && Lcn < data->mft_excludes_[2].end_)) {
-                    if (ignore_mft_excludes == FALSE) InUse = 1;
+                if ((lcn >= data->mft_excludes_[0].start_ && lcn < data->mft_excludes_[0].end_) ||
+                    (lcn >= data->mft_excludes_[1].start_ && lcn < data->mft_excludes_[1].end_) ||
+                    (lcn >= data->mft_excludes_[2].start_ && lcn < data->mft_excludes_[2].end_)) {
+                    if (ignore_mft_excludes == FALSE) in_use = 1;
                 }
 
-                if (PrevInUse == 0 && InUse != 0) {
+                if (prev_in_use == 0 && in_use != 0) {
                     /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
-                    jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13], ClusterStart,
-                                     Lcn - ClusterStart);
+                    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13], cluster_start,
+                                    lcn - cluster_start);
 
                     /* If the gap is bigger/equal than the mimimum size then return it,
                     or remember it, depending on the FindHighestGap parameter. */
-                    if (ClusterStart >= minimum_lcn &&
-                        Lcn - ClusterStart >= minimum_size) {
+                    if (cluster_start >= minimum_lcn &&
+                        lcn - cluster_start >= minimum_size) {
                         if (find_highest_gap == false) {
-                            if (begin_lcn != nullptr) *begin_lcn = ClusterStart;
+                            if (begin_lcn != nullptr) *begin_lcn = cluster_start;
 
-                            if (end_lcn != nullptr) *end_lcn = Lcn;
+                            if (end_lcn != nullptr) *end_lcn = lcn;
 
                             return true;
                         }
 
-                        HighestBeginLcn = ClusterStart;
-                        HighestEndLcn = Lcn;
+                        highest_begin_lcn = cluster_start;
+                        highest_end_lcn = lcn;
                     }
 
                     /* Remember the largest gap on the volume. */
-                    if (LargestBeginLcn == 0 ||
-                        LargestEndLcn - LargestBeginLcn < Lcn - ClusterStart) {
-                        LargestBeginLcn = ClusterStart;
-                        LargestEndLcn = Lcn;
+                    if (largest_begin_lcn == 0 ||
+                        largest_end_lcn - largest_begin_lcn < lcn - cluster_start) {
+                        largest_begin_lcn = cluster_start;
+                        largest_end_lcn = lcn;
                     }
                 }
 
-                if (PrevInUse != 0 && InUse == 0) ClusterStart = Lcn;
+                if (prev_in_use != 0 && in_use == 0) cluster_start = lcn;
 
-                PrevInUse = InUse;
+                prev_in_use = in_use;
             }
 
-            if (Mask == 128) {
-                Mask = 1;
-                Index = Index + 1;
+            if (mask == 128) {
+                mask = 1;
+                index = index + 1;
             }
             else {
-                Mask = Mask << 1;
+                mask = mask << 1;
             }
 
-            Lcn = Lcn + 1;
+            lcn = lcn + 1;
         }
     }
-    while (ErrorCode == ERROR_MORE_DATA &&
-        Lcn < BitmapData.StartingLcn + BitmapData.BitmapSize &&
-        Lcn < maximum_lcn);
+    while (error_code == ERROR_MORE_DATA &&
+        lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_ &&
+        lcn < maximum_lcn);
 
     /* Process the last gap. */
-    if (PrevInUse == 0) {
+    if (prev_in_use == 0) {
         /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13], ClusterStart, Lcn - ClusterStart);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13], cluster_start,
+                        lcn - cluster_start);
 
-        if (ClusterStart >= minimum_lcn && Lcn - ClusterStart >= minimum_size) {
+        if (cluster_start >= minimum_lcn && lcn - cluster_start >= minimum_size) {
             if (find_highest_gap == false) {
-                if (begin_lcn != nullptr) *begin_lcn = ClusterStart;
-                if (end_lcn != nullptr) *end_lcn = Lcn;
+                if (begin_lcn != nullptr) *begin_lcn = cluster_start;
+                if (end_lcn != nullptr) *end_lcn = lcn;
 
                 return true;
             }
 
-            HighestBeginLcn = ClusterStart;
-            HighestEndLcn = Lcn;
+            highest_begin_lcn = cluster_start;
+            highest_end_lcn = lcn;
         }
 
         /* Remember the largest gap on the volume. */
-        if (LargestBeginLcn == 0 ||
-            LargestEndLcn - LargestBeginLcn < Lcn - ClusterStart) {
-            LargestBeginLcn = ClusterStart;
-            LargestEndLcn = Lcn;
+        if (largest_begin_lcn == 0 ||
+            largest_end_lcn - largest_begin_lcn < lcn - cluster_start) {
+            largest_begin_lcn = cluster_start;
+            largest_end_lcn = lcn;
         }
     }
 
     /* If the FindHighestGap flag is true then return the highest gap we have found. */
-    if (find_highest_gap == true && HighestBeginLcn != 0) {
-        if (begin_lcn != nullptr) *begin_lcn = HighestBeginLcn;
-        if (end_lcn != nullptr) *end_lcn = HighestEndLcn;
+    if (find_highest_gap == true && highest_begin_lcn != 0) {
+        if (begin_lcn != nullptr) *begin_lcn = highest_begin_lcn;
+        if (end_lcn != nullptr) *end_lcn = highest_end_lcn;
 
         return true;
     }
 
     /* If the MustFit flag is false then return the largest gap we have found. */
-    if (must_fit == false && LargestBeginLcn != 0) {
-        if (begin_lcn != nullptr) *begin_lcn = LargestBeginLcn;
-        if (end_lcn != nullptr) *end_lcn = LargestEndLcn;
+    if (must_fit == false && largest_begin_lcn != 0) {
+        if (begin_lcn != nullptr) *begin_lcn = largest_begin_lcn;
+        if (end_lcn != nullptr) *end_lcn = largest_end_lcn;
 
         return true;
     }
@@ -1719,553 +1621,497 @@ file. So we have to recalculate the beginning of the zones every time we encount
 an unmovable file.
 
 */
-void DefragLib::calculate_zones(DefragDataStruct* Data) {
-    ItemStruct* Item;
-
-    FragmentListStruct* Fragment;
-
-    uint64_t SizeOfMovableFiles[3];
-    uint64_t SizeOfUnmovableFragments[3];
-    uint64_t ZoneEnd[3];
-    uint64_t OldZoneEnd[3];
-    uint64_t Vcn;
-    uint64_t RealVcn;
-
-    int Zone;
-    int Iterate;
+void DefragLib::calculate_zones(DefragDataStruct* data) {
+    ItemStruct* item;
+    uint64_t size_of_movable_files[3];
+    uint64_t size_of_unmovable_fragments[3];
+    uint64_t zone_end[3];
+    uint64_t old_zone_end[3];
+    int zone;
     int i;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Calculate the number of clusters in movable items for every zone. */
-    for (Zone = 0; Zone <= 2; Zone++) SizeOfMovableFiles[Zone] = 0;
+    for (zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
 
-    for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-        if (Item->is_unmovable_ == true) continue;
-        if (Item->is_excluded_ == true) continue;
-        if (Item->is_dir_ == true && Data->cannot_move_dirs_ > 20) continue;
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        if (item->is_unmovable_ == true) continue;
+        if (item->is_excluded_ == true) continue;
+        if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) continue;
 
-        Zone = 1;
+        zone = 1;
 
-        if (Item->is_hog_ == true) Zone = 2;
-        if (Item->is_dir_ == true) Zone = 0;
+        if (item->is_hog_ == true) zone = 2;
+        if (item->is_dir_ == true) zone = 0;
 
-        SizeOfMovableFiles[Zone] = SizeOfMovableFiles[Zone] + Item->clusters_count_;
+        size_of_movable_files[zone] = size_of_movable_files[zone] + item->clusters_count_;
     }
 
     /* Iterate until the calculation does not change anymore, max 10 times. */
-    for (Zone = 0; Zone <= 2; Zone++) SizeOfUnmovableFragments[Zone] = 0;
+    for (zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
-    for (Zone = 0; Zone <= 2; Zone++) OldZoneEnd[Zone] = 0;
+    for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
 
-    for (Iterate = 1; Iterate <= 10; Iterate++) {
+    for (int iterate = 1; iterate <= 10; iterate++) {
         /* Calculate the end of the zones. */
-        ZoneEnd[0] = SizeOfMovableFiles[0] + SizeOfUnmovableFragments[0] +
-                (uint64_t)(Data->total_clusters_ * Data->free_space_ / 100.0);
+        zone_end[0] = size_of_movable_files[0] + size_of_unmovable_fragments[0] +
+                (uint64_t)(data->total_clusters_ * data->free_space_ / 100.0);
 
-        ZoneEnd[1] = ZoneEnd[0] + SizeOfMovableFiles[1] + SizeOfUnmovableFragments[1] +
-                (uint64_t)(Data->total_clusters_ * Data->free_space_ / 100.0);
+        zone_end[1] = zone_end[0] + size_of_movable_files[1] + size_of_unmovable_fragments[1] +
+                (uint64_t)(data->total_clusters_ * data->free_space_ / 100.0);
 
-        ZoneEnd[2] = ZoneEnd[1] + SizeOfMovableFiles[2] + SizeOfUnmovableFragments[2];
+        zone_end[2] = zone_end[1] + size_of_movable_files[2] + size_of_unmovable_fragments[2];
 
         /* Exit if there was no change. */
-        if (OldZoneEnd[0] == ZoneEnd[0] &&
-            OldZoneEnd[1] == ZoneEnd[1] &&
-            OldZoneEnd[2] == ZoneEnd[2])
+        if (old_zone_end[0] == zone_end[0] &&
+            old_zone_end[1] == zone_end[1] &&
+            old_zone_end[2] == zone_end[2])
             break;
 
-        for (Zone = 0; Zone <= 2; Zone++) OldZoneEnd[Zone] = ZoneEnd[Zone];
+        for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = zone_end[zone];
 
         /* Show debug info. */
-        jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
-                         L"Zone calculation, iteration %u: 0 - %I64d - %I64d - %I64d", Iterate,
-                         ZoneEnd[0], ZoneEnd[1], ZoneEnd[2]);
+        gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
+                        L"Zone calculation, iteration %u: 0 - %I64d - %I64d - %I64d", iterate,
+                        zone_end[0], zone_end[1], zone_end[2]);
 
         /* Reset the SizeOfUnmovableFragments array. We are going to (re)calculate these numbers
         based on the just calculates ZoneEnd's. */
-        for (Zone = 0; Zone <= 2; Zone++) SizeOfUnmovableFragments[Zone] = 0;
+        for (zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
         /* The MFT reserved areas are counted as unmovable data. */
         for (i = 0; i < 3; i++) {
-            if (Data->mft_excludes_[i].start_ < ZoneEnd[0]) {
-                SizeOfUnmovableFragments[0] = SizeOfUnmovableFragments[0] + Data->mft_excludes_[i].end_ - Data->
-                        mft_excludes_
-                        [i].start_;
+            if (data->mft_excludes_[i].start_ < zone_end[0]) {
+                size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0]
+                        + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
             }
-            else if (Data->mft_excludes_[i].start_ < ZoneEnd[1]) {
-                SizeOfUnmovableFragments[1] = SizeOfUnmovableFragments[1] + Data->mft_excludes_[i].end_ - Data->
-                        mft_excludes_
-                        [i].start_;
+            else if (data->mft_excludes_[i].start_ < zone_end[1]) {
+                size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1]
+                        + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
             }
-            else if (Data->mft_excludes_[i].start_ < ZoneEnd[2]) {
-                SizeOfUnmovableFragments[2] = SizeOfUnmovableFragments[2] + Data->mft_excludes_[i].end_ - Data->
-                        mft_excludes_
-                        [i].start_;
+            else if (data->mft_excludes_[i].start_ < zone_end[2]) {
+                size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2]
+                        + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
             }
         }
 
         /* Walk through all items and count the unmovable fragments. Ignore unmovable fragments
         in the MFT zones, we have already counted the zones. */
-        for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-            if (Item->is_unmovable_ == false &&
-                Item->is_excluded_ == false &&
-                (Item->is_dir_ == false || Data->cannot_move_dirs_ <= 20))
+        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+            if (item->is_unmovable_ == false &&
+                item->is_excluded_ == false &&
+                (item->is_dir_ == false || data->cannot_move_dirs_ <= 20))
                 continue;
 
-            Vcn = 0;
-            RealVcn = 0;
+            uint64_t vcn = 0;
+            uint64_t real_vcn = 0;
 
-            for (Fragment = Item->fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
+            for (const FragmentListStruct* Fragment = item->fragments_; Fragment != nullptr; Fragment = Fragment->
+                 next_) {
                 if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-                    if ((Fragment->lcn_ < Data->mft_excludes_[0].start_ || Fragment->lcn_ >= Data->mft_excludes_[0].
+                    if ((Fragment->lcn_ < data->mft_excludes_[0].start_ || Fragment->lcn_ >= data->mft_excludes_[0].
                             end_)
                         &&
-                        (Fragment->lcn_ < Data->mft_excludes_[1].start_ || Fragment->lcn_ >= Data->mft_excludes_[1].
+                        (Fragment->lcn_ < data->mft_excludes_[1].start_ || Fragment->lcn_ >= data->mft_excludes_[1].
                             end_)
                         &&
-                        (Fragment->lcn_ < Data->mft_excludes_[2].start_ || Fragment->lcn_ >= Data->mft_excludes_[2].
+                        (Fragment->lcn_ < data->mft_excludes_[2].start_ || Fragment->lcn_ >= data->mft_excludes_[2].
                             end_)) {
-                        if (Fragment->lcn_ < ZoneEnd[0]) {
-                            SizeOfUnmovableFragments[0] = SizeOfUnmovableFragments[0] + Fragment->next_vcn_ - Vcn;
+                        if (Fragment->lcn_ < zone_end[0]) {
+                            size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + Fragment->next_vcn_ - vcn;
                         }
-                        else if (Fragment->lcn_ < ZoneEnd[1]) {
-                            SizeOfUnmovableFragments[1] = SizeOfUnmovableFragments[1] + Fragment->next_vcn_ - Vcn;
+                        else if (Fragment->lcn_ < zone_end[1]) {
+                            size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1] + Fragment->next_vcn_ - vcn;
                         }
-                        else if (Fragment->lcn_ < ZoneEnd[2]) {
-                            SizeOfUnmovableFragments[2] = SizeOfUnmovableFragments[2] + Fragment->next_vcn_ - Vcn;
+                        else if (Fragment->lcn_ < zone_end[2]) {
+                            size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2] + Fragment->next_vcn_ - vcn;
                         }
                     }
 
-                    RealVcn = RealVcn + Fragment->next_vcn_ - Vcn;
+                    real_vcn = real_vcn + Fragment->next_vcn_ - vcn;
                 }
 
-                Vcn = Fragment->next_vcn_;
+                vcn = Fragment->next_vcn_;
             }
         }
     }
 
     /* Calculated the begin of the zones. */
-    Data->zones_[0] = 0;
+    data->zones_[0] = 0;
 
-    for (i = 1; i <= 3; i++) Data->zones_[i] = ZoneEnd[i - 1];
+    for (i = 1; i <= 3; i++) data->zones_[i] = zone_end[i - 1];
 }
 
-/*
-
-Subfunction for MoveItem(), see below. Move (part of) an item to a new
-location on disk. Return errorcode from DeviceIoControl().
-The file is moved in a single FSCTL_MOVE_FILE call. If the file has
-fragments then Windows will join them up.
-Note: the offset and size of the block is in absolute clusters, not
-virtual clusters.
-
-*/
-uint32_t DefragLib::move_item1(DefragDataStruct* Data,
-                               HANDLE FileHandle,
-                               ItemStruct* Item,
-                               uint64_t NewLcn, /* Where to move to. */
-                               uint64_t Offset, /* Number of first cluster to be moved. */
-                               uint64_t Size) /* Number of clusters to be moved. */
+/**
+ * \brief Subfunction for MoveItem(), see below. Move (part of) an item to a new location on disk. Return errorcode from DeviceIoControl().
+ * The file is moved in a single FSCTL_MOVE_FILE call. If the file has fragments then Windows will join them up.
+ * Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+ * \param new_lcn Where to move to.
+ * \param offset Number of first cluster to be moved
+ * \param size 
+ * \return 
+ */
+uint32_t DefragLib::move_item1(DefragDataStruct* data, const HANDLE file_handle, const ItemStruct* item,
+                               const uint64_t new_lcn, const uint64_t offset,
+                               const uint64_t size) const
+/* Number of clusters to be moved. */
 {
-    MOVE_FILE_DATA MoveParams;
-
-    FragmentListStruct* Fragment;
-
-    uint64_t Vcn;
-    uint64_t RealVcn;
-    uint64_t Lcn;
-
-    uint32_t ErrorCode;
+    MOVE_FILE_DATA move_params;
+    FragmentListStruct* fragment;
+    uint64_t lcn;
     DWORD w;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Find the first fragment that contains clusters inside the block, so we
     can translate the absolute cluster number of the block into the virtual
     cluster number used by Windows. */
-    Vcn = 0;
-    RealVcn = 0;
+    uint64_t vcn = 0;
+    uint64_t real_vcn = 0;
 
-    for (Fragment = Item->fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
-        if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-            if (RealVcn + Fragment->next_vcn_ - Vcn - 1 >= Offset) break;
+    for (fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+        if (fragment->lcn_ != VIRTUALFRAGMENT) {
+            if (real_vcn + fragment->next_vcn_ - vcn - 1 >= offset) break;
 
-            RealVcn = RealVcn + Fragment->next_vcn_ - Vcn;
+            real_vcn = real_vcn + fragment->next_vcn_ - vcn;
         }
 
-        Vcn = Fragment->next_vcn_;
+        vcn = fragment->next_vcn_;
     }
 
     /* Setup the parameters for the move. */
-    MoveParams.FileHandle = FileHandle;
-    MoveParams.StartingLcn.QuadPart = NewLcn;
-    MoveParams.StartingVcn.QuadPart = Vcn + (Offset - RealVcn);
-    MoveParams.ClusterCount = (uint32_t)Size;
+    move_params.FileHandle = file_handle;
+    move_params.StartingLcn.QuadPart = new_lcn;
+    move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
+    move_params.ClusterCount = (uint32_t)size;
 
-    if (Fragment == nullptr) {
-        Lcn = 0;
+    if (fragment == nullptr) {
+        lcn = 0;
     }
     else {
-        Lcn = Fragment->lcn_ + (Offset - RealVcn);
+        lcn = fragment->lcn_ + (offset - real_vcn);
     }
 
     /* Show progress message. */
-    jkGui->show_move(Item, MoveParams.ClusterCount, Lcn, NewLcn, MoveParams.StartingVcn.QuadPart);
+    gui->show_move(item, move_params.ClusterCount, lcn, new_lcn, move_params.StartingVcn.QuadPart);
 
     /* Draw the item and the destination clusters on the screen in the BUSY	color. */
-    colorize_item(Data, Item, MoveParams.StartingVcn.QuadPart, MoveParams.ClusterCount, false);
+    colorize_item(data, item, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
 
-    jkGui->draw_cluster(Data, NewLcn, NewLcn + Size, DefragStruct::COLORBUSY);
+    gui->draw_cluster(data, new_lcn, new_lcn + size, DefragStruct::COLORBUSY);
 
     /* Call Windows to perform the move. */
-    ErrorCode = DeviceIoControl(Data->disk_.volume_handle_,FSCTL_MOVE_FILE, &MoveParams,
-                                sizeof MoveParams, nullptr, 0, &w, nullptr);
+    uint32_t error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_MOVE_FILE, &move_params,
+                                          sizeof move_params, nullptr, 0, &w, nullptr);
 
-    if (ErrorCode != 0) {
-        ErrorCode = NO_ERROR;
+    if (error_code != 0) {
+        error_code = NO_ERROR;
     }
     else {
-        ErrorCode = GetLastError();
+        error_code = GetLastError();
     }
 
     /* Update the PhaseDone counter for the progress bar. */
-    Data->phase_done_ = Data->phase_done_ + MoveParams.ClusterCount;
+    data->phase_done_ = data->phase_done_ + move_params.ClusterCount;
 
     /* Undraw the destination clusters on the screen. */
-    jkGui->draw_cluster(Data, NewLcn, NewLcn + Size, DefragStruct::COLOREMPTY);
+    gui->draw_cluster(data, new_lcn, new_lcn + size, DefragStruct::COLOREMPTY);
 
-    return ErrorCode;
+    return error_code;
 }
 
 /*
 
-Subfunction for MoveItem(), see below. Move (part of) an item to a new
-location on disk. Return errorcode from DeviceIoControl().
-Move the item one fragment at a time, a FSCTL_MOVE_FILE call per fragment.
-The fragments will be lined up on disk and the defragger will treat the
-item as unfragmented.
-Note: the offset and size of the block is in absolute clusters, not
-virtual clusters.
 
 */
-uint32_t DefragLib::move_item2(DefragDataStruct* Data,
-                               HANDLE FileHandle,
-                               ItemStruct* Item,
-                               uint64_t NewLcn, /* Where to move to. */
-                               uint64_t Offset, /* Number of first cluster to be moved. */
-                               uint64_t Size) /* Number of clusters to be moved. */
-{
-    MOVE_FILE_DATA MoveParams;
-
-    FragmentListStruct* Fragment;
-
-    uint64_t Vcn;
-    uint64_t RealVcn;
-    uint64_t FromLcn;
-
-    uint32_t ErrorCode;
+/**
+ * \brief Subfunction for MoveItem(), see below. Move (part of) an item to a new location on disk. Return errorcode from DeviceIoControl().
+ * Move the item one fragment at a time, a FSCTL_MOVE_FILE call per fragment. The fragments will be lined up on disk and the defragger will treat the
+ * item as unfragmented. Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+ * \param new_lcn Where to move to
+ * \param offset Number of first cluster to be moved
+ * \param size Number of clusters to be moved
+ * \return 
+ */
+uint32_t DefragLib::move_item2(DefragDataStruct* data, const HANDLE file_handle, const ItemStruct* item,
+                               const uint64_t new_lcn, const uint64_t offset, const uint64_t size) const {
+    MOVE_FILE_DATA move_params;
+    uint64_t from_lcn;
     DWORD w;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Walk through the fragments of the item and move them one by one to the new location. */
-    ErrorCode = NO_ERROR;
-    Vcn = 0;
-    RealVcn = 0;
+    uint32_t error_code = NO_ERROR;
+    uint64_t vcn = 0;
+    uint64_t real_vcn = 0;
 
-    for (Fragment = Item->fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
-        if (*Data->running_ != RunningState::RUNNING) break;
+    for (auto fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+        if (*data->running_ != RunningState::RUNNING) break;
 
-        if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-            if (RealVcn >= Offset + Size) break;
+        if (fragment->lcn_ != VIRTUALFRAGMENT) {
+            if (real_vcn >= offset + size) break;
 
-            if (RealVcn + Fragment->next_vcn_ - Vcn - 1 >= Offset) {
+            if (real_vcn + fragment->next_vcn_ - vcn - 1 >= offset) {
                 /* Setup the parameters for the move. If the block that we want to move
                 begins somewhere in the middle of a fragment then we have to setup
                 slightly differently than when the fragment is at or after the begin
                 of the block. */
-                MoveParams.FileHandle = FileHandle;
+                move_params.FileHandle = file_handle;
 
-                if (RealVcn < Offset) {
+                if (real_vcn < offset) {
                     /* The fragment starts before the Offset and overlaps. Move the
                     part of the fragment from the Offset until the end of the
                     fragment or the block. */
-                    MoveParams.StartingLcn.QuadPart = NewLcn;
-                    MoveParams.StartingVcn.QuadPart = Vcn + (Offset - RealVcn);
+                    move_params.StartingLcn.QuadPart = new_lcn;
+                    move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
 
-                    if (Size < Fragment->next_vcn_ - Vcn - (Offset - RealVcn)) {
-                        MoveParams.ClusterCount = (uint32_t)Size;
+                    if (size < fragment->next_vcn_ - vcn - (offset - real_vcn)) {
+                        move_params.ClusterCount = (uint32_t)size;
                     }
                     else {
-                        MoveParams.ClusterCount = (uint32_t)(Fragment->next_vcn_ - Vcn - (Offset - RealVcn));
+                        move_params.ClusterCount = (uint32_t)(fragment->next_vcn_ - vcn - (offset - real_vcn));
                     }
 
-                    FromLcn = Fragment->lcn_ + (Offset - RealVcn);
+                    from_lcn = fragment->lcn_ + (offset - real_vcn);
                 }
                 else {
                     /* The fragment starts at or after the Offset. Move the part of
                     the fragment inside the block (up until Offset+Size). */
-                    MoveParams.StartingLcn.QuadPart = NewLcn + RealVcn - Offset;
-                    MoveParams.StartingVcn.QuadPart = Vcn;
+                    move_params.StartingLcn.QuadPart = new_lcn + real_vcn - offset;
+                    move_params.StartingVcn.QuadPart = vcn;
 
-                    if (Fragment->next_vcn_ - Vcn < Offset + Size - RealVcn) {
-                        MoveParams.ClusterCount = (uint32_t)(Fragment->next_vcn_ - Vcn);
+                    if (fragment->next_vcn_ - vcn < offset + size - real_vcn) {
+                        move_params.ClusterCount = (uint32_t)(fragment->next_vcn_ - vcn);
                     }
                     else {
-                        MoveParams.ClusterCount = (uint32_t)(Offset + Size - RealVcn);
+                        move_params.ClusterCount = (uint32_t)(offset + size - real_vcn);
                     }
-                    FromLcn = Fragment->lcn_;
+                    from_lcn = fragment->lcn_;
                 }
 
                 /* Show progress message. */
-                jkGui->show_move(Item, MoveParams.ClusterCount, FromLcn, MoveParams.StartingLcn.QuadPart,
-                                MoveParams.StartingVcn.QuadPart);
+                gui->show_move(item, move_params.ClusterCount, from_lcn, move_params.StartingLcn.QuadPart,
+                               move_params.StartingVcn.QuadPart);
 
                 /* Draw the item and the destination clusters on the screen in the BUSY	color. */
                 //				if (*Data->RedrawScreen == 0) {
-                colorize_item(Data, Item, MoveParams.StartingVcn.QuadPart, MoveParams.ClusterCount, false);
+                colorize_item(data, item, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
                 //				} else {
                 //					m_jkGui->ShowDiskmap(Data);
                 //				}
 
-                jkGui->draw_cluster(Data, MoveParams.StartingLcn.QuadPart,
-                                   MoveParams.StartingLcn.QuadPart + MoveParams.ClusterCount,
-                                   DefragStruct::COLORBUSY);
+                gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
+                                  move_params.StartingLcn.QuadPart + move_params.ClusterCount,
+                                  DefragStruct::COLORBUSY);
 
                 /* Call Windows to perform the move. */
-                ErrorCode = DeviceIoControl(Data->disk_.volume_handle_,FSCTL_MOVE_FILE, &MoveParams,
-                                            sizeof MoveParams, nullptr, 0, &w, nullptr);
+                error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_MOVE_FILE, &move_params,
+                                             sizeof move_params, nullptr, 0, &w, nullptr);
 
-                if (ErrorCode != 0) {
-                    ErrorCode = NO_ERROR;
+                if (error_code != 0) {
+                    error_code = NO_ERROR;
                 }
                 else {
-                    ErrorCode = GetLastError();
+                    error_code = GetLastError();
                 }
 
                 /* Update the PhaseDone counter for the progress bar. */
-                Data->phase_done_ = Data->phase_done_ + MoveParams.ClusterCount;
+                data->phase_done_ = data->phase_done_ + move_params.ClusterCount;
 
                 /* Undraw the destination clusters on the screen. */
-                jkGui->draw_cluster(Data, MoveParams.StartingLcn.QuadPart,
-                                   MoveParams.StartingLcn.QuadPart + MoveParams.ClusterCount,
-                                   DefragStruct::COLOREMPTY);
+                gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
+                                  move_params.StartingLcn.QuadPart + move_params.ClusterCount,
+                                  DefragStruct::COLOREMPTY);
 
                 /* If there was an error then exit. */
-                if (ErrorCode != NO_ERROR) return ErrorCode;
+                if (error_code != NO_ERROR) return error_code;
             }
 
-            RealVcn = RealVcn + Fragment->next_vcn_ - Vcn;
+            real_vcn = real_vcn + fragment->next_vcn_ - vcn;
         }
 
         /* Next fragment. */
-        Vcn = Fragment->next_vcn_;
+        vcn = fragment->next_vcn_;
     }
 
-    return ErrorCode;
+    return error_code;
 }
 
 /*
 
-Subfunction for MoveItem(), see below. Move (part of) an item to a new
-location on disk. Return true if success, false if failure.
-Strategy 0: move the block in a single FSCTL_MOVE_FILE call. If the block
-has fragments then Windows will join them up.
-Strategy 1: move the block one fragment at a time. The fragments will be
-lined up on disk and the defragger will treat them as unfragmented.
-Note: the offset and size of the block is in absolute clusters, not
-virtual clusters.
+
 
 */
-int DefragLib::MoveItem3(DefragDataStruct* Data,
-                         ItemStruct* Item,
-                         HANDLE FileHandle,
-                         uint64_t NewLcn, /* Where to move to. */
-                         uint64_t Offset, /* Number of first cluster to be moved. */
-                         uint64_t Size, /* Number of clusters to be moved. */
-                         int Strategy) /* 0: move in one part, 1: move individual fragments. */
-{
-    uint32_t ErrorCode;
-
-    WCHAR ErrorString[BUFSIZ];
-
-    int Result;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+/**
+ * \brief Subfunction for MoveItem(), see below. Move (part of) an item to a new location on disk.
+ * Strategy 0: move the block in a single FSCTL_MOVE_FILE call. If the block has fragments then Windows will join them up.
+ * Strategy 1: move the block one fragment at a time. The fragments will be lined up on disk and the defragger will treat them as unfragmented.
+ * Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+ * \param new_lcn Where to move to
+ * \param offset Number of first cluster to be moved
+ * \param size Number of clusters to be moved
+ * \param strategy 0: move in one part, 1: move individual fragments
+ * \return 
+ */
+int DefragLib::move_item3(DefragDataStruct* data, ItemStruct* item, const HANDLE file_handle, const uint64_t new_lcn,
+                          const uint64_t offset, const uint64_t size, const int strategy) const {
+    uint32_t error_code;
+    WCHAR error_string[BUFSIZ];
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Slow the program down if so selected. */
-    slow_down(Data);
+    slow_down(data);
 
     /* Move the item, either in a single block or fragment by fragment. */
-    if (Strategy == 0) {
-        ErrorCode = move_item1(Data, FileHandle, Item, NewLcn, Offset, Size);
+    if (strategy == 0) {
+        error_code = move_item1(data, file_handle, item, new_lcn, offset, size);
     }
     else {
-        ErrorCode = move_item2(Data, FileHandle, Item, NewLcn, Offset, Size);
+        error_code = move_item2(data, file_handle, item, new_lcn, offset, size);
     }
 
     /* If there was an error then fetch the errormessage and save it. */
-    if (ErrorCode != NO_ERROR) system_error_str(ErrorCode, ErrorString,BUFSIZ);
+    if (error_code != NO_ERROR) system_error_str(error_code, error_string,BUFSIZ);
 
     /* Fetch the new fragment map of the item and refresh the screen. */
-    colorize_item(Data, Item, 0, 0, true);
+    colorize_item(data, item, 0, 0, true);
 
-    tree_detach(Data, Item);
+    tree_detach(data, item);
 
-    Result = get_fragments(Data, Item, FileHandle);
+    const int result = get_fragments(data, item, file_handle);
 
-    tree_insert(Data, Item);
+    tree_insert(data, item);
 
     //		if (*Data->RedrawScreen == 0) {
-    colorize_item(Data, Item, 0, 0, false);
+    colorize_item(data, item, 0, 0, false);
     //		} else {
     //			m_jkGui->ShowDiskmap(Data);
     //		}
 
     /* If Windows reported an error while moving the item then show the
     errormessage and return false. */
-    if (ErrorCode != NO_ERROR) {
-        jkGui->show_debug(DebugLevel::DetailedProgress, Item, ErrorString);
+    if (error_code != NO_ERROR) {
+        gui->show_debug(DebugLevel::DetailedProgress, item, error_string);
 
         return false;
     }
 
     /* If there was an error analyzing the item then return false. */
-    if (Result == false) return false;
+    if (result == false) return false;
 
     return true;
 }
 
-/*
+/**
+ * \brief Subfunction for MoveItem(), see below. Move the item with strategy 0. If this results in fragmentation then try again using strategy 1.
+ * Note: The Windows defragmentation API does not report an error if it only moves part of the file and has fragmented the file. This can for example
+ * happen when part of the file is locked and cannot be moved, or when (part of) the gap was previously in use by another file but has not yet been
+ * released by the NTFS checkpoint system. Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+ * \param new_lcn Where to move to
+ * \param offset Number of first cluster to be moved
+ * \param size Number of clusters to be moved
+ * \param direction 0: move up, 1: move down
+ * \return true if success, false if failed to move without fragmenting the
+item
+ */
+int DefragLib::move_item4(DefragDataStruct* data, ItemStruct* item, const HANDLE file_handle, const uint64_t new_lcn,
+                          const uint64_t offset, const uint64_t size, const int direction) const {
+    uint64_t cluster_start;
+    uint64_t cluster_end;
 
-Subfunction for MoveItem(), see below. Move the item with strategy 0.
-If this results in fragmentation then try again using strategy 1.
-Return true if success, false if failed to move without fragmenting the
-item.
-Note: The Windows defragmentation API does not report an error if it only
-moves part of the file and has fragmented the file. This can for example
-happen when part of the file is locked and cannot be moved, or when (part
-of) the gap was previously in use by another file but has not yet been
-released by the NTFS checkpoint system.
-Note: the offset and size of the block is in absolute clusters, not
-virtual clusters.
-
-*/
-int DefragLib::MoveItem4(DefragDataStruct* Data,
-                         ItemStruct* Item,
-                         HANDLE FileHandle,
-                         uint64_t NewLcn, /* Where to move to. */
-                         uint64_t Offset, /* Number of first cluster to be moved. */
-                         uint64_t Size, /* Number of clusters to be moved. */
-                         int Direction) /* 0: move up, 1: move down. */
-{
-    uint64_t OldLcn;
-    uint64_t ClusterStart;
-    uint64_t ClusterEnd;
-
-    int Result;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Remember the current position on disk of the item. */
-    OldLcn = get_item_lcn(Item);
+    const uint64_t old_lcn = get_item_lcn(item);
 
     /* Move the Item to the requested LCN. If error then return false. */
-    Result = MoveItem3(Data, Item, FileHandle, NewLcn, Offset, Size, 0);
+    int result = move_item3(data, item, file_handle, new_lcn, offset, size, 0);
 
-    if (Result == false) return false;
-    if (*Data->running_ != RunningState::RUNNING) return false;
+    if (result == false) return false;
+    if (*data->running_ != RunningState::RUNNING) return false;
 
     /* If the block is not fragmented then return true. */
-    if (is_fragmented(Item, Offset, Size) == false) return true;
+    if (is_fragmented(item, offset, size) == false) return true;
 
     /* Show debug message: "Windows could not move the file, trying alternative method." */
-    jkGui->show_debug(DebugLevel::DetailedProgress, Item, Data->debug_msg_[42]);
+    gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[42]);
 
     /* Find another gap on disk for the item. */
-    if (Direction == 0) {
-        ClusterStart = OldLcn + Item->clusters_count_;
+    if (direction == 0) {
+        cluster_start = old_lcn + item->clusters_count_;
 
-        if (ClusterStart + Item->clusters_count_ >= NewLcn &&
-            ClusterStart < NewLcn + Item->clusters_count_) {
-            ClusterStart = NewLcn + Item->clusters_count_;
+        if (cluster_start + item->clusters_count_ >= new_lcn &&
+            cluster_start < new_lcn + item->clusters_count_) {
+            cluster_start = new_lcn + item->clusters_count_;
         }
 
-        Result = find_gap(Data, ClusterStart, 0, Size, true, false, &ClusterStart, &ClusterEnd, FALSE);
+        result = find_gap(data, cluster_start, 0, size, true, false, &cluster_start, &cluster_end, FALSE);
     }
     else {
-        Result = find_gap(Data, Data->zones_[1], OldLcn, Size, true, true, &ClusterStart, &ClusterEnd, FALSE);
+        result = find_gap(data, data->zones_[1], old_lcn, size, true, true, &cluster_start, &cluster_end, FALSE);
     }
 
-    if (Result == false) return false;
+    if (result == false) return false;
 
     /* Add the size of the item to the width of the progress bar, we have discovered
     that we have more work to do. */
-    Data->phase_todo_ = Data->phase_todo_ + Size;
+    data->phase_todo_ = data->phase_todo_ + size;
 
     /* Move the item to the other gap using strategy 1. */
-    if (Direction == 0) {
-        Result = MoveItem3(Data, Item, FileHandle, ClusterStart, Offset, Size, 1);
+    if (direction == 0) {
+        result = move_item3(data, item, file_handle, cluster_start, offset, size, 1);
     }
     else {
-        Result = MoveItem3(Data, Item, FileHandle, ClusterEnd - Size, Offset, Size, 1);
+        result = move_item3(data, item, file_handle, cluster_end - size, offset, size, 1);
     }
 
-    if (Result == false) return false;
+    if (result == false) return false;
 
     /* If the block is still fragmented then return false. */
-    if (is_fragmented(Item, Offset, Size) == true) {
+    if (is_fragmented(item, offset, size) == true) {
         /* Show debug message: "Alternative method failed, leaving file where it is." */
-        jkGui->show_debug(DebugLevel::DetailedProgress, Item, Data->debug_msg_[45]);
+        gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[45]);
 
         return false;
     }
 
-    jkGui->show_debug(DebugLevel::DetailedProgress, Item, L"");
+    gui->show_debug(DebugLevel::DetailedProgress, item, L"");
 
     /* Add the size of the item to the width of the progress bar, we have more work to do. */
-    Data->phase_todo_ = Data->phase_todo_ + Size;
+    data->phase_todo_ = data->phase_todo_ + size;
 
     /* Strategy 1 has helped. Move the Item again to where we want it, but
     this time use strategy 1. */
-    Result = MoveItem3(Data, Item, FileHandle, NewLcn, Offset, Size, 1);
+    result = move_item3(data, item, file_handle, new_lcn, offset, size, 1);
 
-    return Result;
+    return result;
 }
 
-/*
-
-Move (part of) an item to a new location on disk. Moving the Item will
-automatically defragment it. If unsuccesful then set the Unmovable
-flag of the item and return false, otherwise return true.
-Note: the item will move to a different location in the tree.
-Note: the offset and size of the block is in absolute clusters, not
-virtual clusters.
-
-*/
-int DefragLib::MoveItem(DefragDataStruct* Data,
-                        ItemStruct* Item,
-                        uint64_t NewLcn, /* Where to move to. */
-                        uint64_t Offset, /* Number of first cluster to be moved. */
-                        uint64_t Size, /* Number of clusters to be moved. */
-                        int Direction) /* 0: move up, 1: move down. */
-{
-    uint64_t ClustersTodo;
-
+/**
+ * \brief Move (part of) an item to a new location on disk. Moving the Item will automatically defragment it. If unsuccesful then set the Unmovable
+ * flag of the item and return false, otherwise return true. Note: the item will move to a different location in the tree.
+ * Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+ * \param new_lcn Where to move to
+ * \param offset Number of first cluster to be moved
+ * \param size Number of clusters to be moved
+ * \param direction 0: move up, 1: move down
+ * \return 
+ */
+int DefragLib::move_item(DefragDataStruct* data, ItemStruct* item, const uint64_t new_lcn,
+                         const uint64_t offset, const uint64_t size, const int direction) const {
     /* If the Item is Unmovable, Excluded, or has zero size then we cannot move it. */
-    if (Item->is_unmovable_ == true) return false;
-    if (Item->is_excluded_ == true) return false;
-    if (Item->clusters_count_ == 0) return false;
+    if (item->is_unmovable_ == true) return false;
+    if (item->is_excluded_ == true) return false;
+    if (item->clusters_count_ == 0) return false;
 
     /* Directories cannot be moved on FAT volumes. This is a known Windows limitation
     and not a bug in JkDefrag. But JkDefrag will still try, to allow for possible
     circumstances where the Windows defragmentation API can move them after all.
     To speed up things we count the number of directories that could not be moved,
     and when it reaches 20 we ignore all directories from then on. */
-    if (Item->is_dir_ == true && Data->cannot_move_dirs_ > 20) {
-        Item->is_unmovable_ = true;
+    if (item->is_dir_ == true && data->cannot_move_dirs_ > 20) {
+        item->is_unmovable_ = true;
 
-        colorize_item(Data, Item, 0, 0, false);
+        colorize_item(data, item, 0, 0, false);
 
         return false;
     }
@@ -2275,110 +2121,94 @@ int DefragLib::MoveItem(DefragDataStruct* Data,
     uint64_t clusters_done = 0;
     bool result = true;
 
-    while (clusters_done < Size && *Data->running_ == RunningState::RUNNING) {
-        ClustersTodo = Size - clusters_done;
+    while (clusters_done < size && *data->running_ == RunningState::RUNNING) {
+        uint64_t clusters_todo = size - clusters_done;
 
-        if (Data->bytes_per_cluster_ > 0) {
-            if (ClustersTodo > 1073741824 / Data->bytes_per_cluster_) {
-                ClustersTodo = 1073741824 / Data->bytes_per_cluster_;
+        if (data->bytes_per_cluster_ > 0) {
+            if (clusters_todo > 1073741824 / data->bytes_per_cluster_) {
+                clusters_todo = 1073741824 / data->bytes_per_cluster_;
             }
         }
         else {
-            if (ClustersTodo > 262144) ClustersTodo = 262144;
+            if (clusters_todo > 262144) clusters_todo = 262144;
         }
 
-        const HANDLE file_handle = open_item_handle(Data, Item);
+        const HANDLE file_handle = open_item_handle(data, item);
 
         result = false;
 
         if (file_handle == nullptr) break;
 
-        result = MoveItem4(Data, Item, file_handle, NewLcn + clusters_done, Offset + clusters_done,
-                           ClustersTodo, Direction);
+        result = move_item4(data, item, file_handle, new_lcn + clusters_done, offset + clusters_done,
+                            clusters_todo, direction);
 
         if (result == false) break;
 
-        clusters_done = clusters_done + ClustersTodo;
+        clusters_done = clusters_done + clusters_todo;
 
         FlushFileBuffers(file_handle); /* Is this useful? Can't hurt. */
         CloseHandle(file_handle);
     }
 
     if (result == true) {
-        if (Item->is_dir_ == true) Data->cannot_move_dirs_ = 0;
+        if (item->is_dir_ == true) data->cannot_move_dirs_ = 0;
 
         return true;
     }
 
     /* If error then set the Unmovable flag, colorize the item on the screen, recalculate
     the begin of the zone's, and return false. */
-    Item->is_unmovable_ = true;
+    item->is_unmovable_ = true;
 
-    if (Item->is_dir_ == true) Data->cannot_move_dirs_++;
+    if (item->is_dir_ == true) data->cannot_move_dirs_++;
 
-    colorize_item(Data, Item, 0, 0, false);
-    calculate_zones(Data);
+    colorize_item(data, item, 0, 0, false);
+    calculate_zones(data);
 
     return false;
 }
 
-/*
-
-Look in the ItemTree and return the highest file above the gap that fits inside
-the gap (cluster start - cluster end). Return a pointer to the item, or nullptr if
-no file could be found.
-Direction=0      Search for files below the gap.
-Direction=1      Search for files above the gap.
-Zone=0           Only search the directories.
-Zone=1           Only search the regular files.
-Zone=2           Only search the SpaceHogs.
-Zone=3           Search all items.
-
-*/
-ItemStruct* DefragLib::FindHighestItem(const DefragDataStruct* data,
-                                       uint64_t ClusterStart,
-                                       uint64_t ClusterEnd,
-                                       int Direction,
-                                       int Zone) {
-    uint64_t ItemLcn;
-
-    int FileZone;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+/**
+ * \brief Look in the ItemTree and return the highest file above the gap that fits inside the gap (cluster start - cluster end).
+ * \param direction 0=Search for files below the gap, 1=above
+ * \param zone 0=only directories, 1=only regular files, 2=only space hogs, 3=all
+ * \return Return a pointer to the item, or nullptr if no file could be found
+ */
+ItemStruct* DefragLib::find_highest_item(const DefragDataStruct* data, const uint64_t cluster_start,
+                                         const uint64_t cluster_end, const int direction, const int zone) {
+    DefragGui* gui = DefragGui::get_instance();
 
     /* "Looking for highest-fit %I64d[%I64d]" */
-    jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for highest-fit %I64d[%I64d]",
-                     ClusterStart, ClusterEnd - ClusterStart);
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for highest-fit %I64d[%I64d]",
+                    cluster_start, cluster_end - cluster_start);
 
     /* Walk backwards through all the items on disk and select the first
     file that fits inside the free block. If we find an exact match then
     immediately return it. */
-    for (auto item = tree_first(data->item_tree_, Direction);
-         item != nullptr;
-         item = tree_next_prev(item, Direction)) {
-        ItemLcn = get_item_lcn(item);
+    for (auto item = tree_first(data->item_tree_, direction); item != nullptr; item = tree_next_prev(item, direction)) {
+        const uint64_t item_lcn = get_item_lcn(item);
 
-        if (ItemLcn == 0) continue;
+        if (item_lcn == 0) continue;
 
-        if (Direction == 1) {
-            if (ItemLcn < ClusterEnd) return nullptr;
+        if (direction == 1) {
+            if (item_lcn < cluster_end) return nullptr;
         }
         else {
-            if (ItemLcn > ClusterStart) return nullptr;
+            if (item_lcn > cluster_start) return nullptr;
         }
 
         if (item->is_unmovable_ == true) continue;
         if (item->is_excluded_ == true) continue;
 
-        if (Zone != 3) {
-            FileZone = 1;
+        if (zone != 3) {
+            int file_zone = 1;
 
-            if (item->is_hog_ == true) FileZone = 2;
-            if (item->is_dir_ == true) FileZone = 0;
-            if (Zone != FileZone) continue;
+            if (item->is_hog_ == true) file_zone = 2;
+            if (item->is_dir_ == true) file_zone = 0;
+            if (zone != file_zone) continue;
         }
 
-        if (item->clusters_count_ > ClusterEnd - ClusterStart) continue;
+        if (item->clusters_count_ > cluster_end - cluster_start) continue;
 
         return item;
     }
@@ -2400,55 +2230,42 @@ Zone=2           Only search the SpaceHogs.
 Zone=3           Search all items.
 
 */
-ItemStruct* DefragLib::FindBestItem(const DefragDataStruct* data,
-                                    uint64_t ClusterStart,
-                                    uint64_t ClusterEnd,
-                                    int Direction,
-                                    int Zone) {
-    ItemStruct* FirstItem;
+ItemStruct* DefragLib::find_best_item(const DefragDataStruct* data, const uint64_t cluster_start,
+                                      const uint64_t cluster_end, const int direction, const int zone) {
+    __timeb64 time{};
+    DefragGui* gui = DefragGui::get_instance();
 
-    uint64_t GapSize;
-    uint64_t TotalItemsSize;
-
-    int FileZone;
-
-    __timeb64 Time;
-
-    int64_t MaxTime;
-
-    DefragGui* jkGui = DefragGui::get_instance();
-
-    jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for perfect fit %I64d[%I64d]",
-                     ClusterStart, ClusterEnd - ClusterStart);
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for perfect fit %I64d[%I64d]",
+                      cluster_start, cluster_end - cluster_start);
 
     /* Walk backwards through all the items on disk and select the first item that
     fits inside the free block, and combined with other items will fill the gap
     perfectly. If we find an exact match then immediately return it. */
 
-    _ftime64_s(&Time);
+    _ftime64_s(&time);
 
-    MaxTime = Time.time * 1000 + Time.millitm + 500;
-    FirstItem = nullptr;
-    GapSize = ClusterEnd - ClusterStart;
-    TotalItemsSize = 0;
+    const int64_t MaxTime = time.time * 1000 + time.millitm + 500;
+    ItemStruct* first_item = nullptr;
+    uint64_t gap_size = cluster_end - cluster_start;
+    uint64_t total_items_size = 0;
 
-    for (auto item = tree_first(data->item_tree_, Direction);
+    for (auto item = tree_first(data->item_tree_, direction);
          item != nullptr;
-         item = tree_next_prev(item, Direction)) {
+         item = tree_next_prev(item, direction)) {
         /* If we have passed the top of the gap then.... */
         const uint64_t item_lcn = get_item_lcn(item);
 
         if (item_lcn == 0) continue;
 
-        if ((Direction == 1 && item_lcn < ClusterEnd) ||
-            (Direction == 0 && item_lcn > ClusterEnd)) {
+        if ((direction == 1 && item_lcn < cluster_end) ||
+            (direction == 0 && item_lcn > cluster_end)) {
             /* If we did not find an item that fits inside the gap then exit. */
-            if (FirstItem == nullptr) break;
+            if (first_item == nullptr) break;
 
             /* Exit if the total size of all the items is less than the size of the gap.
             We know that we can never find a perfect fit. */
-            if (TotalItemsSize < ClusterEnd - ClusterStart) {
-                jkGui->show_debug(
+            if (total_items_size < cluster_end - cluster_start) {
+                gui->show_debug(
                     DebugLevel::DetailedGapFilling, nullptr,
                     L"No perfect fit found, the total size of all the items above the gap is less than the size of the gap.");
 
@@ -2456,20 +2273,20 @@ ItemStruct* DefragLib::FindBestItem(const DefragDataStruct* data,
             }
 
             /* Exit if the running time is more than 0.5 seconds. */
-            _ftime64_s(&Time);
+            _ftime64_s(&time);
 
-            if (Time.time * 1000 + Time.millitm > MaxTime) {
-                jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No perfect fit found, out of time.");
+            if (time.time * 1000 + time.millitm > MaxTime) {
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No perfect fit found, out of time.");
 
                 return nullptr;
             }
 
             /* Rewind and try again. The item that we have found previously fits in the
             gap, but it does not combine with other items to perfectly fill the gap. */
-            item = FirstItem;
-            FirstItem = nullptr;
-            GapSize = ClusterEnd - ClusterStart;
-            TotalItemsSize = 0;
+            item = first_item;
+            first_item = nullptr;
+            gap_size = cluster_end - cluster_start;
+            total_items_size = 0;
 
             continue;
         }
@@ -2478,191 +2295,172 @@ ItemStruct* DefragLib::FindBestItem(const DefragDataStruct* data,
         if (item->is_unmovable_ == true) continue;
         if (item->is_excluded_ == true) continue;
 
-        if (Zone != 3) {
-            FileZone = 1;
+        if (zone != 3) {
+            int file_zone = 1;
 
-            if (item->is_hog_ == true) FileZone = 2;
-            if (item->is_dir_ == true) FileZone = 0;
-            if (Zone != FileZone) continue;
+            if (item->is_hog_ == true) file_zone = 2;
+            if (item->is_dir_ == true) file_zone = 0;
+            if (zone != file_zone) continue;
         }
 
-        if (item->clusters_count_ < ClusterEnd - ClusterStart) {
-            TotalItemsSize = TotalItemsSize + item->clusters_count_;
+        if (item->clusters_count_ < cluster_end - cluster_start) {
+            total_items_size = total_items_size + item->clusters_count_;
         }
 
-        if (item->clusters_count_ > GapSize) continue;
+        if (item->clusters_count_ > gap_size) continue;
 
         /* Exit if this item perfectly fills the gap, or if we have found a combination
         with a previous item that perfectly fills the gap. */
-        if (item->clusters_count_ == GapSize) {
-            jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Perfect fit found.");
+        if (item->clusters_count_ == gap_size) {
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Perfect fit found.");
 
-            if (FirstItem != nullptr) return FirstItem;
+            if (first_item != nullptr) return first_item;
 
             return item;
         }
 
         /* We have found an item that fit's inside the gap, but does not perfectly fill
         the gap. We are now looking to fill a smaller gap. */
-        GapSize = GapSize - item->clusters_count_;
+        gap_size = gap_size - item->clusters_count_;
 
         /* Remember the first item that fits inside the gap. */
-        if (FirstItem == nullptr) FirstItem = item;
+        if (first_item == nullptr) first_item = item;
     }
 
-    jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                     L"No perfect fit found, all items above the gap are bigger than the gap.");
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                      L"No perfect fit found, all items above the gap are bigger than the gap.");
 
     return nullptr;
 }
 
 /* Update some numbers in the DefragData. */
-void DefragLib::call_show_status(DefragDataStruct* Data, int Phase, int Zone) {
-    ItemStruct* Item;
-
-    STARTING_LCN_INPUT_BUFFER BitmapParam;
+void DefragLib::call_show_status(DefragDataStruct* data, const int phase, const int zone) {
+    ItemStruct* item;
+    STARTING_LCN_INPUT_BUFFER bitmap_param;
 
     struct {
-        uint64_t StartingLcn;
-        uint64_t BitmapSize;
+        uint64_t starting_lcn_;
+        uint64_t bitmap_size_;
+        // Most efficient if power of 2 
+        BYTE buffer_[65536]; 
+    } bitmap_data{};
 
-        BYTE Buffer[65536]; /* Most efficient if binary multiple. */
-    } BitmapData;
-
-    uint64_t Lcn;
-    uint64_t ClusterStart;
-
-    int Index;
-    int IndexMax;
-
-    BYTE Mask;
-
-    int InUse;
-    int PrevInUse;
-
-    uint32_t ErrorCode;
-
-    int64_t Count;
-    int64_t Factor;
-    int64_t Sum;
-
+    uint32_t error_code;
     DWORD w;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Count the number of free gaps on the disk. */
-    Data->count_gaps_ = 0;
-    Data->count_free_clusters_ = 0;
-    Data->biggest_gap_ = 0;
-    Data->count_gaps_less16_ = 0;
-    Data->count_clusters_less16_ = 0;
+    data->count_gaps_ = 0;
+    data->count_free_clusters_ = 0;
+    data->biggest_gap_ = 0;
+    data->count_gaps_less16_ = 0;
+    data->count_clusters_less16_ = 0;
 
-    Lcn = 0;
-    ClusterStart = 0;
-    PrevInUse = 1;
+    uint64_t lcn = 0;
+    uint64_t cluster_start = 0;
+    int prev_in_use = 1;
 
     do {
         /* Fetch a block of cluster data. */
-        BitmapParam.StartingLcn.QuadPart = Lcn;
-        ErrorCode = DeviceIoControl(Data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
-                                    &BitmapParam, sizeof BitmapParam, &BitmapData, sizeof BitmapData, &w, nullptr);
+        bitmap_param.StartingLcn.QuadPart = lcn;
+        error_code = DeviceIoControl(data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
+                                    &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
 
-        if (ErrorCode != 0) {
-            ErrorCode = NO_ERROR;
+        if (error_code != 0) {
+            error_code = NO_ERROR;
         }
         else {
-            ErrorCode = GetLastError();
+            error_code = GetLastError();
         }
 
-        if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) break;
+        if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
-        Lcn = BitmapData.StartingLcn;
-        Index = 0;
-        Mask = 1;
+        lcn = bitmap_data.starting_lcn_;
+        int index = 0;
+        BYTE mask = 1;
+        int index_max = sizeof bitmap_data.buffer_;
 
-        IndexMax = sizeof BitmapData.Buffer;
+        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int)(bitmap_data.bitmap_size_ / 8);
 
-        if (BitmapData.BitmapSize / 8 < IndexMax) IndexMax = (int)(BitmapData.BitmapSize / 8);
+        while (index < index_max) {
+            int in_use = bitmap_data.buffer_[index] & mask;
 
-        while (Index < IndexMax) {
-            InUse = BitmapData.Buffer[Index] & Mask;
-
-            if ((Lcn >= Data->mft_excludes_[0].start_ && Lcn < Data->mft_excludes_[0].end_) ||
-                (Lcn >= Data->mft_excludes_[1].start_ && Lcn < Data->mft_excludes_[1].end_) ||
-                (Lcn >= Data->mft_excludes_[2].start_ && Lcn < Data->mft_excludes_[2].end_)) {
-                InUse = 1;
+            if ((lcn >= data->mft_excludes_[0].start_ && lcn < data->mft_excludes_[0].end_) ||
+                (lcn >= data->mft_excludes_[1].start_ && lcn < data->mft_excludes_[1].end_) ||
+                (lcn >= data->mft_excludes_[2].start_ && lcn < data->mft_excludes_[2].end_)) {
+                in_use = 1;
             }
 
-            if (PrevInUse == 0 && InUse != 0) {
-                Data->count_gaps_ = Data->count_gaps_ + 1;
-                Data->count_free_clusters_ = Data->count_free_clusters_ + Lcn - ClusterStart;
-                if (Data->biggest_gap_ < Lcn - ClusterStart) Data->biggest_gap_ = Lcn - ClusterStart;
+            if (prev_in_use == 0 && in_use != 0) {
+                data->count_gaps_ = data->count_gaps_ + 1;
+                data->count_free_clusters_ = data->count_free_clusters_ + lcn - cluster_start;
+                if (data->biggest_gap_ < lcn - cluster_start) data->biggest_gap_ = lcn - cluster_start;
 
-                if (Lcn - ClusterStart < 16) {
-                    Data->count_gaps_less16_ = Data->count_gaps_less16_ + 1;
-                    Data->count_clusters_less16_ = Data->count_clusters_less16_ + Lcn - ClusterStart;
+                if (lcn - cluster_start < 16) {
+                    data->count_gaps_less16_ = data->count_gaps_less16_ + 1;
+                    data->count_clusters_less16_ = data->count_clusters_less16_ + lcn - cluster_start;
                 }
             }
 
-            if (PrevInUse != 0 && InUse == 0) ClusterStart = Lcn;
+            if (prev_in_use != 0 && in_use == 0) cluster_start = lcn;
 
-            PrevInUse = InUse;
+            prev_in_use = in_use;
 
-            if (Mask == 128) {
-                Mask = 1;
-                Index = Index + 1;
+            if (mask == 128) {
+                mask = 1;
+                index = index + 1;
             }
             else {
-                Mask = Mask << 1;
+                mask = mask << 1;
             }
 
-            Lcn = Lcn + 1;
+            lcn = lcn + 1;
         }
     }
-    while (ErrorCode == ERROR_MORE_DATA && Lcn < BitmapData.StartingLcn + BitmapData.BitmapSize);
+    while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
 
-    if (PrevInUse == 0) {
-        Data->count_gaps_ = Data->count_gaps_ + 1;
-        Data->count_free_clusters_ = Data->count_free_clusters_ + Lcn - ClusterStart;
+    if (prev_in_use == 0) {
+        data->count_gaps_ = data->count_gaps_ + 1;
+        data->count_free_clusters_ = data->count_free_clusters_ + lcn - cluster_start;
 
-        if (Data->biggest_gap_ < Lcn - ClusterStart) Data->biggest_gap_ = Lcn - ClusterStart;
+        if (data->biggest_gap_ < lcn - cluster_start) data->biggest_gap_ = lcn - cluster_start;
 
-        if (Lcn - ClusterStart < 16) {
-            Data->count_gaps_less16_ = Data->count_gaps_less16_ + 1;
-            Data->count_clusters_less16_ = Data->count_clusters_less16_ + Lcn - ClusterStart;
+        if (lcn - cluster_start < 16) {
+            data->count_gaps_less16_ = data->count_gaps_less16_ + 1;
+            data->count_clusters_less16_ = data->count_clusters_less16_ + lcn - cluster_start;
         }
     }
 
     /* Walk through all files and update the counters. */
-    Data->count_directories_ = 0;
-    Data->count_all_files_ = 0;
-    Data->count_fragmented_items_ = 0;
-    Data->count_all_bytes_ = 0;
-    Data->count_fragmented_bytes_ = 0;
-    Data->count_all_clusters_ = 0;
-    Data->count_fragmented_clusters_ = 0;
+    data->count_directories_ = 0;
+    data->count_all_files_ = 0;
+    data->count_fragmented_items_ = 0;
+    data->count_all_bytes_ = 0;
+    data->count_fragmented_bytes_ = 0;
+    data->count_all_clusters_ = 0;
+    data->count_fragmented_clusters_ = 0;
 
-    for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-        if (Item->long_filename_ != nullptr &&
-            (_wcsicmp(Item->long_filename_, L"$BadClus") == 0 ||
-                _wcsicmp(Item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        if (item->long_filename_ != nullptr &&
+            (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
+                _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
         }
 
-        Data->count_all_bytes_ = Data->count_all_bytes_ + Item->bytes_;
-        Data->count_all_clusters_ = Data->count_all_clusters_ + Item->clusters_count_;
+        data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
+        data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
 
-        if (Item->is_dir_ == true) {
-            Data->count_directories_ = Data->count_directories_ + 1;
+        if (item->is_dir_ == true) {
+            data->count_directories_ = data->count_directories_ + 1;
         }
         else {
-            Data->count_all_files_ = Data->count_all_files_ + 1;
+            data->count_all_files_ = data->count_all_files_ + 1;
         }
 
-        if (fragment_count(Item) > 1) {
-            Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
-            Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + Item->bytes_;
-            Data->count_fragmented_clusters_ = Data->count_fragmented_clusters_ + Item->clusters_count_;
+        if (get_fragment_count(item) > 1) {
+            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
+            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + item->bytes_;
+            data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + item->clusters_count_;
         }
     }
 
@@ -2697,50 +2495,50 @@ void DefragLib::call_show_status(DefragDataStruct* Data, int Phase, int Zone) {
     Average = ( (1-3)*(107+312) + (3-3)*(595+645) + 5-3)*(917+923) ) / ( 3 * (3-1) ) = 473.6666
 
     */
-    Count = 0;
+    int64_t count = 0;
 
-    for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-        if (Item->long_filename_ != nullptr &&
-            (_wcsicmp(Item->long_filename_, L"$BadClus") == 0 ||
-                _wcsicmp(Item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        if (item->long_filename_ != nullptr &&
+            (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
+                _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
         }
 
-        if (Item->clusters_count_ == 0) continue;
+        if (item->clusters_count_ == 0) continue;
 
-        Count = Count + 1;
+        count = count + 1;
     }
 
-    if (Count > 1) {
-        Factor = 1 - Count;
-        Sum = 0;
+    if (count > 1) {
+        int64_t factor = 1 - count;
+        int64_t sum = 0;
 
-        for (Item = tree_smallest(Data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-            if (Item->long_filename_ != nullptr &&
-                (_wcsicmp(Item->long_filename_, L"$BadClus") == 0 ||
-                    _wcsicmp(Item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+            if (item->long_filename_ != nullptr &&
+                (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
+                    _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;
             }
 
-            if (Item->clusters_count_ == 0) continue;
+            if (item->clusters_count_ == 0) continue;
 
-            Sum = Sum + Factor * (get_item_lcn(Item) * 2 + Item->clusters_count_);
+            sum = sum + factor * (get_item_lcn(item) * 2 + item->clusters_count_);
 
-            Factor = Factor + 2;
+            factor = factor + 2;
         }
 
-        Data->average_distance_ = Sum / (double)(Count * (Count - 1));
+        data->average_distance_ = sum / (double)(count * (count - 1));
     }
     else {
-        Data->average_distance_ = 0;
+        data->average_distance_ = 0;
     }
 
-    Data->phase_ = Phase;
-    Data->zone_ = Zone;
-    Data->phase_done_ = 0;
-    Data->phase_todo_ = 0;
+    data->phase_ = phase;
+    data->zone_ = zone;
+    data->phase_done_ = 0;
+    data->phase_todo_ = 0;
 
-    jkGui->show_status(Data);
+    gui->show_status(data);
 }
 
 /* For debugging only: compare the data with the output from the
@@ -2749,27 +2547,22 @@ Note: Reparse points will usually be flagged as different. A reparse point is
 a symbolic link. The CreateFile call will resolve the symbolic link and retrieve
 the info from the real item, but the MFT contains the info from the symbolic
 link. */
-void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
-    HANDLE FileHandle;
-
-    uint64_t Clusters; /* Total number of clusters. */
-
-    STARTING_VCN_INPUT_BUFFER RetrieveParam;
+void DefragLib::compare_items([[maybe_unused]] DefragDataStruct* data, const ItemStruct* item) const {
+    HANDLE file_handle;
+    uint64_t clusters; /* Total number of clusters. */
+    STARTING_VCN_INPUT_BUFFER retrieve_param;
 
     struct {
-        uint32_t ExtentCount;
-
-        uint64_t StartingVcn;
-
+        uint32_t extent_count_;
+        uint64_t starting_vcn_;
         struct {
-            uint64_t NextVcn;
-            uint64_t Lcn;
-        } Extents[1000];
-    } ExtentData;
+            uint64_t next_vcn_;
+            uint64_t lcn_;
+        } extents_[1000];
+    } extent_data{};
 
-    BY_HANDLE_FILE_INFORMATION FileInformation;
-
-    uint64_t Vcn;
+    BY_HANDLE_FILE_INFORMATION file_information;
+    uint64_t vcn;
 
     FragmentListStruct* Fragment;
     FragmentListStruct* LastFragment;
@@ -2787,20 +2580,20 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
 
     DefragGui* jkGui = DefragGui::get_instance();
 
-    jkGui->show_debug(DebugLevel::Fatal, nullptr, L"%I64u %s", get_item_lcn(Item), Item->long_filename_);
+    jkGui->show_debug(DebugLevel::Fatal, nullptr, L"%I64u %s", get_item_lcn(item), item->long_filename_);
 
-    if (Item->is_dir_ == false) {
-        FileHandle = CreateFileW(Item->long_path_,FILE_READ_ATTRIBUTES,
+    if (item->is_dir_ == false) {
+        file_handle = CreateFileW(item->long_path_,FILE_READ_ATTRIBUTES,
                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                  nullptr,OPEN_EXISTING,FILE_FLAG_NO_BUFFERING, nullptr);
     }
     else {
-        FileHandle = CreateFileW(Item->long_path_,GENERIC_READ,
+        file_handle = CreateFileW(item->long_path_,GENERIC_READ,
                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                  nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     }
 
-    if (FileHandle == INVALID_HANDLE_VALUE) {
+    if (file_handle == INVALID_HANDLE_VALUE) {
         system_error_str(GetLastError(), ErrorString,BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Could not open: %s", ErrorString);
@@ -2809,21 +2602,21 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
     }
 
     /* Fetch the date/times of the file. */
-    if (GetFileInformationByHandle(FileHandle, &FileInformation) != 0) {
-        u.LowPart = FileInformation.ftCreationTime.dwLowDateTime;
-        u.HighPart = FileInformation.ftCreationTime.dwHighDateTime;
+    if (GetFileInformationByHandle(file_handle, &file_information) != 0) {
+        u.LowPart = file_information.ftCreationTime.dwLowDateTime;
+        u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
-        if (Item->creation_time_ != u.QuadPart) {
+        if (item->creation_time_ != u.QuadPart) {
             jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different CreationTime %I64u <> %I64u = %I64u",
-                             Item->creation_time_, u.QuadPart, Item->creation_time_ - u.QuadPart);
+                              item->creation_time_, u.QuadPart, item->creation_time_ - u.QuadPart);
         }
 
-        u.LowPart = FileInformation.ftLastAccessTime.dwLowDateTime;
-        u.HighPart = FileInformation.ftLastAccessTime.dwHighDateTime;
+        u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
+        u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
-        if (Item->last_access_time_ != u.QuadPart) {
+        if (item->last_access_time_ != u.QuadPart) {
             jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LastAccessTime %I64u <> %I64u = %I64u",
-                             Item->last_access_time_, u.QuadPart, Item->last_access_time_ - u.QuadPart);
+                              item->last_access_time_, u.QuadPart, item->last_access_time_ - u.QuadPart);
         }
     }
 
@@ -2844,9 +2637,9 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
     fixed size, so we may have to loop a couple of times. */
-    Fragment = Item->fragments_;
-    Clusters = 0;
-    Vcn = 0;
+    Fragment = item->fragments_;
+    clusters = 0;
+    vcn = 0;
     MaxLoop = 1000;
     LastFragment = nullptr;
 
@@ -2867,10 +2660,10 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
 
         /* Ask Windows for the (next segment of the) clustermap of this file. If error
         then leave the loop. */
-        RetrieveParam.StartingVcn.QuadPart = Vcn;
+        retrieve_param.StartingVcn.QuadPart = vcn;
 
-        ErrorCode = DeviceIoControl(FileHandle,FSCTL_GET_RETRIEVAL_POINTERS,
-                                    &RetrieveParam, sizeof RetrieveParam, &ExtentData, sizeof ExtentData, &w,
+        ErrorCode = DeviceIoControl(file_handle,FSCTL_GET_RETRIEVAL_POINTERS,
+                                    &retrieve_param, sizeof retrieve_param, &extent_data, sizeof extent_data, &w,
                                     nullptr);
 
         if (ErrorCode != 0) {
@@ -2884,7 +2677,7 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
 
         /* Walk through the clustermap, count the total number of clusters, and
         save all fragments in memory. */
-        for (i = 0; i < ExtentData.ExtentCount; i++) {
+        for (i = 0; i < extent_data.extent_count_; i++) {
             /* Show debug message. */
 #ifdef jk
 			if (ExtentData.Extents[i].Lcn != VIRTUALFRAGMENT) {
@@ -2900,8 +2693,8 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
             There are two kinds of fragments: real and virtual. The latter do not
             occupy clusters on disk, but are information used by compressed
             and sparse files. */
-            if (ExtentData.Extents[i].Lcn != VIRTUALFRAGMENT) {
-                Clusters = Clusters + ExtentData.Extents[i].NextVcn - Vcn;
+            if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
+                clusters = clusters + extent_data.extents_[i].next_vcn_ - vcn;
             }
 
             /* Compare the fragment. */
@@ -2909,21 +2702,21 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
                 jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             }
             else {
-                if (Fragment->lcn_ != ExtentData.Extents[i].Lcn) {
+                if (Fragment->lcn_ != extent_data.extents_[i].lcn_) {
                     jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LCN in fragment: %I64u <> %I64u",
-                                     Fragment->lcn_, ExtentData.Extents[i].Lcn);
+                                      Fragment->lcn_, extent_data.extents_[i].lcn_);
                 }
 
-                if (Fragment->next_vcn_ != ExtentData.Extents[i].NextVcn) {
+                if (Fragment->next_vcn_ != extent_data.extents_[i].next_vcn_) {
                     jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different NextVcn in fragment: %I64u <> %I64u",
-                                     Fragment->next_vcn_, ExtentData.Extents[i].NextVcn);
+                                      Fragment->next_vcn_, extent_data.extents_[i].next_vcn_);
                 }
 
                 Fragment = Fragment->next_;
             }
 
             /* The Vcn of the next fragment is the NextVcn field in this record. */
-            Vcn = ExtentData.Extents[i].NextVcn;
+            vcn = extent_data.extents_[i].next_vcn_;
         }
 
         /* Loop until we have processed the entire clustermap of the file. */
@@ -2934,7 +2727,7 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
     if (ErrorCode != NO_ERROR && ErrorCode != ERROR_HANDLE_EOF) {
         system_error_str(ErrorCode, ErrorString,BUFSIZ);
 
-        jkGui->show_debug(DebugLevel::Fatal, Item, L"  Error while processing clustermap: %s", ErrorString);
+        jkGui->show_debug(DebugLevel::Fatal, item, L"  Error while processing clustermap: %s", ErrorString);
 
         return;
     }
@@ -2943,16 +2736,16 @@ void DefragLib::CompareItems(DefragDataStruct* Data, ItemStruct* Item) {
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment from MFT");
     }
 
-    if (Item->clusters_count_ != Clusters) {
+    if (item->clusters_count_ != clusters) {
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different cluster count: %I64u <> %I64u",
-                         Item->clusters_count_, Clusters);
+                          item->clusters_count_, clusters);
     }
 }
 
 /* Scan all files in a directory and all it's subdirectories (recursive)
 and store the information in a tree in memory for later use by the
 optimizer. */
-void DefragLib::ScanDir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentDirectory) {
+void DefragLib::scan_dir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentDirectory) {
     ItemStruct* Item;
 
     FragmentListStruct* Fragment;
@@ -3148,7 +2941,7 @@ void DefragLib::ScanDir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentD
 
             if (TempPath != nullptr) {
                 swprintf_s(TempPath, Length, L"%s\\%s\\*", RootPath, FindFileData.cFileName);
-                ScanDir(Data, TempPath, Item);
+                scan_dir(Data, TempPath, Item);
                 free(TempPath);
             }
         }
@@ -3167,7 +2960,8 @@ void DefragLib::ScanDir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentD
 
         /* Show debug info about the file. */
         /* Show debug message: "%I64d clusters at %I64d, %I64d bytes" */
-        jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[16], Item->clusters_count_, get_item_lcn(Item), Item->bytes_);
+        jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[16], Item->clusters_count_,
+                          get_item_lcn(Item), Item->bytes_);
 
         if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
             /* Show debug message: "Special file attribute: Compressed" */
@@ -3255,7 +3049,7 @@ void DefragLib::ScanDir(DefragDataStruct* Data, WCHAR* Mask, ItemStruct* ParentD
 
 /* Scan all files in a volume and store the information in a tree in
 memory for later use by the optimizer. */
-void DefragLib::AnalyzeVolume(DefragDataStruct* Data) {
+void DefragLib::analyze_volume(DefragDataStruct* Data) {
     ItemStruct* Item;
 
     BOOL Result;
@@ -3271,7 +3065,7 @@ void DefragLib::AnalyzeVolume(DefragDataStruct* Data) {
     int i;
 
     DefragGui* jkGui = DefragGui::get_instance();
-    JKScanFat* jkScanFat = JKScanFat::getInstance();
+    JKScanFat* jkScanFat = JKScanFat::get_instance();
     ScanNtfs* jkScanNtfs = ScanNtfs::get_instance();
 
     call_show_status(Data, 1, -1); /* "Phase 1: Analyze" */
@@ -3293,7 +3087,7 @@ void DefragLib::AnalyzeVolume(DefragDataStruct* Data) {
     Result = jkScanNtfs->analyze_ntfs_volume(Data);
 
     /* Scan FAT disks. */
-    if (Result == FALSE && *Data->running_ == RunningState::RUNNING) Result = jkScanFat->AnalyzeFatVolume(Data);
+    if (Result == FALSE && *Data->running_ == RunningState::RUNNING) Result = jkScanFat->analyze_fat_volume(Data);
 
     /* Scan all other filesystems. */
     if (Result == FALSE && *Data->running_ == RunningState::RUNNING) {
@@ -3307,7 +3101,7 @@ void DefragLib::AnalyzeVolume(DefragDataStruct* Data) {
         }
 
         /* Scan all the files. */
-        ScanDir(Data, Data->include_mask_, nullptr);
+        scan_dir(Data, Data->include_mask_, nullptr);
     }
 
     /* Update the diskmap with the colors. */
@@ -3586,12 +3380,14 @@ void DefragLib::fixup(DefragDataStruct* data) {
 
         /* If the file does not fit in the current gap then find another gap. */
         if (item->clusters_count_ > gap_end[file_zone] - gap_begin[file_zone]) {
-            result = find_gap(data, data->zones_[file_zone], 0, item->clusters_count_, true, false, &gap_begin[file_zone],
+            result = find_gap(data, data->zones_[file_zone], 0, item->clusters_count_, true, false,
+                              &gap_begin[file_zone],
                               &gap_end[file_zone], FALSE);
 
             if (result == false) {
                 /* Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]" */
-                gui->show_debug(DebugLevel::Progress, item, data->debug_msg_[25], get_item_lcn(item), item->clusters_count_);
+                gui->show_debug(DebugLevel::Progress, item, data->debug_msg_[25], get_item_lcn(item),
+                                item->clusters_count_);
 
                 gap_end[file_zone] = gap_begin[file_zone]; /* Force re-scan of gap. */
 
@@ -3602,7 +3398,7 @@ void DefragLib::fixup(DefragDataStruct* data) {
         }
 
         /* Move the item. */
-        result = MoveItem(data, item, gap_begin[file_zone], 0, item->clusters_count_, 0);
+        result = move_item(data, item, gap_begin[file_zone], 0, item->clusters_count_, 0);
 
         if (result == true) {
             gap_begin[file_zone] = gap_begin[file_zone] + item->clusters_count_;
@@ -3622,7 +3418,7 @@ void DefragLib::fixup(DefragDataStruct* data) {
 }
 
 /* Defragment all the fragmented files. */
-void DefragLib::Defragment(DefragDataStruct* Data) {
+void DefragLib::defragment(DefragDataStruct* Data) {
     ItemStruct* Item;
     ItemStruct* NextItem;
 
@@ -3684,7 +3480,8 @@ void DefragLib::Defragment(DefragDataStruct* Data) {
         if (Item->is_hog_ == true) FileZone = 2;
         if (Item->is_dir_ == true) FileZone = 0;
 
-        Result = find_gap(Data, Data->zones_[FileZone], 0, Item->clusters_count_, false, false, &GapBegin, &GapEnd, FALSE);
+        Result = find_gap(Data, Data->zones_[FileZone], 0, Item->clusters_count_, false, false, &GapBegin, &GapEnd,
+                          FALSE);
 
         if (Result == false) {
             /* Try finding a gap again, this time including the free area. */
@@ -3701,7 +3498,7 @@ void DefragLib::Defragment(DefragDataStruct* Data) {
         /* If the gap is big enough to hold the entire item then move the file
         in a single go, and loop. */
         if (GapEnd - GapBegin >= Item->clusters_count_) {
-            MoveItem(Data, Item, GapBegin, 0, Item->clusters_count_, 0);
+            move_item(Data, Item, GapBegin, 0, Item->clusters_count_, 0);
 
             continue;
         }
@@ -3754,7 +3551,7 @@ void DefragLib::Defragment(DefragDataStruct* Data) {
             if (ClustersDone >= Item->clusters_count_) break;
 
             /* Move the segment. */
-            Result = MoveItem4(Data, Item, FileHandle, GapBegin, ClustersDone, Clusters, 0);
+            Result = move_item4(Data, Item, FileHandle, GapBegin, ClustersDone, Clusters, 0);
 
             /* Next segment. */
             ClustersDone = ClustersDone + Clusters;
@@ -3777,7 +3574,7 @@ void DefragLib::Defragment(DefragDataStruct* Data) {
 }
 
 /* Fill all the gaps at the beginning of the disk with fragments from the files above. */
-void DefragLib::ForcedFill(DefragDataStruct* Data) {
+void DefragLib::forced_fill(DefragDataStruct* Data) {
     uint64_t GapBegin;
     uint64_t GapEnd;
 
@@ -3847,7 +3644,7 @@ void DefragLib::ForcedFill(DefragDataStruct* Data) {
 
         if (Clusters > HighestSize) Clusters = HighestSize;
 
-        Result = MoveItem(Data, HighestItem, GapBegin, HighestVcn + HighestSize - Clusters, Clusters, 0);
+        Result = move_item(Data, HighestItem, GapBegin, HighestVcn + HighestSize - Clusters, Clusters, 0);
 
         GapBegin = GapBegin + Clusters;
         MaxLcn = HighestLcn + HighestSize - Clusters;
@@ -3857,7 +3654,7 @@ void DefragLib::ForcedFill(DefragDataStruct* Data) {
 /* Vacate an area by moving files upward. If there are unmovable files at the Lcn then
 skip them. Then move files upward until the gap is bigger than Clusters, or when we
 encounter an unmovable file. */
-void DefragLib::Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, BOOL IgnoreMftExcludes) {
+void DefragLib::vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, BOOL IgnoreMftExcludes) {
     uint64_t TestGapBegin;
     uint64_t TestGapEnd;
     uint64_t MoveGapBegin;
@@ -3879,7 +3676,8 @@ void DefragLib::Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, 
 
     DefragGui* jkGui = DefragGui::get_instance();
 
-    jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Vacating %I64u clusters starting at LCN=%I64u", Clusters, Lcn);
+    jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Vacating %I64u clusters starting at LCN=%I64u",
+                      Clusters, Lcn);
 
     /* Sanity check. */
     if (Lcn >= Data->total_clusters_) {
@@ -3952,7 +3750,8 @@ void DefragLib::Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, 
             return;
         }
 
-        jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Data found at LCN=%I64u, %s", BiggerBegin, BiggerItem->long_path_);
+        jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Data found at LCN=%I64u, %s", BiggerBegin,
+                          BiggerItem->long_path_);
 
         /* Find the first gap above the Lcn. */
         bool result = find_gap(Data, Lcn, 0, 0, true, false, &TestGapBegin, &TestGapEnd, IgnoreMftExcludes);
@@ -3966,8 +3765,9 @@ void DefragLib::Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, 
         /* Exit if the end of the first gap is below the first movable item, the gap cannot
         be enlarged. */
         if (TestGapEnd < BiggerBegin) {
-            jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Cannot enlarge the gap from %I64u to %I64u (%I64u clusters) any further.",
-                             TestGapBegin, TestGapEnd, TestGapEnd - TestGapBegin);
+            jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                              L"Cannot enlarge the gap from %I64u to %I64u (%I64u clusters) any further.",
+                              TestGapBegin, TestGapEnd, TestGapEnd - TestGapBegin);
 
             return;
         }
@@ -4005,7 +3805,8 @@ void DefragLib::Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, 
             /* If no gap was found then try to find a gap as high on disk as possible, but
             above the item. */
             if (result == false) {
-                jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Finding gap from end of disk above BiggerEnd=%I64u", BiggerEnd);
+                jkGui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                                  L"Finding gap from end of disk above BiggerEnd=%I64u", BiggerEnd);
 
                 result = find_gap(Data, BiggerEnd, 0, BiggerEnd - BiggerBegin, true, true, &MoveGapBegin,
                                   &MoveGapEnd, FALSE);
@@ -4020,7 +3821,7 @@ void DefragLib::Vacate(DefragDataStruct* Data, uint64_t Lcn, uint64_t Clusters, 
         }
 
         /* Move the fragment to the gap. */
-        result = MoveItem(Data, BiggerItem, MoveGapBegin, BiggerRealVcn, BiggerEnd - BiggerBegin, 0);
+        result = move_item(Data, BiggerItem, MoveGapBegin, BiggerRealVcn, BiggerEnd - BiggerBegin, 0);
 
         if (result == true) {
             if (MoveGapBegin < MoveTo) MoveTo = MoveGapBegin;
@@ -4047,7 +3848,7 @@ Return values:
 0    Equal
 1    Item1 is bigger than Item2
 */
-int DefragLib::CompareItems(ItemStruct* Item1, ItemStruct* Item2, int SortField) {
+int DefragLib::compare_items(ItemStruct* Item1, ItemStruct* Item2, int SortField) {
     int Result;
 
     /* If one of the items is nullptr then the other item is bigger. */
@@ -4167,13 +3968,13 @@ void DefragLib::optimize_sort(DefragDataStruct* data, const int sort_field) {
                 if (file_zone != data->zone_) continue;
 
                 if (previous_item != nullptr &&
-                    CompareItems(previous_item, temp_item, sort_field) >= 0) {
+                    compare_items(previous_item, temp_item, sort_field) >= 0) {
                     continue;
                 }
 
                 phase_temp = phase_temp + temp_item->clusters_count_;
 
-                if (item != nullptr && CompareItems(temp_item, item, sort_field) >= 0) continue;
+                if (item != nullptr && compare_items(temp_item, item, sort_field) >= 0) continue;
 
                 item = temp_item;
             }
@@ -4202,15 +4003,16 @@ void DefragLib::optimize_sort(DefragDataStruct* data, const int sort_field) {
                 clusters_done < item->clusters_count_ &&
                 item->is_unmovable_ == false) {
                 if (clusters_done > 0) {
-                    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Item partially placed, %I64u clusters more to do",
-                                   item->clusters_count_ - clusters_done);
+                    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                                    L"Item partially placed, %I64u clusters more to do",
+                                    item->clusters_count_ - clusters_done);
                 }
 
                 /* Call the Vacate() function to make a gap at Lcn big enough to hold the item.
                 The Vacate() function may not be able to move whatever is now at the Lcn, so
                 after calling it we have to locate the first gap after the Lcn. */
                 if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
-                    Vacate(data, lcn, item->clusters_count_ - clusters_done + minimum_vacate,FALSE);
+                    vacate(data, lcn, item->clusters_count_ - clusters_done + minimum_vacate,FALSE);
 
                     result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, FALSE);
 
@@ -4235,7 +4037,7 @@ void DefragLib::optimize_sort(DefragDataStruct* data, const int sort_field) {
                 }
 
                 /* Move the item to the gap. */
-                result = MoveItem(data, item, gap_begin, clusters_done, clusters, 0);
+                result = move_item(data, item, gap_begin, clusters_done, clusters, 0);
 
                 if (result == true) {
                     gap_begin = gap_begin + clusters;
@@ -4281,7 +4083,8 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct* data) {
 
     /* Exit if this is not an NTFS disk. */
     if (data->disk_.type_ != DiskType::NTFS) {
-        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Cannot move the MFT because this is not an NTFS disk.");
+        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                        L"Cannot move the MFT because this is not an NTFS disk.");
 
         return;
     }
@@ -4292,7 +4095,8 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct* data) {
     os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 
     if (GetVersionEx(&os_version) != 0 && os_version.dwMajorVersion < 6) {
-        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Cannot move the MFT because it is not supported by this version of Windows.");
+        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                        L"Cannot move the MFT because it is not supported by this version of Windows.");
 
         return;
     }
@@ -4329,14 +4133,14 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct* data) {
     while (*data->running_ == RunningState::RUNNING && clusters_done < item->clusters_count_) {
         if (clusters_done > data->disk_.mft_locked_clusters_) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Partially placed, %I64u clusters more to do",
-                           item->clusters_count_ - clusters_done);
+                            item->clusters_count_ - clusters_done);
         }
 
         /* Call the Vacate() function to make a gap at Lcn big enough to hold the MFT.
         The Vacate() function may not be able to move whatever is now at the Lcn, so
         after calling it we have to locate the first gap after the Lcn. */
         if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
-            Vacate(data, lcn, item->clusters_count_ - clusters_done,TRUE);
+            vacate(data, lcn, item->clusters_count_ - clusters_done,TRUE);
 
             result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
 
@@ -4361,7 +4165,7 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct* data) {
         }
 
         /* Move the MFT to the gap. */
-        result = MoveItem(data, item, gap_begin, clusters_done, clusters, 0);
+        result = move_item(data, item, gap_begin, clusters_done, clusters, 0);
 
         if (result == true) {
             gap_begin = gap_begin + clusters;
@@ -4442,22 +4246,22 @@ void DefragLib::optimize_volume(DefragDataStruct* data) {
                 /* Find the Item that is the best fit for the gap. If nothing found (no files
                 fit the gap) then exit the loop. */
                 if (perfect_fit == true) {
-                    item = FindBestItem(data, gap_begin, gap_end, 1, zone);
+                    item = find_best_item(data, gap_begin, gap_end, 1, zone);
 
                     if (item == nullptr) {
                         perfect_fit = false;
 
-                        item = FindHighestItem(data, gap_begin, gap_end, 1, zone);
+                        item = find_highest_item(data, gap_begin, gap_end, 1, zone);
                     }
                 }
                 else {
-                    item = FindHighestItem(data, gap_begin, gap_end, 1, zone);
+                    item = find_highest_item(data, gap_begin, gap_end, 1, zone);
                 }
 
                 if (item == nullptr) break;
 
                 /* Move the item. */
-                result = MoveItem(data, item, gap_begin, 0, item->clusters_count_, 0);
+                result = move_item(data, item, gap_begin, 0, item->clusters_count_, 0);
 
                 if (result == true) {
                     gap_begin = gap_begin + item->clusters_count_;
@@ -4472,7 +4276,8 @@ void DefragLib::optimize_volume(DefragDataStruct* data) {
             /* If the gap could not be filled then skip. */
             if (gap_begin < gap_end) {
                 /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28], gap_begin, gap_end - gap_begin);
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28], gap_begin,
+                                gap_end - gap_begin);
 
                 gap_begin = gap_end;
                 retry = 0;
@@ -4535,21 +4340,21 @@ void DefragLib::optimize_up(DefragDataStruct* data) {
             /* Find the Item that is the best fit for the gap. If nothing found (no files
             fit the gap) then exit the loop. */
             if (perfect_fit == true) {
-                item = FindBestItem(data, gap_begin, gap_end, 0, 3);
+                item = find_best_item(data, gap_begin, gap_end, 0, 3);
 
                 if (item == nullptr) {
                     perfect_fit = false;
-                    item = FindHighestItem(data, gap_begin, gap_end, 0, 3);
+                    item = find_highest_item(data, gap_begin, gap_end, 0, 3);
                 }
             }
             else {
-                item = FindHighestItem(data, gap_begin, gap_end, 0, 3);
+                item = find_highest_item(data, gap_begin, gap_end, 0, 3);
             }
 
             if (item == nullptr) break;
 
             /* Move the item. */
-            result = MoveItem(data, item, gap_end - item->clusters_count_, 0, item->clusters_count_, 1);
+            result = move_item(data, item, gap_end - item->clusters_count_, 0, item->clusters_count_, 1);
 
             if (result == true) {
                 gap_end = gap_end - item->clusters_count_;
@@ -4564,7 +4369,8 @@ void DefragLib::optimize_up(DefragDataStruct* data) {
         /* If the gap could not be filled then skip. */
         if (gap_begin < gap_end) {
             /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28], gap_begin, gap_end - gap_begin);
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28], gap_begin,
+                            gap_end - gap_begin);
 
             gap_end = gap_begin;
             retry = 0;
@@ -4796,7 +4602,7 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
 
     /* Show debug message: "Opening volume '%s' at mountpoint '%s'" */
     jkGui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[29], data->disk_.volume_name_,
-                     data->disk_.mount_point_);
+                      data->disk_.mount_point_);
 
     /* Open the VolumeHandle. If error then leave. */
     data->disk_.volume_handle_ = CreateFileW(data->disk_.volume_name_,GENERIC_READ,
@@ -4806,7 +4612,7 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
         system_error_str(GetLastError(), s1,BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': %s",
-                         data->disk_.volume_name_, data->disk_.mount_point_, s1);
+                          data->disk_.volume_name_, data->disk_.mount_point_, s1);
 
         free(data->disk_.mount_point_);
         free(data->disk_.mount_point_slash_);
@@ -4841,7 +4647,7 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) {
         /* Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'" */
         jkGui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[32], data->disk_.volume_name_,
-                         data->disk_.mount_point_);
+                          data->disk_.mount_point_);
 
         CloseHandle(data->disk_.volume_handle_);
 
@@ -4886,17 +4692,20 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
 
         /* Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d" */
         jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[33],
-                         NtfsData.MftStartLcn.QuadPart, NtfsData.MftZoneStart.QuadPart,
-                         NtfsData.MftZoneEnd.QuadPart, NtfsData.Mft2StartLcn.QuadPart,
-                         NtfsData.MftValidDataLength.QuadPart / NtfsData.BytesPerCluster);
+                          NtfsData.MftStartLcn.QuadPart, NtfsData.MftZoneStart.QuadPart,
+                          NtfsData.MftZoneEnd.QuadPart, NtfsData.Mft2StartLcn.QuadPart,
+                          NtfsData.MftValidDataLength.QuadPart / NtfsData.BytesPerCluster);
 
         /* Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d" */
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 0, data->mft_excludes_[0].start_, 0,
-                         data->mft_excludes_[0].end_);
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 1, data->mft_excludes_[1].start_, 1,
-                         data->mft_excludes_[1].end_);
-        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 2, data->mft_excludes_[2].start_, 2,
-                         data->mft_excludes_[2].end_);
+        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 0, data->mft_excludes_[0].start_,
+                          0,
+                          data->mft_excludes_[0].end_);
+        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 1, data->mft_excludes_[1].start_,
+                          1,
+                          data->mft_excludes_[1].end_);
+        jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34], 2, data->mft_excludes_[2].start_,
+                          2,
+                          data->mft_excludes_[2].end_);
     }
 
     /* Fixup the input mask.
@@ -4923,14 +4732,14 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     /* Defragment and optimize. */
     jkGui->ShowDiskmap(data);
 
-    if (*data->running_ == RunningState::RUNNING) AnalyzeVolume(data);
+    if (*data->running_ == RunningState::RUNNING) analyze_volume(data);
 
     if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 1) {
-        Defragment(data);
+        defragment(data);
     }
 
     if (*data->running_ == RunningState::RUNNING && (opt_mode.mode_ == 2 || opt_mode.mode_ == 3)) {
-        Defragment(data);
+        defragment(data);
 
         if (*data->running_ == RunningState::RUNNING) fixup(data);
         if (*data->running_ == RunningState::RUNNING) optimize_volume(data);
@@ -4938,7 +4747,7 @@ void DefragLib::defrag_one_path(DefragDataStruct* data, WCHAR* path, OptimizeMod
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 4) {
-        ForcedFill(data);
+        forced_fill(data);
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 5) {
@@ -5102,7 +4911,7 @@ void DefragLib::defrag_mountpoints(DefragDataStruct* Data, WCHAR* MountPoint, Op
         system_error_str(GetLastError(), s1,BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': %s",
-                         VolumeName, MountPoint, s1);
+                          VolumeName, MountPoint, s1);
 
         return;
     }
@@ -5315,11 +5124,13 @@ void DefragLib::run_jk_defrag(
 
         if (data.use_last_access_time_ == TRUE) {
             gui->show_debug(
-                DebugLevel::Warning, nullptr, L"NtfsDisableLastAccessUpdate is inactive, using LastAccessTime for SpaceHogs.");
+                DebugLevel::Warning, nullptr,
+                L"NtfsDisableLastAccessUpdate is inactive, using LastAccessTime for SpaceHogs.");
         }
         else {
             gui->show_debug(
-                DebugLevel::Warning, nullptr, L"NtfsDisableLastAccessUpdate is active, ignoring LastAccessTime for SpaceHogs.");
+                DebugLevel::Warning, nullptr,
+                L"NtfsDisableLastAccessUpdate is active, ignoring LastAccessTime for SpaceHogs.");
         }
     }
 

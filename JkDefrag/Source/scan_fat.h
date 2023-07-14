@@ -1,6 +1,7 @@
 #pragma once
 
 #pragma pack(push,1)                  /* Align to bytes. */
+#include <memory>
 
 struct FatBootSectorStruct
 {
@@ -121,21 +122,20 @@ public:
 	JKScanFat();
 	~JKScanFat();
 
-	// Get instance of the class
-	static JKScanFat *getInstance();
+	// Get a non-owning pointer to instance of the class
+	static JKScanFat *get_instance();
 
-	BOOL AnalyzeFatVolume(DefragDataStruct *Data);
+	BOOL analyze_fat_volume(DefragDataStruct *data);
 
 private:
-
-	UCHAR CalculateShortNameCheckSum(UCHAR *Name);
-	uint64_t ConvertTime(USHORT Date, USHORT Time, USHORT Time10);
+    static UCHAR calculate_short_name_check_sum(const UCHAR *name);
+    static uint64_t convert_time(USHORT date, USHORT time, USHORT time10);
     static void make_fragment_list(const DefragDataStruct *data, const FatDiskInfoStruct *disk_info, ItemStruct *item, uint64_t cluster);
-	BYTE *LoadDirectory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInfo, uint64_t StartCluster, uint64_t *OutLength);
-	void AnalyzeFatDirectory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInfo, BYTE *Buffer, uint64_t Length, ItemStruct *ParentDirectory);
+	BYTE *load_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInfo, uint64_t StartCluster, uint64_t *OutLength);
+	void analyze_fat_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInfo, BYTE *Buffer, uint64_t Length, ItemStruct *ParentDirectory);
 
 	// static member that is an instance of itself
-	static JKScanFat *m_jkScanFat;
+	inline static std::unique_ptr<JKScanFat> instance_;
 
-	DefragLib *m_jkLib;
+	DefragLib *defrag_lib_;
 };

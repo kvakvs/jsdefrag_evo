@@ -4,7 +4,7 @@ DefragLog::DefragLog()
 {
 	WCHAR *p1;
 
-	defrag_lib_ = DefragLib::getInstance();
+	defrag_lib_ = DefragLib::get_instance();
 
 	GetModuleFileNameW(nullptr,my_name_,MAX_PATH);
 	GetShortPathNameW(my_name_,my_short_name_,MAX_PATH);

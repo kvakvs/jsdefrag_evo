@@ -9,36 +9,29 @@
 #include "ScanFat.h"
 */
 
-JKScanFat* JKScanFat::m_jkScanFat = 0;
-
 JKScanFat::JKScanFat() {
-    m_jkLib = DefragLib::getInstance();
+    defrag_lib_ = DefragLib::get_instance();
 }
 
-JKScanFat::~JKScanFat() {
-    delete m_jkScanFat;
-}
+JKScanFat::~JKScanFat() = default;
 
-JKScanFat* JKScanFat::getInstance() {
-    if (m_jkScanFat == nullptr) {
-        m_jkScanFat = new JKScanFat();
+JKScanFat* JKScanFat::get_instance() {
+    if (instance_ == nullptr) {
+        instance_.reset(new JKScanFat());
     }
 
-    return m_jkScanFat;
+    return instance_.get();
 }
 
 /* Calculate the checksum of 8.3 filename. */
-UCHAR JKScanFat::CalculateShortNameCheckSum(UCHAR* Name) {
-    short Index;
-    UCHAR CheckSum;
+UCHAR JKScanFat::calculate_short_name_check_sum(const UCHAR* name) {
+    UCHAR check_sum = 0;
 
-    CheckSum = 0;
-
-    for (Index = 11; Index != 0; Index--) {
-        CheckSum = (CheckSum & 1 ? 0x80 : 0) + (CheckSum >> 1) + *Name++;
+    for (short index = 11; index != 0; index--) {
+        check_sum = (check_sum & 1 ? 0x80 : 0) + (check_sum >> 1) + *name++;
     }
 
-    return CheckSum;
+    return check_sum;
 }
 
 /*
@@ -48,20 +41,19 @@ Note: the FAT stores times in local time, not in GMT time. This subroutine conve
 that into GMT time, to be compatible with the NTFS date/times.
 
 */
-uint64_t JKScanFat::ConvertTime(USHORT Date, USHORT Time, USHORT Time10) {
-    FILETIME Time1;
-    FILETIME Time2;
+uint64_t JKScanFat::convert_time(const USHORT date, const USHORT time, const USHORT time10) {
+    FILETIME time1;
+    FILETIME time2;
+    ULARGE_INTEGER time3;
 
-    ULARGE_INTEGER Time3;
+    if (DosDateTimeToFileTime(date, time, &time1) == 0) return 0;
+    if (LocalFileTimeToFileTime(&time1, &time2) == 0) return 0;
 
-    if (DosDateTimeToFileTime(Date, Time, &Time1) == 0) return 0;
-    if (LocalFileTimeToFileTime(&Time1, &Time2) == 0) return 0;
+    time3.LowPart = time2.dwLowDateTime;
+    time3.HighPart = time2.dwHighDateTime;
+    time3.QuadPart = time3.QuadPart + time10 * 100000;
 
-    Time3.LowPart = Time2.dwLowDateTime;
-    Time3.HighPart = Time2.dwHighDateTime;
-    Time3.QuadPart = Time3.QuadPart + Time10 * 100000;
-
-    return Time3.QuadPart;
+    return time3.QuadPart;
 }
 
 /*
@@ -159,7 +151,7 @@ void JKScanFat::make_fragment_list(const DefragDataStruct* data, const FatDiskIn
     /* If too many iterations (infinite loop in FAT) then exit. */
     if (max_iterate >= disk_info->CountofClusters + 1) {
         gui->show_debug(DebugLevel::Progress, nullptr,
-                         L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
+                        L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
 
         return;
     }
@@ -190,29 +182,18 @@ void JKScanFat::make_fragment_list(const DefragDataStruct* data, const FatDiskIn
 
 /* Load a directory from disk into a new memory buffer. Return nullptr if error.
 Note: the caller is responsible for free'ing the buffer. */
-BYTE* JKScanFat::LoadDirectory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, uint64_t StartCluster,
-                               uint64_t* OutLength) {
-    BYTE* Buffer;
+BYTE* JKScanFat::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, uint64_t StartCluster,
+                                uint64_t* OutLength) {
+    BYTE* buffer;
+    uint64_t fragment_length;
+    OVERLAPPED g_overlapped;
+    ULARGE_INTEGER trans;
+    DWORD bytes_read;
 
-    uint64_t BufferLength;
-    uint64_t BufferOffset;
-    uint64_t Cluster;
-    uint64_t FirstCluster;
-    uint64_t LastCluster;
-    uint64_t FragmentLength;
-
-    OVERLAPPED gOverlapped;
-
-    ULARGE_INTEGER Trans;
-
-    DWORD BytesRead;
-
-    int Result;
-    int MaxIterate;
-
+    int result;
+    int max_iterate;
     WCHAR s1[BUFSIZ];
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui* gui = DefragGui::get_instance();
 
     /* Reset the OutLength to zero, in case we exit for an error. */
     if (OutLength != nullptr) *OutLength = 0;
@@ -221,167 +202,168 @@ BYTE* JKScanFat::LoadDirectory(DefragDataStruct* Data, FatDiskInfoStruct* DiskIn
     if (StartCluster == 0) return nullptr;
 
     /* Count the size of the directory. */
-    BufferLength = 0;
-    Cluster = StartCluster;
+    uint64_t buffer_length = 0;
+    uint64_t cluster = StartCluster;
 
-    for (MaxIterate = 0; MaxIterate < DiskInfo->CountofClusters + 1; MaxIterate++) {
+    for (max_iterate = 0; max_iterate < DiskInfo->CountofClusters + 1; max_iterate++) {
         /* Exit the loop when we have reached the end of the cluster list. */
-        if (Data->disk_.type_ == DiskType::FAT12 && Cluster >= 0xFF8) break;
-        if (Data->disk_.type_ == DiskType::FAT16 && Cluster >= 0xFFF8) break;
-        if (Data->disk_.type_ == DiskType::FAT32 && Cluster >= 0xFFFFFF8) break;
+        if (Data->disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
+        if (Data->disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
+        if (Data->disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
 
         /* Sanity check, test if the cluster is within the range of valid cluster numbers. */
-        if (Cluster < 2) return nullptr;
-        if (Cluster > DiskInfo->CountofClusters + 1) return nullptr;
+        if (cluster < 2) return nullptr;
+        if (cluster > DiskInfo->CountofClusters + 1) return nullptr;
 
         /* Increment the BufferLength counter. */
-        BufferLength = BufferLength + DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
+        buffer_length = buffer_length + DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
 
         /* Get next cluster from FAT. */
         switch (Data->disk_.type_) {
         case DiskType::FAT12:
-            if ((Cluster & 1) == 1) {
-                Cluster = *(WORD*)&DiskInfo->FatData.FAT12[Cluster + Cluster / 2] >> 4;
+            if ((cluster & 1) == 1) {
+                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] >> 4;
             }
             else {
-                Cluster = *(WORD*)&DiskInfo->FatData.FAT12[Cluster + Cluster / 2] & 0xFFF;
+                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
             }
             break;
 
-        case DiskType::FAT16: Cluster = DiskInfo->FatData.FAT16[Cluster];
+        case DiskType::FAT16: cluster = DiskInfo->FatData.FAT16[cluster];
             break;
-        case DiskType::FAT32: Cluster = DiskInfo->FatData.FAT32[Cluster] & 0xFFFFFFF;
+        case DiskType::FAT32: cluster = DiskInfo->FatData.FAT32[cluster] & 0xFFFFFFF;
             break;
         }
     }
 
     /* If too many iterations (infinite loop in FAT) then return nullptr. */
-    if (MaxIterate >= DiskInfo->CountofClusters + 1) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr,
-                         L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
+    if (max_iterate >= DiskInfo->CountofClusters + 1) {
+        gui->show_debug(DebugLevel::Progress, nullptr,
+                          L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
 
         return nullptr;
     }
 
     /* Allocate buffer. */
-    if (BufferLength > UINT_MAX) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Directory is too big, %I64u bytes", BufferLength);
+    if (buffer_length > UINT_MAX) {
+        gui->show_debug(DebugLevel::Progress, nullptr, L"Directory is too big, %I64u bytes", buffer_length);
 
         return nullptr;
     }
 
-    Buffer = (BYTE*)malloc((size_t)BufferLength);
+    buffer = (BYTE*)malloc((size_t)buffer_length);
 
-    if (Buffer == nullptr) {
-        jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
+    if (buffer == nullptr) {
+        gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
 
         return nullptr;
     }
 
     /* Loop through the FAT cluster list and load all fragments from disk into the buffer. */
-    BufferOffset = 0;
-    Cluster = StartCluster;
-    FirstCluster = Cluster;
-    LastCluster = 0;
+    uint64_t buffer_offset = 0;
+    cluster = StartCluster;
+    uint64_t first_cluster = cluster;
+    uint64_t last_cluster = 0;
 
-    for (MaxIterate = 0; MaxIterate < DiskInfo->CountofClusters + 1; MaxIterate++) {
+    for (max_iterate = 0; max_iterate < DiskInfo->CountofClusters + 1; max_iterate++) {
         /* Exit the loop when we have reached the end of the cluster list. */
-        if (Data->disk_.type_ == DiskType::FAT12 && Cluster >= 0xFF8) break;
-        if (Data->disk_.type_ == DiskType::FAT16 && Cluster >= 0xFFF8) break;
-        if (Data->disk_.type_ == DiskType::FAT32 && Cluster >= 0xFFFFFF8) break;
+        if (Data->disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
+        if (Data->disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
+        if (Data->disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
 
         /* Sanity check, test if the cluster is within the range of valid cluster numbers. */
-        if (Cluster < 2) break;
-        if (Cluster > DiskInfo->CountofClusters + 1) break;
+        if (cluster < 2) break;
+        if (cluster > DiskInfo->CountofClusters + 1) break;
 
         /* If this is a new fragment then load the previous fragment from disk. If not then
         add to the counters and continue. */
-        if (Cluster != LastCluster + 1 && LastCluster != 0) {
-            FragmentLength = (LastCluster - FirstCluster + 1) * DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
-            Trans.QuadPart = (DiskInfo->FirstDataSector + (FirstCluster - 2) * DiskInfo->SectorsPerCluster) * DiskInfo->
+        if (cluster != last_cluster + 1 && last_cluster != 0) {
+            fragment_length = (last_cluster - first_cluster + 1) * DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
+            trans.QuadPart = (DiskInfo->FirstDataSector + (first_cluster - 2) * DiskInfo->SectorsPerCluster) * DiskInfo->
                     BytesPerSector;
 
-            gOverlapped.Offset = Trans.LowPart;
-            gOverlapped.OffsetHigh = Trans.HighPart;
-            gOverlapped.hEvent = nullptr;
+            g_overlapped.Offset = trans.LowPart;
+            g_overlapped.OffsetHigh = trans.HighPart;
+            g_overlapped.hEvent = nullptr;
 
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                             L"Reading directory fragment, %I64u bytes at offset=%I64u.", FragmentLength,
-                             Trans.QuadPart);
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                              L"Reading directory fragment, %I64u bytes at offset=%I64u.", fragment_length,
+                              trans.QuadPart);
 
-            Result = ReadFile(Data->disk_.volume_handle_, &Buffer[BufferOffset], (uint32_t)FragmentLength, &BytesRead,
-                              &gOverlapped);
+            result = ReadFile(Data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t)fragment_length, &bytes_read,
+                              &g_overlapped);
 
-            if (Result == 0) {
-                m_jkLib->system_error_str(GetLastError(), s1,BUFSIZ);
+            if (result == 0) {
+                defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
 
-                jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
+                gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
-                free(Buffer);
+                free(buffer);
 
                 return nullptr;
             }
 
             //ShowHex(Data,Buffer,256);
-            BufferOffset = BufferOffset + FragmentLength;
-            FirstCluster = Cluster;
+            buffer_offset = buffer_offset + fragment_length;
+            first_cluster = cluster;
         }
 
-        LastCluster = Cluster;
+        last_cluster = cluster;
 
         /* Get next cluster from FAT. */
         switch (Data->disk_.type_) {
         case DiskType::FAT12:
-            if ((Cluster & 1) == 1) {
-                Cluster = *(WORD*)&DiskInfo->FatData.FAT12[Cluster + Cluster / 2] >> 4;
+            if ((cluster & 1) == 1) {
+                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] >> 4;
             }
             else {
-                Cluster = *(WORD*)&DiskInfo->FatData.FAT12[Cluster + Cluster / 2] & 0xFFF;
+                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
             }
 
             break;
-        case DiskType::FAT16: Cluster = DiskInfo->FatData.FAT16[Cluster];
+        case DiskType::FAT16: cluster = DiskInfo->FatData.FAT16[cluster];
             break;
-        case DiskType::FAT32: Cluster = DiskInfo->FatData.FAT32[Cluster] & 0xFFFFFFF;
+        case DiskType::FAT32: cluster = DiskInfo->FatData.FAT32[cluster] & 0xFFFFFFF;
             break;
         }
     }
 
     /* Load the last fragment. */
-    if (LastCluster != 0) {
-        FragmentLength = (LastCluster - FirstCluster + 1) * DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
-        Trans.QuadPart = (DiskInfo->FirstDataSector + (FirstCluster - 2) * DiskInfo->SectorsPerCluster) * DiskInfo->
+    if (last_cluster != 0) {
+        fragment_length = (last_cluster - first_cluster + 1) * DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
+        trans.QuadPart = (DiskInfo->FirstDataSector + (first_cluster - 2) * DiskInfo->SectorsPerCluster) * DiskInfo->
                 BytesPerSector;
 
-        gOverlapped.Offset = Trans.LowPart;
-        gOverlapped.OffsetHigh = Trans.HighPart;
-        gOverlapped.hEvent = nullptr;
+        g_overlapped.Offset = trans.LowPart;
+        g_overlapped.OffsetHigh = trans.HighPart;
+        g_overlapped.hEvent = nullptr;
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Reading directory fragment, %I64u bytes at offset=%I64u.", FragmentLength,
-                         Trans.QuadPart);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                          L"Reading directory fragment, %I64u bytes at offset=%I64u.", fragment_length,
+                          trans.QuadPart);
 
-        Result = ReadFile(Data->disk_.volume_handle_, &Buffer[BufferOffset], (uint32_t)FragmentLength, &BytesRead,
-                          &gOverlapped);
+        result = ReadFile(Data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t)fragment_length, &bytes_read,
+                          &g_overlapped);
 
-        if (Result == 0) {
-            m_jkLib->system_error_str(GetLastError(), s1,BUFSIZ);
+        if (result == 0) {
+            defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
 
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
+            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
-            free(Buffer);
+            free(buffer);
 
             return nullptr;
         }
     }
 
-    if (OutLength != nullptr) *OutLength = BufferLength;
+    if (OutLength != nullptr) *OutLength = buffer_length;
 
-    return Buffer;
+    return buffer;
 }
 
 /* Analyze a directory and add all the items to the item tree. */
-void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, BYTE* Buffer,
-                                    uint64_t Length, ItemStruct* ParentDirectory) {
+void JKScanFat::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, BYTE* Buffer,
+                                      uint64_t Length, ItemStruct* ParentDirectory) {
     FatDirStruct* Dir;
     FatLongNameDirStruct* LDir;
     ItemStruct* Item;
@@ -411,7 +393,7 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
 
     /* Slow the program down to the percentage that was specified on the
     command line. */
-    m_jkLib->slow_down(Data);
+    defrag_lib_->slow_down(Data);
 
     //ShowHex(Data,Buffer,256);
 
@@ -433,7 +415,8 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
 
         /* Exit at the end of the directory. */
         if (Dir->DIR_Name[0] == 0) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tFree (not used), end of directory.", Index / 32);
+            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tFree (not used), end of directory.",
+                              Index / 32);
 
             break;
         }
@@ -492,7 +475,7 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
         if (LastLongNameSection != 1) {
             LongName[0] = '\0';
         }
-        else if (CalculateShortNameCheckSum(Dir->DIR_Name) != LongNameChecksum) {
+        else if (calculate_short_name_check_sum(Dir->DIR_Name) != LongNameChecksum) {
             jkGui->show_debug(DebugLevel::Fatal, nullptr, L"%u.\tError: long filename is out of sync");
             LongName[0] = '\0';
         }
@@ -587,10 +570,12 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
             Item->short_filename_ = Item->long_filename_;
         }
 
-        if (Item->long_filename_ == nullptr && Item->short_filename_ != nullptr) Item->long_filename_ = Item->
-                short_filename_;
-        if (Item->long_filename_ != nullptr && Item->short_filename_ == nullptr) Item->short_filename_ = Item->
-                long_filename_;
+        if (Item->long_filename_ == nullptr && Item->short_filename_ != nullptr)
+            Item->long_filename_ = Item->
+                    short_filename_;
+        if (Item->long_filename_ != nullptr && Item->short_filename_ == nullptr)
+            Item->short_filename_ = Item->
+                    long_filename_;
 
         Item->short_path_ = nullptr;
         Item->long_path_ = nullptr;
@@ -605,9 +590,9 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
 
         make_fragment_list(Data, DiskInfo, Item, StartCluster);
 
-        Item->creation_time_ = ConvertTime(Dir->DIR_CrtDate, Dir->DIR_CrtTime, Dir->DIR_CrtTimeTenth);
-        Item->mft_change_time_ = ConvertTime(Dir->DIR_WrtDate, Dir->DIR_WrtTime, 0);
-        Item->last_access_time_ = ConvertTime(Dir->DIR_LstAccDate, 0, 0);
+        Item->creation_time_ = convert_time(Dir->DIR_CrtDate, Dir->DIR_CrtTime, Dir->DIR_CrtTimeTenth);
+        Item->mft_change_time_ = convert_time(Dir->DIR_WrtDate, Dir->DIR_WrtTime, 0);
+        Item->last_access_time_ = convert_time(Dir->DIR_LstAccDate, 0, 0);
         Item->parent_inode_ = 0;
         Item->parent_directory_ = ParentDirectory;
         Item->is_dir_ = false;
@@ -618,15 +603,16 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
         Item->is_excluded_ = false;
         Item->is_hog_ = false;
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"\tSize = %I64u clusters, %I64u bytes", Item->clusters_count_, Item->bytes_);
+        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"\tSize = %I64u clusters, %I64u bytes",
+                          Item->clusters_count_, Item->bytes_);
 
         /* Add the item record to the sorted item tree in memory. */
-        m_jkLib->tree_insert(Data, Item);
+        defrag_lib_->tree_insert(Data, Item);
 
         /* Draw the item on the screen. */
         jkGui->show_analyze(Data, Item);
         //		if (*Data->RedrawScreen == false) {
-        m_jkLib->colorize_item(Data, Item, 0, 0, false);
+        defrag_lib_->colorize_item(Data, Item, 0, 0, false);
         //		} else {
         //			ShowDiskmap(Data);
         //		}
@@ -640,7 +626,7 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
         Data->count_all_bytes_ = Data->count_all_bytes_ + Item->bytes_;
         Data->count_all_clusters_ = Data->count_all_clusters_ + Item->clusters_count_;
 
-        if (m_jkLib->fragment_count(Item) > 1) {
+        if (defrag_lib_->get_fragment_count(Item) > 1) {
             Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
             Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + Item->bytes_;
             Data->count_fragmented_clusters_ = Data->count_fragmented_clusters_ + Item->clusters_count_;
@@ -648,9 +634,9 @@ void JKScanFat::AnalyzeFatDirectory(DefragDataStruct* Data, FatDiskInfoStruct* D
 
         /* If this is a directory then iterate. */
         if (Item->is_dir_ == true) {
-            SubDirBuf = LoadDirectory(Data, DiskInfo, StartCluster, &SubDirLength);
+            SubDirBuf = load_directory(Data, DiskInfo, StartCluster, &SubDirLength);
 
-            AnalyzeFatDirectory(Data, DiskInfo, SubDirBuf, SubDirLength, Item);
+            analyze_fat_directory(Data, DiskInfo, SubDirBuf, SubDirLength, Item);
 
             free(SubDirBuf);
 
@@ -693,7 +679,7 @@ case FAT16: if (FATContent == 0xFFF7) IsBadCluster = TRUE; break;
 case FAT32: if (FATContent == 0x0FFFFFF7) IsBadCluster = TRUE; break;
 }
 */
-BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
+BOOL JKScanFat::analyze_fat_volume(DefragDataStruct* data) {
     FatBootSectorStruct BootSector;
     FatDiskInfoStruct DiskInfo;
 
@@ -723,11 +709,11 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     gOverlapped.OffsetHigh = 0;
     gOverlapped.hEvent = nullptr;
 
-    Result = ReadFile(Data->disk_.volume_handle_, &BootSector, sizeof(FatBootSectorStruct), &BytesRead,
+    Result = ReadFile(data->disk_.volume_handle_, &BootSector, sizeof(FatBootSectorStruct), &BytesRead,
                       &gOverlapped);
 
     if (Result == 0 || BytesRead != 512) {
-        m_jkLib->system_error_str(GetLastError(), s1,BUFSIZ);
+        defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading bootblock: %s", s1);
 
@@ -780,23 +766,23 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     DiskInfo.CountofClusters = DiskInfo.DataSec / BootSector.BPB_SecPerClus;
 
     if (DiskInfo.CountofClusters < 4085) {
-        Data->disk_.type_ = DiskType::FAT12;
+        data->disk_.type_ = DiskType::FAT12;
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT12 disk.");
     }
     else if (DiskInfo.CountofClusters < 65525) {
-        Data->disk_.type_ = DiskType::FAT16;
+        data->disk_.type_ = DiskType::FAT16;
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT16 disk.");
     }
     else {
-        Data->disk_.type_ = DiskType::FAT32;
+        data->disk_.type_ = DiskType::FAT32;
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT32 disk.");
     }
 
-    Data->bytes_per_cluster_ = DiskInfo.BytesPerSector * DiskInfo.SectorsPerCluster;
-    Data->total_clusters_ = DiskInfo.CountofClusters;
+    data->bytes_per_cluster_ = DiskInfo.BytesPerSector * DiskInfo.SectorsPerCluster;
+    data->total_clusters_ = DiskInfo.CountofClusters;
 
     /* Output debug information. */
     strncpy_s(s2,BUFSIZ, (char*)&BootSector.BS_OEMName[0], 8);
@@ -820,7 +806,7 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     jkGui->show_debug(DebugLevel::Progress, nullptr, L"  NumberOfHeads: %lu", BootSector.BPB_NumHeads);
     jkGui->show_debug(DebugLevel::Progress, nullptr, L"  HiddenSectors: %lu", BootSector.BPB_HiddSec);
 
-    if (Data->disk_.type_ != DiskType::FAT32) {
+    if (data->disk_.type_ != DiskType::FAT32) {
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_DrvNum: %u", BootSector.Fat16.BS_DrvNum);
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_BootSig: %u", BootSector.Fat16.BS_BootSig);
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_VolID: %u", BootSector.Fat16.BS_VolID);
@@ -862,7 +848,7 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     }
 
     /* Read the FAT from disk into memory. */
-    switch (Data->disk_.type_) {
+    switch (data->disk_.type_) {
     case DiskType::FAT12: FatSize = (size_t)(DiskInfo.CountofClusters + 1 + (DiskInfo.CountofClusters + 1) / 2);
         break;
     case DiskType::FAT16: FatSize = (size_t)((DiskInfo.CountofClusters + 1) * 2);
@@ -888,12 +874,13 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     gOverlapped.OffsetHigh = Trans.HighPart;
     gOverlapped.hEvent = nullptr;
 
-    jkGui->show_debug(DebugLevel::Progress, nullptr, L"Reading FAT, %lu bytes at offset=%I64u", FatSize, Trans.QuadPart);
+    jkGui->show_debug(DebugLevel::Progress, nullptr, L"Reading FAT, %lu bytes at offset=%I64u", FatSize,
+                      Trans.QuadPart);
 
-    Result = ReadFile(Data->disk_.volume_handle_, DiskInfo.FatData.FAT12, (uint32_t)FatSize, &BytesRead, &gOverlapped);
+    Result = ReadFile(data->disk_.volume_handle_, DiskInfo.FatData.FAT12, (uint32_t)FatSize, &BytesRead, &gOverlapped);
 
     if (Result == 0) {
-        m_jkLib->system_error_str(GetLastError(), s1,BUFSIZ);
+        defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
@@ -903,8 +890,8 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     //ShowHex(Data,DiskInfo.FatData.FAT12,32);
 
     /* Read the root directory from disk into memory. */
-    if (Data->disk_.type_ == DiskType::FAT32) {
-        RootDirectory = LoadDirectory(Data, &DiskInfo, BootSector.Fat32.BPB_RootClus, &RootLength);
+    if (data->disk_.type_ == DiskType::FAT32) {
+        RootDirectory = load_directory(data, &DiskInfo, BootSector.Fat32.BPB_RootClus, &RootLength);
     }
     else {
         RootStart = (BootSector.BPB_RsvdSecCnt + BootSector.BPB_NumFATs * DiskInfo.FATSz) * DiskInfo.BytesPerSector;
@@ -921,8 +908,8 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
 
         if (RootStart > (DiskInfo.CountofClusters + 1) * DiskInfo.SectorsPerCluster * DiskInfo.BytesPerSector) {
             jkGui->show_debug(DebugLevel::Progress, nullptr, L"Trying to access %I64u, but the last sector is at %I64u",
-                             RootStart,
-                             (DiskInfo.CountofClusters + 1) * DiskInfo.SectorsPerCluster * DiskInfo.BytesPerSector);
+                              RootStart,
+                              (DiskInfo.CountofClusters + 1) * DiskInfo.SectorsPerCluster * DiskInfo.BytesPerSector);
 
             free(DiskInfo.FatData.FAT12);
 
@@ -953,12 +940,13 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
         gOverlapped.OffsetHigh = Trans.HighPart;
         gOverlapped.hEvent = nullptr;
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Reading root directory, %lu bytes at offset=%I64u.", BytesRead, Trans.QuadPart);
+        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                          L"Reading root directory, %lu bytes at offset=%I64u.", BytesRead, Trans.QuadPart);
 
-        Result = ReadFile(Data->disk_.volume_handle_, RootDirectory, BytesRead, &BytesRead, &gOverlapped);
+        Result = ReadFile(data->disk_.volume_handle_, RootDirectory, BytesRead, &BytesRead, &gOverlapped);
 
         if (Result == 0) {
-            m_jkLib->system_error_str(GetLastError(), s1,BUFSIZ);
+            defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
 
             jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
@@ -970,7 +958,7 @@ BOOL JKScanFat::AnalyzeFatVolume(DefragDataStruct* Data) {
     }
 
     /* Analyze all the items in the root directory and add to the item tree. */
-    AnalyzeFatDirectory(Data, &DiskInfo, RootDirectory, RootLength, nullptr);
+    analyze_fat_directory(data, &DiskInfo, RootDirectory, RootLength, nullptr);
 
     /* Cleanup. */
     free(RootDirectory);
