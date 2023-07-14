@@ -1,51 +1,51 @@
 #include "StdAfx.h"
 
-JKDefragLog::JKDefragLog()
+DefragLog::DefragLog()
 {
 	WCHAR *p1;
 
-	m_jkLib = JKDefragLib::getInstance();
+	defrag_lib_ = DefragLib::getInstance();
 
-	GetModuleFileNameW(NULL,MyName,MAX_PATH);
-	GetShortPathNameW(MyName,MyShortName,MAX_PATH);
-	GetLongPathNameW(MyShortName,MyName,MAX_PATH);
+	GetModuleFileNameW(nullptr,my_name_,MAX_PATH);
+	GetShortPathNameW(my_name_,my_short_name_,MAX_PATH);
+	GetLongPathNameW(my_short_name_,my_name_,MAX_PATH);
 
 	/* Determine default path to logfile. */
-	swprintf_s(LogFile,MAX_PATH,L"%s",MyName);
+	swprintf_s(log_file_,MAX_PATH,L"%s",my_name_);
 
-	p1 = m_jkLib->stristrW(LogFile,L".exe");
+	p1 = defrag_lib_->stristr_w(log_file_,L".exe");
 
-	if (p1 == NULL) p1 = m_jkLib->stristrW(LogFile,L".scr");
+	if (p1 == nullptr) p1 = defrag_lib_->stristr_w(log_file_,L".scr");
 
-	if (p1 != NULL)
+	if (p1 != nullptr)
 	{
 		*p1 = '\0';
 
-		wcscat_s(LogFile,MAX_PATH,L".log");
-		_wunlink(LogFile);
+		wcscat_s(log_file_,MAX_PATH,L".log");
+		_wunlink(log_file_);
 
 	}
 	else
 	{
-		*LogFile = '\0';
+		*log_file_ = '\0';
 	}
 }
 
-void JKDefragLog::SetLogFilename(WCHAR *fileName)
+void DefragLog::set_log_filename(WCHAR *file_name)
 {
 	/* Determine default path to logfile. */
-	swprintf_s(LogFile,MAX_PATH,L"%s",fileName);
-	_wunlink(LogFile);
+	swprintf_s(log_file_,MAX_PATH,L"%s",file_name);
+	_wunlink(log_file_);
 }
 
-WCHAR *JKDefragLog::GetLogFilename()
+WCHAR *DefragLog::get_log_filename()
 {
-	return LogFile;
+	return log_file_;
 }
 
 /* Write a text to the logfile. The parameters are the same as for the "printf"
 functions, a Format string and a series of parameters. */
-void JKDefragLog::LogMessage(WCHAR *Format, ...)
+void DefragLog::log_message(WCHAR *format, ...)
 {
 	va_list VarArgs;
 	FILE *Fout;
@@ -54,21 +54,21 @@ void JKDefragLog::LogMessage(WCHAR *Format, ...)
 	struct tm NowTm;
 
 	/* If there is no message then return. */
-	if (Format == NULL) return;
+	if (format == nullptr) return;
 
 	/* If there is no logfile then return. */
-	if (*LogFile == '\0') return;
+	if (*log_file_ == '\0') return;
 
 	/* Open the logfile. */
-	Result = _wfopen_s(&Fout,LogFile,L"a, ccs=UTF-8");
-	if ((Result != 0) || (Fout == NULL)) return;
+	Result = _wfopen_s(&Fout,log_file_,L"a, ccs=UTF-8");
+	if ((Result != 0) || (Fout == nullptr)) return;
 
 	/* Write the string to the logfile. */
 	time(&Now);
 	Result = localtime_s(&NowTm,&Now);
 	fwprintf_s(Fout,L"%02lu:%02lu:%02lu ",NowTm.tm_hour,NowTm.tm_min,NowTm.tm_sec);
-	va_start(VarArgs,Format);
-	vfwprintf_s(Fout,Format,VarArgs);
+	va_start(VarArgs,format);
+	vfwprintf_s(Fout,format,VarArgs);
 	va_end(VarArgs);
 	fwprintf_s(Fout,L"\n");
 

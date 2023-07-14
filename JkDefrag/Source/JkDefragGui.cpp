@@ -7,1252 +7,1119 @@
 #include "JkDefragGui.h"
 */
 
-JKDefragGui *JKDefragGui::m_jkDefragGui = 0;
+DefragGui* DefragGui::gui_ = nullptr;
 
-JKDefragGui::JKDefragGui()
-{
-	m_jkLib = JKDefragLib::getInstance();
+DefragGui::DefragGui(): debug_level_() {
+    defrag_lib_ = DefragLib::getInstance();
 
-	m_bmp = NULL;
+    bmp_ = nullptr;
 
-	jkStruct = new JKDefragStruct();
+    defrag_struct_ = new DefragStruct();
 
-	m_squareSize = 12;
-//	m_clusterSquares = NULL;
-	m_numDiskSquares = 0;
+    square_size_ = 12;
+    //	m_clusterSquares = nullptr;
+    num_disk_squares_ = 0;
 
-	m_offsetX = 26;
-	m_offsetY = 16;
+    offset_x_ = 26;
+    offset_y_ = 16;
 
-	clusterInfo = NULL;
-	m_numClusters = 1;
+    cluster_info_ = nullptr;
+    num_clusters_ = 1;
 
-	ProgressStartTime = 0;
-	ProgressTime = 0;
-	ProgressDone = 0;
+    progress_start_time_ = 0;
+    progress_time_ = 0;
+    progress_done_ = 0;
 
-	int i = 0;
+    int i = 0;
 
-	for (i = 0; i < 6; i++) *Messages[i] = '\0';
+    for (i = 0; i < 6; i++) *messages_[i] = '\0';
 
-//	RedrawScreen = 0;
+    //	RedrawScreen = 0;
 }
 
-JKDefragGui::~JKDefragGui()
-{
-	delete jkStruct;
-	delete m_jkDefragGui;
-
-/*
-	if (m_jkDefragGui->m_clusterSquares != NULL)
-	{
-		delete[] m_jkDefragGui->m_clusterSquares;
-	}
-*/
-
-	if (m_bmp != NULL)
-	{
-		delete m_bmp;
-	}
+DefragGui::~DefragGui() {
+    delete defrag_struct_;
+    delete gui_;
+    delete bmp_;
 }
 
-JKDefragGui *JKDefragGui::getInstance()
-{
-	if (m_jkDefragGui == NULL)
-	{
-		m_jkDefragGui = new JKDefragGui();
-	}
+DefragGui* DefragGui::get_instance() {
+    if (gui_ == nullptr) {
+        gui_ = new DefragGui();
+    }
 
-	return m_jkDefragGui;
+    return gui_;
 }
 
-int JKDefragGui::Initialize(HINSTANCE hInstance, int nCmdShow, JKDefragLog *jkLog, int debugLevel)
-{
-	ULONG_PTR gdiplusToken;
+int DefragGui::initialize(const HINSTANCE instance, const int cmd_show, DefragLog* log, const DebugLevel debug_level) {
+    ULONG_PTR gdiplus_token;
 
-	GdiplusStartupInput gdiplusStartupInput;
+    const GdiplusStartupInput gdiplus_startup_input;
 
-	GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    GdiplusStartup(&gdiplus_token, &gdiplus_startup_input, nullptr);
 
-	m_jkLog = jkLog;
-	m_debugLevel = debugLevel;
+    log_ = log;
+    debug_level_ = debug_level;
 
-	m_displayMutex = CreateMutex(NULL,FALSE,"JKDefrag");
+    display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
-	m_wndClass.cbClsExtra    = 0;
-	m_wndClass.cbWndExtra    = 0;
-	m_wndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-	m_wndClass.hCursor       = LoadCursor(NULL,IDC_ARROW);
-	m_wndClass.hIcon         = LoadIcon(NULL,MAKEINTRESOURCE(1));
-	m_wndClass.hInstance     = hInstance;
-	m_wndClass.lpfnWndProc   = (WNDPROC)JKDefragGui::ProcessMessagefn;
-	m_wndClass.lpszClassName = "MyClass";
-	m_wndClass.lpszMenuName  = NULL;
-	m_wndClass.style         = CS_HREDRAW | CS_VREDRAW;
-	m_wndClass.cbSize        = sizeof(WNDCLASSEX);
-	m_wndClass.hIconSm       = LoadIcon(hInstance,MAKEINTRESOURCE(1));
+    wnd_class_.cbClsExtra = 0;
+    wnd_class_.cbWndExtra = 0;
+    wnd_class_.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wnd_class_.hCursor = LoadCursor(nullptr,IDC_ARROW);
+    wnd_class_.hIcon = LoadIcon(nullptr,MAKEINTRESOURCE(1));
+    wnd_class_.hInstance = instance;
+    wnd_class_.lpfnWndProc = (WNDPROC)DefragGui::process_messagefn;
+    wnd_class_.lpszClassName = "MyClass";
+    wnd_class_.lpszMenuName = nullptr;
+    wnd_class_.style = CS_HREDRAW | CS_VREDRAW;
+    wnd_class_.cbSize = sizeof(WNDCLASSEX);
+    wnd_class_.hIconSm = LoadIcon(instance,MAKEINTRESOURCE(1));
 
-	CHAR koko[100];
+    CHAR version_str[100];
 
-	LoadString(hInstance,2,koko, 99);
+    LoadString(instance, 2, version_str, 99);
 
-	if (RegisterClassEx(&m_wndClass) == 0)
-	{
-		MessageBoxW(NULL,L"Cannot register class",jkStruct->VERSIONTEXT,MB_ICONEXCLAMATION | MB_OK);
-		return(0);
-	}
+    if (RegisterClassEx(&wnd_class_) == 0) {
+        MessageBoxW(nullptr, L"Cannot register class", defrag_struct_->versiontext_,MB_ICONEXCLAMATION | MB_OK);
+        return (0);
+    }
 
-	m_hWnd = CreateWindowW(L"MyClass",jkStruct->VERSIONTEXT,WS_TILEDWINDOW,
-		CW_USEDEFAULT,0,1024,768,NULL,NULL,hInstance,NULL);
+    wnd_ = CreateWindowW(L"MyClass", defrag_struct_->versiontext_, WS_TILEDWINDOW,
+                         CW_USEDEFAULT, 0, 1024, 768, nullptr, nullptr, instance, nullptr);
 
-	if (m_hWnd == NULL)
-	{
-		MessageBoxW(NULL,L"Cannot create window",jkStruct->VERSIONTEXT,MB_ICONEXCLAMATION | MB_OK);
-		return(0);
-	}
+    if (wnd_ == nullptr) {
+        MessageBoxW(nullptr, L"Cannot create window", defrag_struct_->versiontext_,MB_ICONEXCLAMATION | MB_OK);
+        return (0);
+    }
 
-	/* Show the window in the state that Windows has specified, minimized or maximized. */
-	ShowWindow(m_hWnd,nCmdShow);
-	UpdateWindow(m_hWnd);
+    /* Show the window in the state that Windows has specified, minimized or maximized. */
+    ShowWindow(wnd_, cmd_show);
+    UpdateWindow(wnd_);
 
-	SetTimer(m_hWnd,1,300,NULL);
+    SetTimer(wnd_, 1, 300, nullptr);
 
-//	InvalidateRect(m_hWnd,NULL,FALSE);
-
-	return 1;
+    return 1;
 }
 
-WPARAM JKDefragGui::DoModal()
-{
-	int GetMessageResult;
+WPARAM DefragGui::do_modal() {
+    /* The main message thread. */
+    while (true) {
+        const int get_message_result = GetMessage(&message_, nullptr, 0, 0);
 
-	/* The main message thread. */
-	while (TRUE)
-	{
-		GetMessageResult = GetMessage(&Message,NULL,0,0);
+        if (get_message_result == 0) break;
+        if (get_message_result == -1) break;
+        if (message_.message == WM_QUIT) break;
 
-		if (GetMessageResult == 0) break;
-		if (GetMessageResult == -1) break;
-		if (Message.message == WM_QUIT) break;
+        TranslateMessage(&message_);
+        DispatchMessage(&message_);
+    }
 
-		TranslateMessage(&Message);
-		DispatchMessage(&Message);
-	}
-
-	return Message.wParam;;
+    return message_.wParam;
 }
 
-void JKDefragGui::setDisplayData(HDC hdc)
-{
-	Graphics graphics(hdc);
+void DefragGui::set_display_data(const HDC dc) {
+    const Graphics graphics(dc);
+    Rect client_window_size;
 
-	Rect clientWindowSize;
+    Status status = graphics.GetVisibleClipBounds(&client_window_size);
 
-	Status status = graphics.GetVisibleClipBounds(&clientWindowSize);
+    client_window_size_ = client_window_size;
 
-	m_clientWindowSize = clientWindowSize;
+    /*
+        if (m_clusterSquares != nullptr)
+        {
+            delete[] m_clusterSquares;
+        }
+    */
 
-/*
-	if (m_clusterSquares != NULL)
-	{
-		delete[] m_clusterSquares;
-	}
-*/
+    top_height_ = 33;
 
-	m_topHeight = 33;
+    if (debug_level_ > DebugLevel::Warning) {
+        top_height_ = 49;
+    }
 
-	if (m_debugLevel > 1)
-	{
-		m_topHeight = 49;
-	}
+    disk_area_size_.Width = client_window_size.Width - offset_x_ * 2;
+    disk_area_size_.Height = client_window_size.Height - top_height_ - offset_y_ * 2;
 
-	m_diskAreaSize.Width  = clientWindowSize.Width  - m_offsetX * 2;
-	m_diskAreaSize.Height = clientWindowSize.Height - m_topHeight - m_offsetY * 2;
+    num_disk_squares_x_ = (int)(disk_area_size_.Width / square_size_);
+    num_disk_squares_y_ = (int)(disk_area_size_.Height / square_size_);
 
-	m_numDiskSquaresX = (int)(m_diskAreaSize.Width  / m_squareSize);
-	m_numDiskSquaresY = (int)(m_diskAreaSize.Height / m_squareSize);
+    num_disk_squares_ = num_disk_squares_x_ * num_disk_squares_y_;
 
-	m_numDiskSquares  = m_numDiskSquaresX * m_numDiskSquaresY;
+    //	m_clusterSquares = new clusterSquareStruct[m_numDiskSquares];
 
-//	m_clusterSquares = new clusterSquareStruct[m_numDiskSquares];
+    for (int ii = 0; ii < num_disk_squares_; ii++) {
+        cluster_squares_[ii].color_ = 0;
+        cluster_squares_[ii].dirty_ = true;
+    }
 
-	for (int ii = 0; ii < m_numDiskSquares; ii++)
-	{
-		m_clusterSquares[ii].color = 0;
-		m_clusterSquares[ii].dirty = true;
-	}
+    real_offset_x_ = (int)((client_window_size_.Width - num_disk_squares_x_ * square_size_) * 0.5);
+    real_offset_y_ = (int)((client_window_size_.Height - top_height_ - num_disk_squares_y_ * square_size_) * 0.5);
 
-	m_realOffsetX = (int)((m_clientWindowSize.Width - m_numDiskSquaresX * m_squareSize) * 0.5);
-	m_realOffsetY = (int)((m_clientWindowSize.Height - m_topHeight - m_numDiskSquaresY * m_squareSize) * 0.5);
+    if (bmp_ != nullptr) {
+        delete bmp_;
 
-	if (m_bmp != NULL)
-	{
-		delete m_bmp;
+        bmp_ = nullptr;
+    }
 
-		m_bmp = NULL;
-	}
+    bmp_ = new Bitmap(client_window_size_.Width, client_window_size_.Height);
 
-	m_bmp = new Bitmap(m_clientWindowSize.Width, m_clientWindowSize.Height);
+    //	Color bottomPartColor;
+    //	bottomPartColor.SetFromCOLORREF(RGB(255,255,255));
 
-//	Color bottomPartColor;
-//	bottomPartColor.SetFromCOLORREF(RGB(255,255,255));
+    //	SolidBrush bottomPartBrush(bottomPartColor);
 
-//	SolidBrush bottomPartBrush(bottomPartColor);
+    //	Rect drawArea(0, 0, m_clientWindowSize.Width, m_clientWindowSize.Height);
+    //	graphics.FillRectangle(&bottomPartBrush, drawArea);
 
-//	Rect drawArea(0, 0, m_clientWindowSize.Width, m_clientWindowSize.Height);
-//	graphics.FillRectangle(&bottomPartBrush, drawArea);
-
-	/* Ask defragger to completely redraw the screen. */
-//	RedrawScreen = 0;
+    /* Ask defragger to completely redraw the screen. */
+    //	RedrawScreen = 0;
 }
 
 /* Callback: clear the screen. */
-void JKDefragGui::ClearScreen(WCHAR *Format, ...)
-{
-	va_list VarArgs;
+void DefragGui::clear_screen(WCHAR* format, ...) {
+    va_list var_args;
 
-	int i;
+    /* If there is no message then return. */
+    if (format == nullptr) return;
 
-	/* If there is no message then return. */
-	if (Format == NULL) return;
+    /* Clear all the messages. */
+    for (int i = 0; i < 6; i++) *messages_[i] = '\0';
 
-	/* Clear all the messages. */
-	for (i = 0; i < 6; i++) *Messages[i] = '\0';
+    /* Save the message in Messages 0. */
+    va_start(var_args, format);
+    vswprintf_s(messages_[0], 50000, format, var_args);
 
-	/* Save the message in Messages 0. */
-	va_start(VarArgs,Format);
-	vswprintf_s(Messages[0],50000,Format,VarArgs);
+    /* If there is no logfile then return. */
+    if (log_ != nullptr) {
+        log_->log_message(format, var_args);
+    }
 
-	/* If there is no logfile then return. */
-	if (m_jkLog != NULL)
-	{
-		m_jkLog->LogMessage(Format, VarArgs);
-	}
+    va_end(var_args);
 
-	va_end(VarArgs);
-
-	PaintImage(m_hDC);
-//	InvalidateRect(m_hWnd,NULL,FALSE);
+    paint_image(dc_);
+    //	InvalidateRect(m_hWnd,nullptr,FALSE);
 }
 
 /* Callback: whenever an item (file, directory) is moved on disk. */
-void JKDefragGui::ShowMove(struct ItemStruct *Item,
-						   ULONG64 Clusters,
-						   ULONG64 FromLcn,
-						   ULONG64 ToLcn,
-						   ULONG64 FromVcn)
-{
-	/* Save the message in Messages 3. */
-	if (Clusters == 1)
-	{
-		swprintf_s(Messages[3],50000,L"Moving 1 cluster from %I64d to %I64d.",FromLcn,ToLcn);
-	}
-	else
-	{
-		swprintf_s(Messages[3],50000,L"Moving %I64d clusters from %I64d to %I64d.",
-			Clusters,FromLcn,ToLcn);
-	}
+void DefragGui::show_move(const struct ItemStruct* item, const uint64_t clusters, const uint64_t from_lcn,
+                          const uint64_t to_lcn, const uint64_t from_vcn) {
+    /* Save the message in Messages 3. */
+    if (clusters == 1) {
+        swprintf_s(messages_[3], 50000, L"Moving 1 cluster from %I64d to %I64d.", from_lcn, to_lcn);
+    }
+    else {
+        swprintf_s(messages_[3], 50000, L"Moving %I64d clusters from %I64d to %I64d.",
+                   clusters, from_lcn, to_lcn);
+    }
 
-	/* Save the name of the file in Messages 4. */
-	if ((Item != NULL) && (Item->LongPath != NULL))
-	{
-		swprintf_s(Messages[4],50000,L"%s",Item->LongPath);
-	}
-	else
-	{
-		*(Messages[4]) = '\0';
-	}
+    /* Save the name of the file in Messages 4. */
+    if ((item != nullptr) && (item->LongPath != nullptr)) {
+        swprintf_s(messages_[4], 50000, L"%s", item->LongPath);
+    }
+    else {
+        *(messages_[4]) = '\0';
+    }
 
-	/* If debug mode then write a message to the logfile. */
-	if (m_debugLevel < 3) return;
+    /* If debug mode then write a message to the logfile. */
+    if (debug_level_ < DebugLevel::DetailedProgress) return;
 
-	if (FromVcn > 0)
-	{
-		if (Clusters == 1)
-		{
-			m_jkLog->LogMessage(L"%s\n  Moving 1 cluster from %I64d to %I64d, VCN=%I64d.",
-				Item->LongPath,FromLcn,ToLcn,FromVcn);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"%s\n  Moving %I64d clusters from %I64d to %I64d, VCN=%I64d.",
-				Item->LongPath,Clusters,FromLcn,ToLcn,FromVcn);
-		}
-	}
-	else
-	{
-		if (Clusters == 1)
-		{
-			m_jkLog->LogMessage(L"%s\n  Moving 1 cluster from %I64d to %I64d.",
-				Item->LongPath,FromLcn,ToLcn);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"%s\n  Moving %I64d clusters from %I64d to %I64d.",
-				Item->LongPath,Clusters,FromLcn,ToLcn);
-		}
-	}
-	PaintImage(m_hDC);
-
-//	InvalidateRect(m_hWnd,NULL,FALSE);
+    if (from_vcn > 0) {
+        if (clusters == 1) {
+            log_->log_message(L"%s\n  Moving 1 cluster from %I64d to %I64d, VCN=%I64d.",
+                              item->LongPath, from_lcn, to_lcn, from_vcn);
+        }
+        else {
+            log_->log_message(L"%s\n  Moving %I64d clusters from %I64d to %I64d, VCN=%I64d.",
+                              item->LongPath, clusters, from_lcn, to_lcn, from_vcn);
+        }
+    }
+    else {
+        if (clusters == 1) {
+            log_->log_message(L"%s\n  Moving 1 cluster from %I64d to %I64d.",
+                              item->LongPath, from_lcn, to_lcn);
+        }
+        else {
+            log_->log_message(L"%s\n  Moving %I64d clusters from %I64d to %I64d.",
+                              item->LongPath, clusters, from_lcn, to_lcn);
+        }
+    }
+    paint_image(dc_);
 }
 
 
 /* Callback: for every file during analysis.
-This subroutine is called one last time with Item=NULL when analysis has
-finished. */
-void JKDefragGui::ShowAnalyze(struct DefragDataStruct *Data, struct ItemStruct *Item)
-{
-	if ((Data != NULL) && (Data->CountAllFiles != 0))
-	{
-		swprintf_s(Messages[3],50000,L"Files %I64d, Directories %I64d, Clusters %I64d",
-			Data->CountAllFiles,Data->CountDirectories,Data->CountAllClusters);
-	}
-	else
-	{
-		swprintf_s(Messages[3],50000,L"Applying Exclude and SpaceHogs masks....");
-	}
+This subroutine is called one last time with Item=nullptr when analysis has finished. */
+void DefragGui::show_analyze(const struct DefragDataStruct* data, const struct ItemStruct* item) {
+    if (data != nullptr && data->count_all_files_ != 0) {
+        swprintf_s(messages_[3], 50000, L"Files %I64d, Directories %I64d, Clusters %I64d",
+                   data->count_all_files_, data->count_directories_, data->count_all_clusters_);
+    }
+    else {
+        swprintf_s(messages_[3], 50000, L"Applying Exclude and SpaceHogs masks....");
+    }
 
-	/* Save the name of the file in Messages 4. */
-	if ((Item != NULL) && (Item->LongPath != NULL))
-	{
-		swprintf_s(Messages[4],50000,L"%s",Item->LongPath);
-	}
-	else
-	{
-		*(Messages[4]) = '\0';
-	}
-	PaintImage(m_hDC);
-
-//	InvalidateRect(m_hWnd,NULL,FALSE);
+    /* Save the name of the file in Messages 4. */
+    if (item != nullptr && item->LongPath != nullptr) {
+        swprintf_s(messages_[4], 50000, L"%s", item->LongPath);
+    }
+    else {
+        *(messages_[4]) = '\0';
+    }
+    paint_image(dc_);
 }
 
 /* Callback: show a debug message. */
+void DefragGui::show_debug(const DebugLevel level, const struct ItemStruct* item, WCHAR* format, ...) {
+    va_list var_args;
 
-void  JKDefragGui::ShowDebug(int Level, struct ItemStruct *Item, WCHAR *Format, ...)
-{
-	va_list VarArgs;
+    if (debug_level_ < level) return;
 
-	if (m_debugLevel < Level) return;
+    /* Save the name of the file in Messages 4. */
+    if ((item != nullptr) && (item->LongPath != nullptr)) {
+        swprintf_s(messages_[4], 50000, L"%s", item->LongPath);
+    }
 
-	/* Save the name of the file in Messages 4. */
-	if ((Item != NULL) && (Item->LongPath != NULL))
-	{
-		swprintf_s(Messages[4],50000,L"%s",Item->LongPath);
-	}
+    /* If there is no message then return. */
+    if (format == nullptr) return;
 
-	/* If there is no message then return. */
-	if (Format == NULL) return;
-
-	/* Save the debug message in Messages 5. */
-	va_start(VarArgs,Format);
-	vswprintf_s(Messages[5],50000,Format,VarArgs);
-	m_jkLog->LogMessage(Format, VarArgs);
-	va_end(VarArgs);
-	PaintImage(m_hDC);
-
-//	InvalidateRect(m_hWnd,NULL,FALSE);
+    /* Save the debug message in Messages 5. */
+    va_start(var_args, format);
+    vswprintf_s(messages_[5], 50000, format, var_args);
+    log_->log_message(format, var_args);
+    va_end(var_args);
+    paint_image(dc_);
 }
 
 /* Callback: paint a cluster on the screen in a color. */
-void JKDefragGui::DrawCluster(struct DefragDataStruct *Data,
-							  ULONG64 ClusterStart,
-							  ULONG64 ClusterEnd,
-							  int Color)
-{
-	struct __timeb64 Now;
+void DefragGui::draw_cluster(struct DefragDataStruct* data, uint64_t cluster_start, const uint64_t cluster_end,
+                             const int color) {
+    struct __timeb64 now{};
+    [[maybe_unused]] Rect window_size = client_window_size_;
 
-	Rect windowSize = m_clientWindowSize;
+    /* Save the PhaseTodo and PhaseDone counters for later use by the progress counter. */
+    if (data->PhaseTodo != 0) {
+        _ftime64_s(&now);
 
-	/* Save the PhaseTodo and PhaseDone counters for later use by the progress counter. */
-	if (Data->PhaseTodo != 0)
-	{
-		_ftime64_s(&Now);
+        progress_time_ = now.time * 1000 + now.millitm;
+        progress_done_ = data->PhaseDone;
+        progress_todo_ = data->PhaseTodo;
+    }
 
-		ProgressTime = Now.time * 1000 + Now.millitm;
-		ProgressDone = Data->PhaseDone;
-		ProgressTodo = Data->PhaseTodo;
-	}
+    /* Sanity check. */
+    if (data->total_clusters_ == 0) return;
+    if (dc_ == nullptr) return;
+    if (cluster_start == cluster_end) return;
+    //	if (ClusterStart > Data->TotalClusters) ClusterStart = 0;
 
-	/* Sanity check. */
-	if (Data->TotalClusters == 0) return;
-	if (m_hDC == NULL) return;
-	if (ClusterStart == ClusterEnd) return;
-//	if (ClusterStart > Data->TotalClusters) ClusterStart = 0;
+    WaitForSingleObject(display_mutex_, 100);
 
-	WaitForSingleObject(m_displayMutex,100);
+    display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
-	m_displayMutex = CreateMutex(NULL,FALSE,"JKDefrag");
+    if (num_clusters_ != data->total_clusters_ || cluster_info_ == nullptr) {
+        if (cluster_info_ != nullptr) {
+            free(cluster_info_);
 
-	if (m_numClusters != Data->TotalClusters || clusterInfo == NULL)
-	{
-		if (clusterInfo != NULL)
-		{
-			free(clusterInfo);
+            cluster_info_ = nullptr;
+        }
 
-			clusterInfo = NULL;
-		}
+        num_clusters_ = data->total_clusters_;
 
-		m_numClusters = Data->TotalClusters;
+        cluster_info_ = (byte*)malloc((size_t)num_clusters_);
 
-		clusterInfo = (byte *)malloc((size_t)m_numClusters);
+        for (int ii = 0; ii <= num_clusters_; ii++) {
+            cluster_info_[ii] = DefragStruct::COLOREMPTY;
+        }
 
-		for(int ii = 0; ii <= m_numClusters; ii++)
-		{
-			clusterInfo[ii] = JKDefragStruct::COLOREMPTY;
-		}
+        return;
+    }
 
-//		RedrawScreen = 0;
+    for (uint64_t ii = cluster_start; ii <= cluster_end; ii++) {
+        cluster_info_[ii] = color;
+    }
 
-		return;
-	} 
+    const auto cluster_per_square = (float)(num_clusters_ / num_disk_squares_);
+    const int cluster_start_square_num = (int)((uint64_t)cluster_start / (uint64_t)cluster_per_square);
+    const int cluster_end_square_num = (int)((uint64_t)cluster_end / (uint64_t)cluster_per_square);
 
+    fill_squares(cluster_start_square_num, cluster_end_square_num);
 
-	for(ULONG64 ii = ClusterStart; ii <= ClusterEnd; ii++)
-	{
-		clusterInfo[ii] = Color;
-	}
-
-	float clusterPerSquare = (float)(m_numClusters / m_numDiskSquares);
-	int clusterStartSquareNum = (int)((ULONG64)ClusterStart / (ULONG64)clusterPerSquare);
-	int clusterEndSquareNum = (int)((ULONG64)ClusterEnd / (ULONG64)clusterPerSquare);
-
-	FillSquares(clusterStartSquareNum, clusterEndSquareNum);
-
-	ReleaseMutex(m_displayMutex);
-	PaintImage(m_hDC);
-
-//	InvalidateRect(m_hWnd,NULL,FALSE);
+    ReleaseMutex(display_mutex_);
+    paint_image(dc_);
 }
 
 /* Callback: just before the defragger starts a new Phase, and when it finishes. */
-void JKDefragGui::ShowStatus(struct DefragDataStruct *Data)
-{
-	struct ItemStruct *Item;
+void DefragGui::show_status(const struct DefragDataStruct* data) {
+    __timeb64 now{};
 
-	int Fragments;
+    int i;
 
-	ULONG64 TotalFragments;
-	ULONG64 TotalBytes;
-	ULONG64 TotalClusters;
+    /* Reset the progress counter. */
+    _ftime64_s(&now);
 
-	struct ItemStruct *LargestItems[25];
+    progress_start_time_ = now.time * 1000 + now.millitm;
+    progress_time_ = progress_start_time_;
+    progress_done_ = 0;
+    progress_todo_ = 0;
 
-	int LastLargest;
+    /* Reset all the messages. */
+    for (i = 0; i < 6; i++) *(messages_[i]) = '\0';
 
-	struct __timeb64 Now;
+    /* Update Message 0 and 1. */
+    if (data != nullptr) {
+        swprintf_s(messages_[0], 50000, L"%s", data->disk_.mount_point_);
 
-	int i;
-	int j;
+        switch (data->phase_) {
+        case 1: wcscpy_s(messages_[1], 50000, L"Phase 1: Analyze");
+            break;
+        case 2: wcscpy_s(messages_[1], 50000, L"Phase 2: Defragment");
+            break;
+        case 3: wcscpy_s(messages_[1], 50000, L"Phase 3: ForcedFill");
+            break;
+        case 4: swprintf_s(messages_[1], 50000, L"Zone %u: Sort", data->zone_ + 1);
+            break;
+        case 5: swprintf_s(messages_[1], 50000, L"Zone %u: Fast Optimize", data->zone_ + 1);
+            break;
+        case 6: wcscpy_s(messages_[1], 50000, L"Phase 3: Move Up");
+            break;
+        case 7:
+            wcscpy_s(messages_[1], 50000, L"Finished.");
+            swprintf_s(messages_[4], 50000, L"Logfile: %s", log_->get_log_filename());
+            break;
+        case 8: wcscpy_s(messages_[1], 50000, L"Phase 3: Fixup");
+            break;
+        }
 
-	/* Reset the progress counter. */
-	_ftime64_s(&Now);
+        log_->log_message(messages_[1]);
+    }
 
-	ProgressStartTime = Now.time * 1000 + Now.millitm;
-	ProgressTime = ProgressStartTime;
-	ProgressDone = 0;
-	ProgressTodo = 0;
+    /* Write some statistics to the logfile. */
+    if ((data != nullptr) && (data->phase_ == 7)) {
+        struct ItemStruct* largest_items[25];
+        uint64_t total_clusters;
+        uint64_t total_bytes;
+        uint64_t total_fragments;
+        int fragments;
+        struct ItemStruct* item;
+        log_->log_message(L"- Total disk space: %I64d bytes (%.04f gigabytes), %I64d clusters",
+                          data->bytes_per_cluster_ * data->total_clusters_,
+                          (double)(data->bytes_per_cluster_ * data->total_clusters_) / (1024 * 1024 * 1024),
+                          data->total_clusters_);
 
-	/* Reset all the messages. */
-	for (i = 0; i < 6; i++) *(Messages[i]) = '\0';
+        log_->log_message(L"- Bytes per cluster: %I64d bytes", data->bytes_per_cluster_);
 
-	/* Update Message 0 and 1. */
-	if (Data != NULL)
-	{
-		swprintf_s(Messages[0],50000,L"%s",Data->Disk.MountPoint);
+        log_->log_message(L"- Number of files: %I64d", data->count_all_files_);
+        log_->log_message(L"- Number of directories: %I64d", data->count_directories_);
+        log_->log_message(L"- Total size of analyzed items: %I64d bytes (%.04f gigabytes), %I64d clusters",
+                          data->count_all_clusters_ * data->bytes_per_cluster_,
+                          (double)(data->count_all_clusters_ * data->bytes_per_cluster_) / (1024 * 1024 * 1024),
+                          data->count_all_clusters_);
 
-		switch(Data->Phase)
-		{
-		case 1: wcscpy_s(Messages[1],50000,L"Phase 1: Analyze"); break;
-		case 2: wcscpy_s(Messages[1],50000,L"Phase 2: Defragment"); break;
-		case 3: wcscpy_s(Messages[1],50000,L"Phase 3: ForcedFill"); break;
-		case 4: swprintf_s(Messages[1],50000,L"Zone %u: Sort",Data->Zone + 1); break;
-		case 5: swprintf_s(Messages[1],50000,L"Zone %u: Fast Optimize",Data->Zone + 1); break;
-		case 6: wcscpy_s(Messages[1],50000,L"Phase 3: Move Up"); break;
-		case 7:
-			wcscpy_s(Messages[1],50000,L"Finished.");
-			swprintf_s(Messages[4],50000,L"Logfile: %s",m_jkLog->GetLogFilename());
-			break;
-		case 8: wcscpy_s(Messages[1],50000,L"Phase 3: Fixup"); break;
-		}
+        if (data->count_all_files_ + data->count_directories_ > 0) {
+            log_->log_message(L"- Number of fragmented items: %I64d (%.04f%% of all items)",
+                              data->count_fragmented_items_,
+                              (double)(data->count_fragmented_items_ * 100) / (data->count_all_files_ + data->
+                                  count_directories_));
+        }
+        else {
+            log_->log_message(L"- Number of fragmented items: %I64d", data->count_fragmented_items_);
+        }
 
-		m_jkLog->LogMessage(Messages[1]);
-	}
+        if ((data->count_all_clusters_ > 0) && (data->total_clusters_ > 0)) {
+            log_->log_message(
+                L"- Total size of fragmented items: %I64d bytes, %I64d clusters, %.04f%% of all items, %.04f%% of disk",
+                data->count_fragmented_clusters_ * data->bytes_per_cluster_,
+                data->count_fragmented_clusters_,
+                (double)(data->count_fragmented_clusters_ * 100) / data->count_all_clusters_,
+                (double)(data->count_fragmented_clusters_ * 100) / data->total_clusters_);
+        }
+        else {
+            log_->log_message(L"- Total size of fragmented items: %I64d bytes, %I64d clusters",
+                              data->count_fragmented_clusters_ * data->bytes_per_cluster_,
+                              data->count_fragmented_clusters_);
+        }
 
-	/* Write some statistics to the logfile. */
-	if ((Data != NULL) && (Data->Phase == 7))
-	{
-		m_jkLog->LogMessage(L"- Total disk space: %I64d bytes (%.04f gigabytes), %I64d clusters",
-			Data->BytesPerCluster * Data->TotalClusters,
-			(double)(Data->BytesPerCluster * Data->TotalClusters) / (1024 * 1024 * 1024),
-			Data->TotalClusters);
+        if (data->total_clusters_ > 0) {
+            log_->log_message(L"- Free disk space: %I64d bytes, %I64d clusters, %.04f%% of disk",
+                              data->count_free_clusters_ * data->bytes_per_cluster_,
+                              data->count_free_clusters_,
+                              (double)(data->count_free_clusters_ * 100) / data->total_clusters_);
+        }
+        else {
+            log_->log_message(L"- Free disk space: %I64d bytes, %I64d clusters",
+                              data->count_free_clusters_ * data->bytes_per_cluster_,
+                              data->count_free_clusters_);
+        }
 
-		m_jkLog->LogMessage(L"- Bytes per cluster: %I64d bytes",Data->BytesPerCluster);
+        log_->log_message(L"- Number of gaps: %I64d", data->count_gaps_);
 
-		m_jkLog->LogMessage(L"- Number of files: %I64d",Data->CountAllFiles);
-		m_jkLog->LogMessage(L"- Number of directories: %I64d",Data->CountDirectories);
-		m_jkLog->LogMessage(L"- Total size of analyzed items: %I64d bytes (%.04f gigabytes), %I64d clusters",
-			Data->CountAllClusters * Data->BytesPerCluster,
-			(double)(Data->CountAllClusters * Data->BytesPerCluster) / (1024 * 1024 * 1024),
-			Data->CountAllClusters);
+        if (data->count_gaps_ > 0) {
+            log_->log_message(L"- Number of small gaps: %I64d (%.04f%% of all gaps)",
+                              data->count_gaps_less16_,
+                              (double)(data->count_gaps_less16_ * 100) / data->count_gaps_);
+        }
+        else {
+            log_->log_message(L"- Number of small gaps: %I64d",
+                              data->count_gaps_less16_);
+        }
 
-		if (Data->CountAllFiles + Data->CountDirectories > 0)
-		{
-			m_jkLog->LogMessage(L"- Number of fragmented items: %I64d (%.04f%% of all items)",
-				Data->CountFragmentedItems,
-				(double)(Data->CountFragmentedItems * 100) / (Data->CountAllFiles + Data->CountDirectories));
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Number of fragmented items: %I64d",Data->CountFragmentedItems);
-		}
+        if (data->count_free_clusters_ > 0) {
+            log_->log_message(L"- Size of small gaps: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
+                              data->count_clusters_less16_ * data->bytes_per_cluster_,
+                              data->count_clusters_less16_,
+                              (double)(data->count_clusters_less16_ * 100) / data->count_free_clusters_);
+        }
+        else {
+            log_->log_message(L"- Size of small gaps: %I64d bytes, %I64d clusters",
+                              data->count_clusters_less16_ * data->bytes_per_cluster_,
+                              data->count_clusters_less16_);
+        }
 
-		if ((Data->CountAllClusters > 0) && (Data->TotalClusters > 0))
-		{
-			m_jkLog->LogMessage(L"- Total size of fragmented items: %I64d bytes, %I64d clusters, %.04f%% of all items, %.04f%% of disk",
-				Data->CountFragmentedClusters * Data->BytesPerCluster,
-				Data->CountFragmentedClusters,
-				(double)(Data->CountFragmentedClusters * 100) / Data->CountAllClusters,
-				(double)(Data->CountFragmentedClusters * 100) / Data->TotalClusters);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Total size of fragmented items: %I64d bytes, %I64d clusters",
-				Data->CountFragmentedClusters * Data->BytesPerCluster,
-				Data->CountFragmentedClusters);
-		}
+        if (data->count_gaps_ > 0) {
+            log_->log_message(L"- Number of big gaps: %I64d (%.04f%% of all gaps)",
+                              data->count_gaps_ - data->count_gaps_less16_,
+                              (double)((data->count_gaps_ - data->count_gaps_less16_) * 100) / data->count_gaps_);
+        }
+        else {
+            log_->log_message(L"- Number of big gaps: %I64d",
+                              data->count_gaps_ - data->count_gaps_less16_);
+        }
 
-		if (Data->TotalClusters > 0)
-		{
-			m_jkLog->LogMessage(L"- Free disk space: %I64d bytes, %I64d clusters, %.04f%% of disk",
-				Data->CountFreeClusters * Data->BytesPerCluster,
-				Data->CountFreeClusters,
-				(double)(Data->CountFreeClusters * 100) / Data->TotalClusters);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Free disk space: %I64d bytes, %I64d clusters",
-				Data->CountFreeClusters * Data->BytesPerCluster,
-				Data->CountFreeClusters);
-		}
+        if (data->count_free_clusters_ > 0) {
+            log_->log_message(L"- Size of big gaps: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
+                              (data->count_free_clusters_ - data->count_clusters_less16_) * data->bytes_per_cluster_,
+                              data->count_free_clusters_ - data->count_clusters_less16_,
+                              (double)((data->count_free_clusters_ - data->count_clusters_less16_) * 100) / data->
+                              count_free_clusters_);
+        }
+        else {
+            log_->log_message(L"- Size of big gaps: %I64d bytes, %I64d clusters",
+                              (data->count_free_clusters_ - data->count_clusters_less16_) * data->bytes_per_cluster_,
+                              data->count_free_clusters_ - data->count_clusters_less16_);
+        }
 
-		m_jkLog->LogMessage(L"- Number of gaps: %I64d",Data->CountGaps);
+        if (data->count_gaps_ > 0) {
+            log_->log_message(L"- Average gap size: %.04f clusters",
+                              (double)(data->count_free_clusters_) / data->count_gaps_);
+        }
 
-		if (Data->CountGaps > 0)
-		{
-			m_jkLog->LogMessage(L"- Number of small gaps: %I64d (%.04f%% of all gaps)",
-				Data->CountGapsLess16,
-				(double)(Data->CountGapsLess16 * 100) / Data->CountGaps);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Number of small gaps: %I64d",
-				Data->CountGapsLess16);
-		}
+        if (data->count_free_clusters_ > 0) {
+            log_->log_message(L"- Biggest gap: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
+                              data->biggest_gap_ * data->bytes_per_cluster_,
+                              data->biggest_gap_,
+                              (double)(data->biggest_gap_ * 100) / data->count_free_clusters_);
+        }
+        else {
+            log_->log_message(L"- Biggest gap: %I64d bytes, %I64d clusters",
+                              data->biggest_gap_ * data->bytes_per_cluster_,
+                              data->biggest_gap_);
+        }
 
-		if (Data->CountFreeClusters > 0)
-		{
-			m_jkLog->LogMessage(L"- Size of small gaps: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
-				Data->CountClustersLess16 * Data->BytesPerCluster,
-				Data->CountClustersLess16,
-				(double)(Data->CountClustersLess16 * 100) / Data->CountFreeClusters);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Size of small gaps: %I64d bytes, %I64d clusters",
-				Data->CountClustersLess16 * Data->BytesPerCluster,
-				Data->CountClustersLess16);
-		}
+        if (data->total_clusters_ > 0) {
+            log_->log_message(L"- Average end-begin distance: %.0f clusters, %.4f%% of volume size",
+                              data->average_distance_, 100.0 * data->average_distance_ / data->total_clusters_);
+        }
+        else {
+            log_->log_message(L"- Average end-begin distance: %.0f clusters", data->average_distance_);
+        }
 
-		if (Data->CountGaps > 0)
-		{
-			m_jkLog->LogMessage(L"- Number of big gaps: %I64d (%.04f%% of all gaps)",
-				Data->CountGaps - Data->CountGapsLess16,
-				(double)((Data->CountGaps - Data->CountGapsLess16) * 100) / Data->CountGaps);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Number of big gaps: %I64d",
-				Data->CountGaps - Data->CountGapsLess16);
-		}
+        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->TreeNext(item)) {
+            if (item->is_unmovable_ != true) continue;
+            if (item->is_excluded_ == true) continue;
+            if ((item->is_dir_ == true) && (data->cannot_move_dirs_ > 20)) continue;
+            break;
+        }
 
-		if (Data->CountFreeClusters > 0)
-		{
-			m_jkLog->LogMessage(L"- Size of big gaps: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
-				(Data->CountFreeClusters - Data->CountClustersLess16) * Data->BytesPerCluster,
-				Data->CountFreeClusters - Data->CountClustersLess16,
-				(double)((Data->CountFreeClusters - Data->CountClustersLess16) * 100) / Data->CountFreeClusters);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Size of big gaps: %I64d bytes, %I64d clusters",
-				(Data->CountFreeClusters - Data->CountClustersLess16) * Data->BytesPerCluster,
-				Data->CountFreeClusters - Data->CountClustersLess16);
-		}
+        if (item != nullptr) {
+            log_->log_message(L"These items could not be moved:");
+            log_->log_message(L"  Fragments       Bytes  Clusters Name");
 
-		if (Data->CountGaps > 0)
-		{
-			m_jkLog->LogMessage(L"- Average gap size: %.04f clusters",
-				(double)(Data->CountFreeClusters) / Data->CountGaps);
-		}
+            total_fragments = 0;
+            total_bytes = 0;
+            total_clusters = 0;
 
-		if (Data->CountFreeClusters > 0)
-		{
-			m_jkLog->LogMessage(L"- Biggest gap: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
-				Data->BiggestGap * Data->BytesPerCluster,
-				Data->BiggestGap,
-				(double)(Data->BiggestGap * 100) / Data->CountFreeClusters);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Biggest gap: %I64d bytes, %I64d clusters",
-				Data->BiggestGap * Data->BytesPerCluster,
-				Data->BiggestGap);
-		}
+            for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
+                 TreeNext(item)) {
+                if (item->is_unmovable_ != true) continue;
+                if (item->is_excluded_ == true) continue;
+                if ((item->is_dir_ == true) && (data->cannot_move_dirs_ > 20)) continue;
+                if ((item->LongFilename != nullptr) &&
+                    ((_wcsicmp(item->LongFilename, L"$BadClus") == 0) ||
+                        (_wcsicmp(item->LongFilename, L"$BadClus:$Bad:$DATA") == 0)))
+                    continue;
 
-		if (Data->TotalClusters > 0)
-		{
-			m_jkLog->LogMessage(L"- Average end-begin distance: %.0f clusters, %.4f%% of volume size",
-				Data->AverageDistance,100.0 * Data->AverageDistance / Data->TotalClusters);
-		}
-		else
-		{
-			m_jkLog->LogMessage(L"- Average end-begin distance: %.0f clusters",Data->AverageDistance);
-		}
+                fragments = defrag_lib_->FragmentCount(item);
 
-		for (Item = m_jkLib->TreeSmallest(Data->ItemTree); Item != NULL; Item = m_jkLib->TreeNext(Item))
-		{
-			if (Item->Unmovable != YES) continue;
-			if (Item->Exclude == YES) continue;
-			if ((Item->Directory == YES) && (Data->CannotMoveDirs > 20)) continue;
-			break;
-		}
+                if (item->LongPath == nullptr) {
+                    log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->Bytes,
+                                      item->Clusters,
+                                      defrag_lib_->get_item_lcn(item));
+                }
+                else {
+                    log_->log_message(L"  %9lu %11I64u %9I64u %s", fragments, item->Bytes, item->Clusters,
+                                      item->LongPath);
+                }
 
-		if (Item != NULL)
-		{
-			m_jkLog->LogMessage(L"These items could not be moved:");
-			m_jkLog->LogMessage(L"  Fragments       Bytes  Clusters Name");
+                total_fragments = total_fragments + fragments;
+                total_bytes = total_bytes + item->Bytes;
+                total_clusters = total_clusters + item->Clusters;
+            }
 
-			TotalFragments = 0;
-			TotalBytes = 0;
-			TotalClusters = 0;
+            log_->log_message(L"  --------- ----------- --------- -----");
+            log_->log_message(L"  %9I64u %11I64u %9I64u Total", total_fragments, total_bytes, total_clusters);
+        }
 
-			for (Item = m_jkLib->TreeSmallest(Data->ItemTree); Item != NULL; Item = m_jkLib->TreeNext(Item))
-			{
-				if (Item->Unmovable != YES) continue;
-				if (Item->Exclude == YES) continue;
-				if ((Item->Directory == YES) && (Data->CannotMoveDirs > 20)) continue;
-				if ((Item->LongFilename != NULL) &&
-					((_wcsicmp(Item->LongFilename,L"$BadClus") == 0) ||
-					(_wcsicmp(Item->LongFilename,L"$BadClus:$Bad:$DATA") == 0))) continue;
+        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->TreeNext(item)) {
+            if (item->is_excluded_ == true) continue;
+            if ((item->is_dir_ == true) && (data->cannot_move_dirs_ > 20)) continue;
 
-				Fragments = m_jkLib->FragmentCount(Item);
+            fragments = defrag_lib_->FragmentCount(item);
 
-				if (Item->LongPath == NULL)
-				{
-					m_jkLog->LogMessage(L"  %9lu %11I64u %9I64u [at cluster %I64u]",Fragments,Item->Bytes,Item->Clusters,
-						m_jkLib->GetItemLcn(Item));
-				}
-				else
-				{
-					m_jkLog->LogMessage(L"  %9lu %11I64u %9I64u %s",Fragments,Item->Bytes,Item->Clusters,Item->LongPath);
-				}
+            if (fragments <= 1) continue;
 
-				TotalFragments = TotalFragments + Fragments;
-				TotalBytes = TotalBytes + Item->Bytes;
-				TotalClusters = TotalClusters + Item->Clusters;
-			}
+            break;
+        }
 
-			m_jkLog->LogMessage(L"  --------- ----------- --------- -----");
-			m_jkLog->LogMessage(L"  %9I64u %11I64u %9I64u Total",TotalFragments,TotalBytes,TotalClusters);
-		}
+        if (item != nullptr) {
+            log_->log_message(L"These items are still fragmented:");
+            log_->log_message(L"  Fragments       Bytes  Clusters Name");
 
-		for (Item = m_jkLib->TreeSmallest(Data->ItemTree); Item != NULL; Item = m_jkLib->TreeNext(Item))
-		{
-			if (Item->Exclude == YES) continue;
-			if ((Item->Directory == YES) && (Data->CannotMoveDirs > 20)) continue;
+            total_fragments = 0;
+            total_bytes = 0;
+            total_clusters = 0;
 
-			Fragments = m_jkLib->FragmentCount(Item);
+            for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->
+                 TreeNext(item)) {
+                if (item->is_excluded_ == true) continue;
+                if ((item->is_dir_ == true) && (data->cannot_move_dirs_ > 20)) continue;
 
-			if (Fragments <= 1) continue;
+                fragments = defrag_lib_->FragmentCount(item);
 
-			break;
-		}
+                if (fragments <= 1) continue;
 
-		if (Item != NULL)
-		{
-			m_jkLog->LogMessage(L"These items are still fragmented:");
-			m_jkLog->LogMessage(L"  Fragments       Bytes  Clusters Name");
+                if (item->LongPath == nullptr) {
+                    log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->Bytes,
+                                      item->Clusters,
+                                      defrag_lib_->get_item_lcn(item));
+                }
+                else {
+                    log_->log_message(L"  %9lu %11I64u %9I64u %s", fragments, item->Bytes, item->Clusters,
+                                      item->LongPath);
+                }
 
-			TotalFragments = 0;
-			TotalBytes = 0;
-			TotalClusters = 0;
+                total_fragments = total_fragments + fragments;
+                total_bytes = total_bytes + item->Bytes;
+                total_clusters = total_clusters + item->Clusters;
+            }
 
-			for (Item = m_jkLib->TreeSmallest(Data->ItemTree); Item != NULL; Item = m_jkLib->TreeNext(Item))
-			{
-				if (Item->Exclude == YES) continue;
-				if ((Item->Directory == YES) && (Data->CannotMoveDirs > 20)) continue;
+            log_->log_message(L"  --------- ----------- --------- -----");
+            log_->log_message(L"  %9I64u %11I64u %9I64u Total", total_fragments, total_bytes, total_clusters);
+        }
 
-				Fragments = m_jkLib->FragmentCount(Item);
+        int last_largest = 0;
 
-				if (Fragments <= 1) continue;
+        for (item = defrag_lib_->tree_smallest(data->item_tree_); item != nullptr; item = defrag_lib_->TreeNext(item)) {
+            if ((item->LongFilename != nullptr) &&
+                ((_wcsicmp(item->LongFilename, L"$BadClus") == 0) ||
+                    (_wcsicmp(item->LongFilename, L"$BadClus:$Bad:$DATA") == 0))) {
+                continue;
+            }
 
-				if (Item->LongPath == NULL)
-				{
-					m_jkLog->LogMessage(L"  %9lu %11I64u %9I64u [at cluster %I64u]",Fragments,Item->Bytes,Item->Clusters,
-						m_jkLib->GetItemLcn(Item));
-				}
-				else
-				{
-					m_jkLog->LogMessage(L"  %9lu %11I64u %9I64u %s",Fragments,Item->Bytes,Item->Clusters,Item->LongPath);
-				}
+            for (i = last_largest - 1; i >= 0; i--) {
+                if (item->Clusters < largest_items[i]->Clusters) break;
 
-				TotalFragments = TotalFragments + Fragments;
-				TotalBytes = TotalBytes + Item->Bytes;
-				TotalClusters = TotalClusters + Item->Clusters;
-			}
+                if ((item->Clusters == largest_items[i]->Clusters) &&
+                    (item->Bytes < largest_items[i]->Bytes))
+                    break;
 
-			m_jkLog->LogMessage(L"  --------- ----------- --------- -----");
-			m_jkLog->LogMessage(L"  %9I64u %11I64u %9I64u Total",TotalFragments,TotalBytes,TotalClusters);
-		}
+                if ((item->Clusters == largest_items[i]->Clusters) &&
+                    (item->Bytes == largest_items[i]->Bytes) &&
+                    (item->LongPath != nullptr) &&
+                    (largest_items[i]->LongPath != nullptr) &&
+                    (_wcsicmp(item->LongPath, largest_items[i]->LongPath) > 0))
+                    break;
+            }
 
-		LastLargest = 0;
+            if (i < 24) {
+                if (last_largest < 25) last_largest++;
 
-		for (Item = m_jkLib->TreeSmallest(Data->ItemTree); Item != NULL; Item = m_jkLib->TreeNext(Item))
-		{
-			if ((Item->LongFilename != NULL) &&
-				((_wcsicmp(Item->LongFilename,L"$BadClus") == 0) ||
-				(_wcsicmp(Item->LongFilename,L"$BadClus:$Bad:$DATA") == 0)))
-			{
-				continue;
-			}
+                for (int j = last_largest - 1; j > i + 1; j--) {
+                    largest_items[j] = largest_items[j - 1];
+                }
 
-			for (i = LastLargest - 1; i >= 0; i--)
-			{
-				if (Item->Clusters < LargestItems[i]->Clusters) break;
+                largest_items[i + 1] = item;
+            }
+        }
 
-				if ((Item->Clusters == LargestItems[i]->Clusters) &&
-					(Item->Bytes < LargestItems[i]->Bytes)) break;
+        if (last_largest > 0) {
+            log_->log_message(L"The 25 largest items on disk:");
+            log_->log_message(L"  Fragments       Bytes  Clusters Name");
 
-				if ((Item->Clusters == LargestItems[i]->Clusters) &&
-					(Item->Bytes == LargestItems[i]->Bytes) &&
-					(Item->LongPath != NULL) &&
-					(LargestItems[i]->LongPath != NULL) &&
-					(_wcsicmp(Item->LongPath,LargestItems[i]->LongPath) > 0)) break;
-			}
-
-			if (i < 24)
-			{
-				if (LastLargest < 25) LastLargest++;
-
-				for (j = LastLargest - 1; j > i + 1; j--)
-				{
-					LargestItems[j] = LargestItems[j-1];
-				}
-
-				LargestItems[i + 1] = Item;
-			}
-		}
-
-		if (LastLargest > 0)
-		{
-			m_jkLog->LogMessage(L"The 25 largest items on disk:");
-			m_jkLog->LogMessage(L"  Fragments       Bytes  Clusters Name");
-
-			for (i = 0; i < LastLargest; i++)
-			{
-				if (LargestItems[i]->LongPath == NULL)
-				{
-					m_jkLog->LogMessage(L"  %9u %11I64u %9I64u [at cluster %I64u]",m_jkLib->FragmentCount(LargestItems[i]),
-						LargestItems[i]->Bytes,LargestItems[i]->Clusters,m_jkLib->GetItemLcn(LargestItems[i]));
-				}
-				else
-				{
-					m_jkLog->LogMessage(L"  %9u %11I64u %9I64u %s",m_jkLib->FragmentCount(LargestItems[i]),
-						LargestItems[i]->Bytes,LargestItems[i]->Clusters,LargestItems[i]->LongPath);
-				}
-			}
-		}
-	}
+            for (i = 0; i < last_largest; i++) {
+                if (largest_items[i]->LongPath == nullptr) {
+                    log_->log_message(L"  %9u %11I64u %9I64u [at cluster %I64u]",
+                                      defrag_lib_->FragmentCount(largest_items[i]),
+                                      largest_items[i]->Bytes, largest_items[i]->Clusters,
+                                      defrag_lib_->get_item_lcn(largest_items[i]));
+                }
+                else {
+                    log_->log_message(L"  %9u %11I64u %9I64u %s", defrag_lib_->FragmentCount(largest_items[i]),
+                                      largest_items[i]->Bytes, largest_items[i]->Clusters, largest_items[i]->LongPath);
+                }
+            }
+        }
+    }
 }
 
 
-void JKDefragGui::PaintImage(HDC hdc)
-{
-	Graphics *graphics = Graphics::FromImage(m_bmp);
+void DefragGui::paint_image(HDC dc) {
+    Graphics* graphics = Graphics::FromImage(bmp_);
+    Rect window_size = client_window_size_;
+    Rect draw_area;
 
-	double Done;
+    [[maybe_unused]] const float square_size_unit = (float)(1 / (float)square_size_);
 
-	Rect windowSize = m_clientWindowSize;
-	Rect drawArea;
+    /* Reset the display idle timer (screen saver) and system idle timer (power saver). */
+    SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 
-	float squareSizeUnit = (float)(1 / (float)m_squareSize);
+    if (progress_todo_ > 0) {
+        double done;
+        done = (double)((double)progress_done_ / (double)progress_todo_);
 
-	/* Reset the display idle timer (screen saver) and system idle timer (power saver). */
-	SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
+        if (done > 1) done = 1;
 
-	if (ProgressTodo > 0)
-	{
-		Done = (double)((double)ProgressDone / (double)ProgressTodo);
+        swprintf_s(messages_[2], 50000, L"%.4f%%", 100 * done);
+    }
 
-		if (Done > 1) Done = 1;
+    Color back_color1;
+    back_color1.SetFromCOLORREF(RGB(0, 0, 255));
 
-		swprintf_s(Messages[2],50000,L"%.4f%%",100 * Done);
-	}
+    Color back_color2;
+    back_color2.SetFromCOLORREF(RGB(255, 0, 0));
 
-	Color backColor1;
-	backColor1.SetFromCOLORREF(RGB(0, 0, 255));
+    LinearGradientBrush bg_brush(window_size, Color::DarkBlue, Color::LightBlue, LinearGradientModeForwardDiagonal);
 
-	Color backColor2;
-	backColor2.SetFromCOLORREF(RGB(255, 0, 0));
+    draw_area = window_size;
 
-	LinearGradientBrush bgBrush(windowSize,Color::DarkBlue,Color::LightBlue,LinearGradientModeForwardDiagonal);
+    draw_area.Height = top_height_ + 1;
 
-	drawArea = windowSize;
+    Color busy_color;
+    busy_color.SetFromCOLORREF(Colors[DefragStruct::COLORBUSY]);
 
-	drawArea.Height = m_topHeight + 1;
+    SolidBrush busy_brush(busy_color);
 
-	Color busyColor;
-	busyColor.SetFromCOLORREF(Colors[JKDefragStruct::COLORBUSY]);
+    /*
+        graphics->FillRectangle(&busyBrush, drawArea);
+    */
+    graphics->FillRectangle(&bg_brush, draw_area);
 
-	SolidBrush busyBrush(busyColor);
+    SolidBrush brush(Color::White);
 
-/*
-	graphics->FillRectangle(&busyBrush, drawArea);
-*/
-	graphics->FillRectangle(&bgBrush, drawArea);
+    FontFamily font_family(L"Tahoma");
+    Font font(&font_family, 12, FontStyleRegular, UnitPixel);
+    WCHAR* text;
+    PointF point_f(2.0f, 0.0f);
 
-	SolidBrush brush(Color::White);
+    text = messages_[0];
+    graphics->DrawString(text, -1, &font, point_f, &brush);
 
-	FontFamily fontFamily(L"Tahoma");
-	Font       font(&fontFamily,12,FontStyleRegular, UnitPixel);
-	WCHAR      *text;
-	PointF     pointF(2.0f, 0.0f);
+    point_f = PointF(40.0f, 0.0f);
+    text = messages_[1];
+    graphics->DrawString(text, -1, &font, point_f, &brush);
 
-	text = Messages[0];
-	graphics->DrawString(text, -1, &font, pointF, &brush);
+    point_f = PointF(200.0f, 0.0f);
+    text = messages_[2];
+    graphics->DrawString(text, -1, &font, point_f, &brush);
 
-	pointF = PointF(40.0f, 0.0f);
-	text = Messages[1];
-	graphics->DrawString(text, -1, &font, pointF, &brush);
+    point_f = PointF(280.0f, 0.0f);
+    text = messages_[3];
+    graphics->DrawString(text, -1, &font, point_f, &brush);
 
-	pointF = PointF(200.0f, 0.0f);
-	text = Messages[2];
-	graphics->DrawString(text, -1, &font, pointF, &brush);
+    point_f = PointF(2.0f, 17.0f);
+    text = messages_[4];
+    graphics->DrawString(text, -1, &font, point_f, &brush);
 
-	pointF = PointF(280.0f, 0.0f);
-	text = Messages[3];
-	graphics->DrawString(text, -1, &font, pointF, &brush);
-
-	pointF = PointF(2.0f, 17.0f);
-	text = Messages[4];
-	graphics->DrawString(text, -1, &font, pointF, &brush);
-
-	if (m_debugLevel > 1)
-	{
-		pointF = PointF(2.0f, 33.0f);
-		text = Messages[5];
-		graphics->DrawString(text, -1, &font, pointF, &brush);
-	}
+    if (debug_level_ > DebugLevel::Warning) {
+        point_f = PointF(2.0f, 33.0f);
+        text = messages_[5];
+        graphics->DrawString(text, -1, &font, point_f, &brush);
+    }
 
 
-	int xx1 = m_realOffsetX - 1;
-	int yy1 = m_realOffsetY + m_topHeight - 1;
+    int xx1 = real_offset_x_ - 1;
+    int yy1 = real_offset_y_ + top_height_ - 1;
 
-	int xx2 = xx1 + m_numDiskSquaresX * m_squareSize + 1;
-	int yy2 = yy1 + m_numDiskSquaresY * m_squareSize + 1;
+    int xx2 = xx1 + num_disk_squares_x_ * square_size_ + 1;
+    int yy2 = yy1 + num_disk_squares_y_ * square_size_ + 1;
 
-/*
-	Color bottomPartColor;
-	bottomPartColor.SetFromCOLORREF(Colors[JKDefragStruct::COLORBUSY]);
+    /*
+        Color bottomPartColor;
+        bottomPartColor.SetFromCOLORREF(Colors[JKDefragStruct::COLORBUSY]);
+    
+        SolidBrush bottomPartBrush(bottomPartColor);
+    */
 
-	SolidBrush bottomPartBrush(bottomPartColor);
-*/
+    draw_area = Rect(0, top_height_ + 1, client_window_size_.Width, yy1 - top_height_ - 2);
+    /*
+        graphics->FillRectangle(&bottomPartBrush, drawArea);
+    */
+    graphics->FillRectangle(&bg_brush, draw_area);
 
-	drawArea = Rect(0, m_topHeight + 1, m_clientWindowSize.Width, yy1 - m_topHeight - 2);
-/*
-	graphics->FillRectangle(&bottomPartBrush, drawArea);
-*/
-	graphics->FillRectangle(&bgBrush, drawArea);
+    draw_area = Rect(0, yy2 + 2, client_window_size_.Width, client_window_size_.Height - yy2 - 2);
+    /*
+        graphics->FillRectangle(&bottomPartBrush, drawArea);
+    */
+    graphics->FillRectangle(&bg_brush, draw_area);
 
-	drawArea = Rect(0, yy2 + 2, m_clientWindowSize.Width, m_clientWindowSize.Height - yy2 - 2);
-/*
-	graphics->FillRectangle(&bottomPartBrush, drawArea);
-*/
-	graphics->FillRectangle(&bgBrush, drawArea);
+    draw_area = Rect(0, yy1 - 1, xx1 - 1, yy2 - yy1 + 3);
+    /*
+        graphics->FillRectangle(&bottomPartBrush, drawArea);
+    */
+    graphics->FillRectangle(&bg_brush, draw_area);
 
-	drawArea = Rect(0, yy1 - 1, xx1 - 1, yy2 - yy1 + 3);
-/*
-	graphics->FillRectangle(&bottomPartBrush, drawArea);
-*/
-	graphics->FillRectangle(&bgBrush, drawArea);
+    draw_area = Rect(xx2, yy1 - 1, client_window_size_.Width - xx2, yy2 - yy1 + 3);
+    /*
+        graphics->FillRectangle(&bottomPartBrush, drawArea);
+    */
+    graphics->FillRectangle(&bg_brush, draw_area);
 
-	drawArea = Rect(xx2, yy1 - 1, m_clientWindowSize.Width - xx2, yy2 - yy1 + 3);
-/*
-	graphics->FillRectangle(&bottomPartBrush, drawArea);
-*/
-	graphics->FillRectangle(&bgBrush, drawArea);
+    Pen pen1(Color(0, 0, 0));
+    Pen pen2(Color(255, 255, 255));
 
-	Pen pen1(Color(0,0,0));
-	Pen pen2(Color(255,255,255));
+    graphics->DrawLine(&pen1, xx1, yy2, xx1, yy1);
+    graphics->DrawLine(&pen1, xx1, yy1, xx2, yy1);
+    graphics->DrawLine(&pen1, xx2, yy1, xx2, yy2);
+    graphics->DrawLine(&pen1, xx2, yy2, xx1, yy2);
 
-	graphics->DrawLine(&pen1, xx1, yy2, xx1, yy1);
-	graphics->DrawLine(&pen1, xx1, yy1, xx2, yy1);
-	graphics->DrawLine(&pen1, xx2, yy1, xx2, yy2);
-	graphics->DrawLine(&pen1, xx2, yy2, xx1, yy2);
+    graphics->DrawLine(&pen2, xx1 - 1, yy2 + 1, xx1 - 1, yy1 - 1);
+    graphics->DrawLine(&pen2, xx1 - 1, yy1 - 1, xx2 + 1, yy1 - 1);
+    graphics->DrawLine(&pen2, xx2 + 1, yy1 - 1, xx2 + 1, yy2 + 1);
+    graphics->DrawLine(&pen2, xx2 + 1, yy2 + 1, xx1 - 1, yy2 + 1);
 
-	graphics->DrawLine(&pen2, xx1 - 1, yy2 + 1, xx1 - 1, yy1 - 1);
-	graphics->DrawLine(&pen2, xx1 - 1, yy1 - 1, xx2 + 1, yy1 - 1);
-	graphics->DrawLine(&pen2, xx2 + 1, yy1 - 1, xx2 + 1, yy2 + 1);
-	graphics->DrawLine(&pen2, xx2 + 1, yy2 + 1, xx1 - 1, yy2 + 1);
+    COLORREF color_empty_ref = Colors[DefragStruct::COLOREMPTY];
+    Color color_empty;
+    color_empty.SetFromCOLORREF(color_empty_ref);
 
-	COLORREF colEmpty = Colors[JKDefragStruct::COLOREMPTY];
-	Color colorEmpty;
-	colorEmpty.SetFromCOLORREF(colEmpty);
+    Pen pen(Color(210, 210, 210));
+    Pen pen_empty(color_empty);
 
-	Pen pen(Color(210,210,210));
-	Pen penEmpty(colorEmpty);
+    for (int jj = 0; jj < num_disk_squares_; jj++) {
+        if (cluster_squares_[jj].dirty_ == false) {
+            continue;
+        }
 
-	for (int jj = 0; jj < m_numDiskSquares; jj++)
-	{
-		if (m_clusterSquares[jj].dirty == false)
-		{
-			continue;
-		}
+        cluster_squares_[jj].dirty_ = false;
 
-		m_clusterSquares[jj].dirty = false;
+        int x1 = jj % num_disk_squares_x_;
+        int y1 = jj / num_disk_squares_x_;
 
-		int x1 = jj % m_numDiskSquaresX;
-		int y1 = jj / m_numDiskSquaresX;
+        int xx3 = real_offset_x_ + x1 * square_size_;
+        int yy3 = real_offset_y_ + y1 * square_size_ + top_height_;
 
-		int xx1 = m_realOffsetX + x1 * m_squareSize;
-		int yy1 = m_realOffsetY + y1 * m_squareSize + m_topHeight;
+        [[maybe_unused]] byte cluster_empty = (cluster_squares_[jj].color_ & (1 << 7)) >> 7;
+        [[maybe_unused]] byte cluster_allocated = (cluster_squares_[jj].color_ & (1 << 6)) >> 6;
+        byte cluster_unfragmented = (cluster_squares_[jj].color_ & (1 << 5)) >> 5;
+        byte cluster_unmovable = (cluster_squares_[jj].color_ & (1 << 4)) >> 4;
+        byte cluster_fragmented = (cluster_squares_[jj].color_ & (1 << 3)) >> 3;
+        byte cluster_busy = (cluster_squares_[jj].color_ & (1 << 2)) >> 2;
+        byte cluster_mft = (cluster_squares_[jj].color_ & (1 << 1)) >> 1;
+        byte cluster_spacehog = (cluster_squares_[jj].color_ & 1);
 
-		byte clusterEmpty        = (m_clusterSquares[jj].color & (1 << 7)) >> 7;
-		byte clusterAllocated    = (m_clusterSquares[jj].color & (1 << 6)) >> 6;
-		byte clusterUnfragmented = (m_clusterSquares[jj].color & (1 << 5)) >> 5;
-		byte clusterUnmovable    = (m_clusterSquares[jj].color & (1 << 4)) >> 4;
-		byte clusterFragmented   = (m_clusterSquares[jj].color & (1 << 3)) >> 3;
-		byte clusterBusy         = (m_clusterSquares[jj].color & (1 << 2)) >> 2;
-		byte clusterMft          = (m_clusterSquares[jj].color & (1 << 1)) >> 1;
-		byte clusterSpacehog     = (m_clusterSquares[jj].color & 1);
+        COLORREF col = Colors[DefragStruct::COLOREMPTY];
 
-		COLORREF col = Colors[JKDefragStruct::COLOREMPTY];
+        int empty_cluster = true;
 
-		int emptyCluster = true;
+        if (cluster_busy == 1) {
+            col = Colors[DefragStruct::COLORBUSY];
+            empty_cluster = false;
+        }
+        else if (cluster_unmovable == 1) {
+            col = Colors[DefragStruct::COLORUNMOVABLE];
+            empty_cluster = false;
+        }
+        else if (cluster_fragmented == 1) {
+            col = Colors[DefragStruct::COLORFRAGMENTED];
+            empty_cluster = false;
+        }
+        else if (cluster_mft == 1) {
+            col = Colors[DefragStruct::COLORMFT];
+            empty_cluster = false;
+        }
+        else if (cluster_unfragmented == 1) {
+            col = Colors[DefragStruct::COLORUNFRAGMENTED];
+            empty_cluster = false;
+        }
+        else if (cluster_spacehog == 1) {
+            col = Colors[DefragStruct::COLORSPACEHOG];
+            empty_cluster = false;
+        }
 
-		if (clusterBusy == 1)
-		{
-			col = Colors[JKDefragStruct::COLORBUSY];
-			emptyCluster = false;
-		}
-		else if (clusterUnmovable == 1)
-		{
-			col = Colors[JKDefragStruct::COLORUNMOVABLE];
-			emptyCluster = false;
-		}
-		else if (clusterFragmented == 1)
-		{
-			col = Colors[JKDefragStruct::COLORFRAGMENTED];
-			emptyCluster = false;
-		}
-		else if (clusterMft == 1)
-		{
-			col = Colors[JKDefragStruct::COLORMFT];
-			emptyCluster = false;
-		}
-		else if (clusterUnfragmented == 1)
-		{
-			col = Colors[JKDefragStruct::COLORUNFRAGMENTED];
-			emptyCluster = false;
-		}
-		else if (clusterSpacehog == 1)
-		{
-			col = Colors[JKDefragStruct::COLORSPACEHOG];
-			emptyCluster = false;
-		}
+        Color c1;
+        Color c2;
 
-		Color C1;
-		Color C2;
+        c1.SetFromCOLORREF(col);
 
-		C1.SetFromCOLORREF(col);
+        int rr = GetRValue(col) + 200;
+        rr = (rr > 255) ? 255 : rr;
 
-		int RR = GetRValue(col) + 200;
-		RR = (RR > 255) ? 255 : RR;
+        int gg = GetGValue(col) + 200;
+        gg = (gg > 255) ? 255 : gg;
 
-		int GG = GetGValue(col) + 200;
-		GG = (GG > 255) ? 255 : GG;
+        int bb = GetBValue(col) + 100;
+        bb = (bb > 255) ? 255 : bb;
 
-		int BB = GetBValue(col) + 100;
-		BB = (BB > 255) ? 255 : BB;
+        c2.SetFromCOLORREF(RGB((byte)rr, (byte)gg, (byte)bb));
 
-		C2.SetFromCOLORREF(RGB((byte)RR, (byte)GG, (byte)BB));
+        if (empty_cluster) {
+            Rect draw_area2(xx3, yy3, square_size_ - 0, square_size_ - 0);
 
-		if (emptyCluster)
-		{
-			Rect drawArea2(xx1, yy1, m_squareSize - 0, m_squareSize - 0);
+            LinearGradientBrush bb2(draw_area2, c1, c2, LinearGradientModeVertical);
+            graphics->FillRectangle(&bb2, draw_area2);
 
-			LinearGradientBrush BB2(drawArea2,C1,C2,LinearGradientModeVertical);
-			graphics->FillRectangle(&BB2, drawArea2);
+            int line_x1 = draw_area2.X;
+            int line_y1 = draw_area2.Y;
+            int line_x2 = draw_area2.X + square_size_ - 1;
+            int line_y2 = draw_area2.Y;
+            int line_x3 = draw_area2.X;
+            int line_y3 = draw_area2.Y + square_size_ - 1;
+            int line_x4 = draw_area2.X + square_size_ - 1;
+            int line_y4 = draw_area2.Y + square_size_ - 1;
 
-			int lineX1 = drawArea2.X;
-			int lineY1 = drawArea2.Y;
-			int lineX2 = drawArea2.X + m_squareSize - 1;
-			int lineY2 = drawArea2.Y;
-			int lineX3 = drawArea2.X;
-			int lineY3 = drawArea2.Y + m_squareSize - 1;
-			int lineX4 = drawArea2.X + m_squareSize - 1;
-			int lineY4 = drawArea2.Y + m_squareSize - 1;
+            graphics->DrawLine(&pen_empty, line_x1, line_y1, line_x2, line_y2);
+            graphics->DrawLine(&pen, line_x3, line_y3, line_x4, line_y4);
+        }
+        else {
+            Rect draw_area2(xx3, yy3, square_size_ - 0, square_size_ - 0);
 
-			graphics->DrawLine(&penEmpty, lineX1, lineY1, lineX2, lineY2);
-			graphics->DrawLine(&pen, lineX3, lineY3, lineX4, lineY4);
-		}
-		else
-		{
-			Rect drawArea2(xx1, yy1, m_squareSize - 0, m_squareSize - 0);
+            LinearGradientBrush bb1(draw_area2, c2, c1, LinearGradientModeForwardDiagonal);
 
-			LinearGradientBrush BB1(drawArea2,C2,C1,LinearGradientModeForwardDiagonal);
+            graphics->FillRectangle(&bb1, draw_area2);
 
-			graphics->FillRectangle(&BB1, drawArea2);
+            int line_x1 = draw_area2.X;
+            int line_y1 = draw_area2.Y + square_size_ - 1;
+            int line_x2 = draw_area2.X + square_size_ - 1;
+            int line_y2 = draw_area2.Y;
+            int line_x3 = draw_area2.X + square_size_ - 1;
+            int line_y3 = draw_area2.Y + square_size_ - 1;
 
-			int lineX1 = drawArea2.X;
-			int lineY1 = drawArea2.Y + m_squareSize - 1;
-			int lineX2 = drawArea2.X + m_squareSize - 1;
-			int lineY2 = drawArea2.Y;
-			int lineX3 = drawArea2.X + m_squareSize - 1;
-			int lineY3 = drawArea2.Y + m_squareSize - 1;
+            graphics->DrawLine(&pen, line_x1, line_y1, line_x3, line_y3);
+            graphics->DrawLine(&pen, line_x2, line_y2, line_x3, line_y3);
+        }
+    }
 
-			graphics->DrawLine(&pen, lineX1, lineY1, lineX3, lineY3);
-			graphics->DrawLine(&pen, lineX2, lineY2, lineX3, lineY3);
-		}
-
-	}
-
-	delete graphics;
-
+    delete graphics;
 }
 
-void JKDefragGui::OnPaint(HDC hdc)
-{
-/*
-	Bitmap bmp(m_clientWindowSize.Width, m_clientWindowSize.Height);
+void DefragGui::on_paint(HDC dc) const {
+    /*
+        Bitmap bmp(m_clientWindowSize.Width, m_clientWindowSize.Height);
+    
+        Graphics *graphics2 = Graphics::FromImage(&bmp);
+    */
 
-	Graphics *graphics2 = Graphics::FromImage(&bmp);
-*/
+    Graphics graphics(dc);
 
-	Graphics graphics(hdc);
+    /*
+        graphics2->DrawImage(m_bmp,0,0);
+    */
 
-/*
-	graphics2->DrawImage(m_bmp,0,0);
-*/
+    /*
+        Color busyColor(128,128,128,128);
+    
+        SolidBrush busyBrush(busyColor);
+    
+        Rect rr = Rect(100, 100, 400, 100);
+    
+        graphics2->FillRectangle(&busyBrush, rr);
+    
+        SolidBrush brush(Color::White);
+    
+        FontFamily fontFamily(L"Tahoma");
+        Font       font(&fontFamily,12,FontStyleRegular, UnitPixel);
+        PointF     pointF(132.0f, 120.0f);
+    
+        WCHAR      *text;
+    
+        text = Messages[2];
+    
+        graphics2->DrawString(text, -1, &font, pointF, &brush);
+    */
 
-/*
-	Color busyColor(128,128,128,128);
+    graphics.DrawImage(bmp_, 0, 0);
 
-	SolidBrush busyBrush(busyColor);
+    /*
+        delete graphics2;
+    */
 
-	Rect rr = Rect(100, 100, 400, 100);
-
-	graphics2->FillRectangle(&busyBrush, rr);
-
-	SolidBrush brush(Color::White);
-
-	FontFamily fontFamily(L"Tahoma");
-	Font       font(&fontFamily,12,FontStyleRegular, UnitPixel);
-	PointF     pointF(132.0f, 120.0f);
-
-	WCHAR      *text;
-
-	text = Messages[2];
-
-	graphics2->DrawString(text, -1, &font, pointF, &brush);
-*/
-
-	graphics.DrawImage(m_bmp,0,0);
-
-/*
-	delete graphics2;
-*/
-
-	return;
+    return;
 }
 
 /* Message handler. */
-LRESULT CALLBACK JKDefragGui::ProcessMessagefn(HWND hWnd, UINT Message, WPARAM wParam, LPARAM lParam)
-{
-	switch(Message)
-	{
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
+LRESULT CALLBACK DefragGui::process_messagefn(const HWND wnd, const UINT message, const WPARAM w_param,
+                                              const LPARAM l_param) {
+    switch (message) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
 
-	case WM_TIMER:
+    case WM_TIMER:
 
-/*
-		if (wParam == 333)
-		{
-			PAINTSTRUCT ps;
-
-			WaitForSingleObject(m_jkDefragGui->m_displayMutex,100);
-
-			m_jkDefragGui->m_displayMutex = CreateMutex(NULL,FALSE,"JKDefrag");
-
-			m_jkDefragGui->m_hDC = BeginPaint(hWnd, &ps);
-
-			m_jkDefragGui->setDisplayData(m_jkDefragGui->m_hDC);
-
-			m_jkDefragGui->FillSquares( 0, m_jkDefragGui->m_numDiskSquares);
-
-			m_jkDefragGui->PaintImage(m_jkDefragGui->m_hDC);
-
-			EndPaint(hWnd, &ps);
-
-			ReleaseMutex(m_jkDefragGui->m_displayMutex);
-
-			KillTimer(m_jkDefragGui->m_hWnd, m_jkDefragGui->m_sizeTimer);
-		}
-*/
-
-
-		InvalidateRect(hWnd,NULL,FALSE);
-
-		return 0;
-
-	case WM_PAINT:
-		{
-			/* Grab the display mutex, to make sure that we are the only thread changing the window. */
-			WaitForSingleObject(m_jkDefragGui->m_displayMutex,100);
-
-			m_jkDefragGui->m_displayMutex = CreateMutex(NULL,FALSE,"JKDefrag");
-
-			PAINTSTRUCT ps;
-
-			m_jkDefragGui->m_hDC = BeginPaint(hWnd, &ps);
-
-			m_jkDefragGui->OnPaint(m_jkDefragGui->m_hDC);
-
-			EndPaint(hWnd, &ps);
-
-			ReleaseMutex(m_jkDefragGui->m_displayMutex);
-		}
-
-		return 0;
+        /*
+                if (wParam == 333)
+                {
+                    PAINTSTRUCT ps;
+        
+                    WaitForSingleObject(m_jkDefragGui->m_displayMutex,100);
+        
+                    m_jkDefragGui->m_displayMutex = CreateMutex(nullptr,FALSE,"JKDefrag");
+        
+                    m_jkDefragGui->m_hDC = BeginPaint(hWnd, &ps);
+        
+                    m_jkDefragGui->setDisplayData(m_jkDefragGui->m_hDC);
+        
+                    m_jkDefragGui->FillSquares( 0, m_jkDefragGui->m_numDiskSquares);
+        
+                    m_jkDefragGui->PaintImage(m_jkDefragGui->m_hDC);
+        
+                    EndPaint(hWnd, &ps);
+        
+                    ReleaseMutex(m_jkDefragGui->m_displayMutex);
+        
+                    KillTimer(m_jkDefragGui->m_hWnd, m_jkDefragGui->m_sizeTimer);
+                }
+        */
 
 
-	case WM_ERASEBKGND:
-		{
-//			m_jkDefragGui->RedrawScreen = 0;
-			InvalidateRect(m_jkDefragGui->m_hWnd,NULL,FALSE);
-		}
+        InvalidateRect(wnd, nullptr,FALSE);
 
-		return 0;
-/*
-	case WM_WINDOWPOSCHANGED:
-		{
-			m_jkDefragGui->RedrawScreen = 0;
-			InvalidateRect(m_jkDefragGui->m_hWnd,NULL,FALSE);
-		}
+        return 0;
 
-		return 0;
-*/
+    case WM_PAINT: {
+        /* Grab the display mutex, to make sure that we are the only thread changing the window. */
+        WaitForSingleObject(gui_->display_mutex_, 100);
 
-	case WM_SIZE:
-		{
+        gui_->display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
-/*
-			m_jkDefragGui->m_sizeTimer = SetTimer(m_jkDefragGui->m_hWnd,333,500,NULL);
-*/
+        PAINTSTRUCT ps;
 
+        gui_->dc_ = BeginPaint(wnd, &ps);
+
+        gui_->on_paint(gui_->dc_);
+
+        EndPaint(wnd, &ps);
+
+        ReleaseMutex(gui_->display_mutex_);
+    }
+
+        return 0;
 
 
-			PAINTSTRUCT ps;
+    case WM_ERASEBKGND: {
+        //			m_jkDefragGui->RedrawScreen = 0;
+        InvalidateRect(gui_->wnd_, nullptr,FALSE);
+    }
 
-			WaitForSingleObject(m_jkDefragGui->m_displayMutex,100);
+        return 0;
+    /*
+        case WM_WINDOWPOSCHANGED:
+            {
+                m_jkDefragGui->RedrawScreen = 0;
+                InvalidateRect(m_jkDefragGui->m_hWnd,nullptr,FALSE);
+            }
+    
+            return 0;
+    */
 
-			m_jkDefragGui->m_displayMutex = CreateMutex(NULL,FALSE,"JKDefrag");
+    case WM_SIZE: {
+        /*
+                    m_jkDefragGui->m_sizeTimer = SetTimer(m_jkDefragGui->m_hWnd,333,500,nullptr);
+        */
 
-			m_jkDefragGui->m_hDC = BeginPaint(hWnd, &ps);
 
-			m_jkDefragGui->setDisplayData(m_jkDefragGui->m_hDC);
+        PAINTSTRUCT ps;
 
-			m_jkDefragGui->FillSquares( 0, m_jkDefragGui->m_numDiskSquares);
+        WaitForSingleObject(gui_->display_mutex_, 100);
 
-			m_jkDefragGui->PaintImage(m_jkDefragGui->m_hDC);
+        gui_->display_mutex_ = CreateMutex(nullptr,FALSE, "JKDefrag");
 
-			EndPaint(hWnd, &ps);
+        gui_->dc_ = BeginPaint(wnd, &ps);
 
-			ReleaseMutex(m_jkDefragGui->m_displayMutex);
+        gui_->set_display_data(gui_->dc_);
 
-		}
+        gui_->fill_squares(0, gui_->num_disk_squares_);
 
-		return 0;
-	}
+        gui_->paint_image(gui_->dc_);
 
-	return(DefWindowProc(hWnd,Message,wParam,lParam));
+        EndPaint(wnd, &ps);
+
+        ReleaseMutex(gui_->display_mutex_);
+    }
+
+        return 0;
+    }
+
+    return (DefWindowProc(wnd, message, w_param, l_param));
 }
 
-void JKDefragGui::FillSquares( int clusterStartSquareNum, int clusterEndSquareNum )
-{
-	float clusterPerSquare = (float)(m_numClusters / m_numDiskSquares);
+void DefragGui::fill_squares(int clusterStartSquareNum, int clusterEndSquareNum) {
+    float clusterPerSquare = (float)(num_clusters_ / num_disk_squares_);
 
-	for(int ii = clusterStartSquareNum; ii <= clusterEndSquareNum; ii++)
-	{
-		byte currentColor = JKDefragStruct::COLOREMPTY;
+    for (int ii = clusterStartSquareNum; ii <= clusterEndSquareNum; ii++) {
+        byte currentColor = DefragStruct::COLOREMPTY;
 
-		byte clusterEmpty = 0;
-		byte clusterAllocated = 0;
-		byte clusterUnfragmented = 0;
-		byte clusterUnmovable= 0;
-		byte clusterFragmented = 0;
-		byte clusterBusy = 0;
-		byte clusterMft = 0;
-		byte clusterSpacehog = 0;
+        byte clusterEmpty = 0;
+        byte clusterAllocated = 0;
+        byte clusterUnfragmented = 0;
+        byte clusterUnmovable = 0;
+        byte clusterFragmented = 0;
+        byte clusterBusy = 0;
+        byte clusterMft = 0;
+        byte clusterSpacehog = 0;
 
-		for(int kk = (int)(ii * clusterPerSquare); kk < m_numClusters && kk < (int)((ii + 1) * clusterPerSquare); kk++)
-		{
-			switch (clusterInfo[kk])
-			{
-			case JKDefragStruct::COLOREMPTY:
-				clusterEmpty = 1;
-				break;
-			case JKDefragStruct::COLORALLOCATED:
-				clusterAllocated = 1;
-				break;
-			case JKDefragStruct::COLORUNFRAGMENTED:
-				clusterUnfragmented = 1;
-				break;
-			case JKDefragStruct::COLORUNMOVABLE:
-				clusterUnmovable = 1;
-				break;
-			case JKDefragStruct::COLORFRAGMENTED:
-				clusterFragmented = 1;
-				break;
-			case JKDefragStruct::COLORBUSY:
-				clusterBusy = 1;
-				break;
-			case JKDefragStruct::COLORMFT:
-				clusterMft = 1;
-				break;
-			case JKDefragStruct::COLORSPACEHOG:
-				clusterSpacehog = 1;
-				break;
-			}
-		}
+        for (int kk = (int)(ii * clusterPerSquare); kk < num_clusters_ && kk < (int)((ii + 1) * clusterPerSquare);
+             kk++) {
+            switch (cluster_info_[kk]) {
+            case DefragStruct::COLOREMPTY:
+                clusterEmpty = 1;
+                break;
+            case DefragStruct::COLORALLOCATED:
+                clusterAllocated = 1;
+                break;
+            case DefragStruct::COLORUNFRAGMENTED:
+                clusterUnfragmented = 1;
+                break;
+            case DefragStruct::COLORUNMOVABLE:
+                clusterUnmovable = 1;
+                break;
+            case DefragStruct::COLORFRAGMENTED:
+                clusterFragmented = 1;
+                break;
+            case DefragStruct::COLORBUSY:
+                clusterBusy = 1;
+                break;
+            case DefragStruct::COLORMFT:
+                clusterMft = 1;
+                break;
+            case DefragStruct::COLORSPACEHOG:
+                clusterSpacehog = 1;
+                break;
+            }
+        }
 
-		if (ii < m_numDiskSquares)
-		{
-			m_clusterSquares[ii].dirty = true;
-			m_clusterSquares[ii].color = //maxColor;
-				clusterEmpty << 7 |
-				clusterAllocated << 6 |
-				clusterUnfragmented << 5 |
-				clusterUnmovable << 4 |
-				clusterFragmented << 3 |
-				clusterBusy << 2 |
-				clusterMft << 1 |
-				clusterSpacehog;
-		}
-	}
+        if (ii < num_disk_squares_) {
+            cluster_squares_[ii].dirty_ = true;
+            cluster_squares_[ii].color_ = //maxColor;
+                    clusterEmpty << 7 |
+                    clusterAllocated << 6 |
+                    clusterUnfragmented << 5 |
+                    clusterUnmovable << 4 |
+                    clusterFragmented << 3 |
+                    clusterBusy << 2 |
+                    clusterMft << 1 |
+                    clusterSpacehog;
+        }
+    }
 }
 
 /*
@@ -1266,190 +1133,176 @@ without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no).
 
 */
-void JKDefragGui::ShowDiskmap(struct DefragDataStruct *Data)
-{
-	struct ItemStruct *Item;
+void DefragGui::ShowDiskmap(struct DefragDataStruct* Data) {
+    struct ItemStruct* Item;
 
-	STARTING_LCN_INPUT_BUFFER BitmapParam;
+    STARTING_LCN_INPUT_BUFFER BitmapParam;
 
-	struct
-	{
-		ULONG64 StartingLcn;
-		ULONG64 BitmapSize;
+    struct {
+        uint64_t StartingLcn;
+        uint64_t BitmapSize;
 
-		BYTE Buffer[65536];               /* Most efficient if binary multiple. */
-	} BitmapData;
+        BYTE Buffer[65536]; /* Most efficient if binary multiple. */
+    } BitmapData;
 
-	ULONG64 Lcn;
-	ULONG64 ClusterStart;
+    uint64_t Lcn;
+    uint64_t ClusterStart;
 
-	DWORD ErrorCode;
+    uint32_t ErrorCode;
 
-	int Index;
-	int IndexMax;
+    int Index;
+    int IndexMax;
 
-	BYTE Mask;
+    BYTE Mask;
 
-	int InUse;
-	int PrevInUse;
+    int InUse;
+    int PrevInUse;
 
-	DWORD w;
+    DWORD w;
 
-	int i;
+    int i;
 
-//	*Data->RedrawScreen = 2;                       /* Set the flag to "busy". */
+    //	*Data->RedrawScreen = 2;                       /* Set the flag to "busy". */
 
-	/* Exit if the library is not processing a disk yet. */
-	if (Data->Disk.VolumeHandle == NULL)
-	{
-//		*Data->RedrawScreen = 0;                       /* Set the flag to "no". */
-		return;
-	}
+    /* Exit if the library is not processing a disk yet. */
+    if (Data->disk_.volume_handle_ == nullptr) {
+        //		*Data->RedrawScreen = 0;                       /* Set the flag to "no". */
+        return;
+    }
 
-	/* Clear screen. */
-	ClearScreen(NULL);
+    /* Clear screen. */
+    clear_screen(nullptr);
 
-	/* Show the map of all the clusters in use. */
-	Lcn = 0;
-	ClusterStart = 0;
-	PrevInUse = 1;
+    /* Show the map of all the clusters in use. */
+    Lcn = 0;
+    ClusterStart = 0;
+    PrevInUse = 1;
 
-	do
-	{
-		if (*Data->Running != RUNNING) break;
-//		if (*Data->RedrawScreen != 2) break;
-		if (Data->Disk.VolumeHandle == INVALID_HANDLE_VALUE) break;
+    do {
+        if (*Data->running_ != RunningState::RUNNING) break;
+        //		if (*Data->RedrawScreen != 2) break;
+        if (Data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
-		/* Fetch a block of cluster data. */
-		BitmapParam.StartingLcn.QuadPart = Lcn;
+        /* Fetch a block of cluster data. */
+        BitmapParam.StartingLcn.QuadPart = Lcn;
 
-		ErrorCode = DeviceIoControl(Data->Disk.VolumeHandle,FSCTL_GET_VOLUME_BITMAP,
-			&BitmapParam,sizeof(BitmapParam),&BitmapData,sizeof(BitmapData),&w,NULL);
+        ErrorCode = DeviceIoControl(Data->disk_.volume_handle_,FSCTL_GET_VOLUME_BITMAP,
+                                    &BitmapParam, sizeof(BitmapParam), &BitmapData, sizeof(BitmapData), &w,
+                                    nullptr);
 
-		if (ErrorCode != 0)
-		{
-			ErrorCode = NO_ERROR;
-		}
-		else
-		{
-			ErrorCode = GetLastError();
-		}
+        if (ErrorCode != 0) {
+            ErrorCode = NO_ERROR;
+        }
+        else {
+            ErrorCode = GetLastError();
+        }
 
-		if ((ErrorCode != NO_ERROR) && (ErrorCode != ERROR_MORE_DATA)) break;
+        if ((ErrorCode != NO_ERROR) && (ErrorCode != ERROR_MORE_DATA)) break;
 
-		/* Sanity check. */
-		if (Lcn >= BitmapData.StartingLcn + BitmapData.BitmapSize) break;
+        /* Sanity check. */
+        if (Lcn >= BitmapData.StartingLcn + BitmapData.BitmapSize) break;
 
-		/* Analyze the clusterdata. We resume where the previous block left off. */
-		Lcn = BitmapData.StartingLcn;
-		Index = 0;
-		Mask = 1;
+        /* Analyze the clusterdata. We resume where the previous block left off. */
+        Lcn = BitmapData.StartingLcn;
+        Index = 0;
+        Mask = 1;
 
-		IndexMax = sizeof(BitmapData.Buffer);
+        IndexMax = sizeof(BitmapData.Buffer);
 
-		if (BitmapData.BitmapSize / 8 < IndexMax) IndexMax = (int)(BitmapData.BitmapSize / 8);
+        if (BitmapData.BitmapSize / 8 < IndexMax) IndexMax = (int)(BitmapData.BitmapSize / 8);
 
-		while ((Index < IndexMax) && (*Data->Running == RUNNING))
-		{
-			InUse = (BitmapData.Buffer[Index] & Mask);
+        while ((Index < IndexMax) && (*Data->running_ == RunningState::RUNNING)) {
+            InUse = (BitmapData.Buffer[Index] & Mask);
 
-			/* If at the beginning of the disk then copy the InUse value as our
-			starting value. */
-			if (Lcn == 0) PrevInUse = InUse;
+            /* If at the beginning of the disk then copy the InUse value as our
+            starting value. */
+            if (Lcn == 0) PrevInUse = InUse;
 
-			/* At the beginning and end of an Exclude draw the cluster. */
-			if ((Lcn == Data->MftExcludes[0].Start) || (Lcn == Data->MftExcludes[0].End) ||
-				(Lcn == Data->MftExcludes[1].Start) || (Lcn == Data->MftExcludes[1].End) ||
-				(Lcn == Data->MftExcludes[2].Start) || (Lcn == Data->MftExcludes[2].End))
-			{
-				if ((Lcn == Data->MftExcludes[0].End) ||
-					(Lcn == Data->MftExcludes[1].End) ||
-					(Lcn == Data->MftExcludes[2].End))
-				{
-					DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORUNMOVABLE);
-				}
-				else
-				if (PrevInUse == 0)
-				{
-					DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLOREMPTY);
-				}
-				else
-				{
-					DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORALLOCATED);
-				}
+            /* At the beginning and end of an Exclude draw the cluster. */
+            if ((Lcn == Data->mft_excludes_[0].Start) || (Lcn == Data->mft_excludes_[0].End) ||
+                (Lcn == Data->mft_excludes_[1].Start) || (Lcn == Data->mft_excludes_[1].End) ||
+                (Lcn == Data->mft_excludes_[2].Start) || (Lcn == Data->mft_excludes_[2].End)) {
+                if ((Lcn == Data->mft_excludes_[0].End) ||
+                    (Lcn == Data->mft_excludes_[1].End) ||
+                    (Lcn == Data->mft_excludes_[2].End)) {
+                    draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLORUNMOVABLE);
+                }
+                else if (PrevInUse == 0) {
+                    draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLOREMPTY);
+                }
+                else {
+                    draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLORALLOCATED);
+                }
 
-				InUse = 1;
-				PrevInUse = 1;
-				ClusterStart = Lcn;
-			}
+                InUse = 1;
+                PrevInUse = 1;
+                ClusterStart = Lcn;
+            }
 
-			if ((PrevInUse == 0) && (InUse != 0))          /* Free */
-			{
-				DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLOREMPTY);
+            if ((PrevInUse == 0) && (InUse != 0)) /* Free */
+            {
+                draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLOREMPTY);
 
-				ClusterStart = Lcn;
-			}
+                ClusterStart = Lcn;
+            }
 
-			if ((PrevInUse != 0) && (InUse == 0))          /* In use */
-			{
-				DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORALLOCATED);
+            if ((PrevInUse != 0) && (InUse == 0)) /* In use */
+            {
+                draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLORALLOCATED);
 
-				ClusterStart = Lcn;
-			}
+                ClusterStart = Lcn;
+            }
 
-			PrevInUse = InUse;
+            PrevInUse = InUse;
 
-			if (Mask == 128)
-			{
-				Mask = 1;
-				Index = Index + 1;
-			}
-			else
-			{
-				Mask = Mask << 1;
-			}
+            if (Mask == 128) {
+                Mask = 1;
+                Index = Index + 1;
+            }
+            else {
+                Mask = Mask << 1;
+            }
 
-			Lcn = Lcn + 1;
-		}
-	} while ((ErrorCode == ERROR_MORE_DATA) && (Lcn < BitmapData.StartingLcn + BitmapData.BitmapSize));
+            Lcn = Lcn + 1;
+        }
+    }
+    while ((ErrorCode == ERROR_MORE_DATA) && (Lcn < BitmapData.StartingLcn + BitmapData.BitmapSize));
 
-	if ((Lcn > 0)/* && (*Data->RedrawScreen == 2)*/)
-	{
-		if (PrevInUse == 0)          /* Free */
-		{
-			DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLOREMPTY);
-		}
+    if ((Lcn > 0)/* && (*Data->RedrawScreen == 2)*/) {
+        if (PrevInUse == 0) /* Free */
+        {
+            draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLOREMPTY);
+        }
 
-		if (PrevInUse != 0)          /* In use */
-		{
-			DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORALLOCATED);
-		}
-	}
+        if (PrevInUse != 0) /* In use */
+        {
+            draw_cluster(Data, ClusterStart, Lcn, DefragStruct::COLORALLOCATED);
+        }
+    }
 
-	/* Show the MFT zones. */
-	for (i = 0; i < 3; i++)
-	{
-//		if (*Data->RedrawScreen != 2) break;
-		if (Data->MftExcludes[i].Start <= 0) continue;
+    /* Show the MFT zones. */
+    for (i = 0; i < 3; i++) {
+        //		if (*Data->RedrawScreen != 2) break;
+        if (Data->mft_excludes_[i].Start <= 0) continue;
 
-		DrawCluster(Data,Data->MftExcludes[i].Start, Data->MftExcludes[i].End, JKDefragStruct::COLORMFT);
-	}
+        draw_cluster(Data, Data->mft_excludes_[i].Start, Data->mft_excludes_[i].End, DefragStruct::COLORMFT);
+    }
 
-	/* Colorize all the files on the screen.
-	Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
-	ignore it. */
-	for (Item = m_jkLib->TreeSmallest(Data->ItemTree); Item != NULL; Item = m_jkLib->TreeNext(Item))
-	{
-		if (*Data->Running != RUNNING) break;
-//		if (*Data->RedrawScreen != 2) break;
+    /* Colorize all the files on the screen.
+    Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
+    ignore it. */
+    for (Item = defrag_lib_->tree_smallest(Data->item_tree_); Item != nullptr; Item = defrag_lib_->TreeNext(Item)) {
+        if (*Data->running_ != RunningState::RUNNING) break;
+        //		if (*Data->RedrawScreen != 2) break;
 
-		if ((Item->LongFilename != NULL) &&
-			((_wcsicmp(Item->LongFilename,L"$BadClus") == 0) ||
-			(_wcsicmp(Item->LongFilename,L"$BadClus:$Bad:$DATA") == 0))) continue;
+        if ((Item->LongFilename != nullptr) &&
+            ((_wcsicmp(Item->LongFilename, L"$BadClus") == 0) ||
+                (_wcsicmp(Item->LongFilename, L"$BadClus:$Bad:$DATA") == 0)))
+            continue;
 
-		m_jkLib->ColorizeItem(Data,Item,0,0,NO);
-	}
+        defrag_lib_->ColorizeItem(Data, Item, 0, 0, false);
+    }
 
-	/* Set the flag to "no". */
-//	if (*Data->RedrawScreen == 2) *Data->RedrawScreen = 0;
+    /* Set the flag to "no". */
+    //	if (*Data->RedrawScreen == 2) *Data->RedrawScreen = 0;
 }

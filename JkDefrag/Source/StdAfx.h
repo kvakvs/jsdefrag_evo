@@ -1,6 +1,4 @@
-
-#ifndef __STDAFX_H__
-#define __STDAFX_H__
+#pragma once
 
 #define _WIN32_WINNT 0x0500
 
@@ -16,14 +14,12 @@ using namespace Gdiplus;
 #include <tlhelp32.h>                  /* CreateToolhelp32Snapshot() */
 
 #ifdef _DEBUG
-#include <dbghelp.h>                   /* SetUnhandledExceptionFilter() */
+#   include <dbghelp.h>                   /* SetUnhandledExceptionFilter() */
 #endif
 
-#include "JKDefragStruct.h"
-#include "JkDefragLib.h"
-#include "JKDefragLog.h"
+#include "DefragStruct.h"
+#include "DefragLib.h"
+#include "DefragLog.h"
 #include "ScanFat.h"
 #include "ScanNtfs.h"
-#include "JkDefragGui.h"
-
-#endif // __STDAFX_H__
+#include "DefragGui.h"

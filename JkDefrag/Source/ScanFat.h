@@ -99,14 +99,14 @@ struct FatLongNameDirStruct
 /* Struct used by the scanner to store disk information from the bootblock. */
 struct FatDiskInfoStruct
 {
-	ULONG64 BytesPerSector;
-	ULONG64 SectorsPerCluster;
-	ULONG64 TotalSectors;
-	ULONG64 RootDirSectors;
-	ULONG64 FirstDataSector;
-	ULONG64 FATSz;
-	ULONG64 DataSec;
-	ULONG64 CountofClusters;
+	uint64_t BytesPerSector;
+	uint64_t SectorsPerCluster;
+	uint64_t TotalSectors;
+	uint64_t RootDirSectors;
+	uint64_t FirstDataSector;
+	uint64_t FATSz;
+	uint64_t DataSec;
+	uint64_t CountofClusters;
 
 	union
 	{
@@ -130,15 +130,15 @@ public:
 private:
 
 	UCHAR CalculateShortNameCheckSum(UCHAR *Name);
-	ULONG64 ConvertTime(USHORT Date, USHORT Time, USHORT Time10);
-	void MakeFragmentList(struct DefragDataStruct *Data, struct FatDiskInfoStruct *DiskInfo, struct ItemStruct *Item, ULONG64 Cluster);
-	BYTE *LoadDirectory(struct DefragDataStruct *Data, struct FatDiskInfoStruct *DiskInfo, ULONG64 StartCluster, ULONG64 *OutLength);
-	void AnalyzeFatDirectory(struct DefragDataStruct *Data, struct FatDiskInfoStruct *DiskInfo, BYTE *Buffer, ULONG64 Length, struct ItemStruct *ParentDirectory);
+	uint64_t ConvertTime(USHORT Date, USHORT Time, USHORT Time10);
+	void MakeFragmentList(struct DefragDataStruct *Data, struct FatDiskInfoStruct *DiskInfo, struct ItemStruct *Item, uint64_t Cluster);
+	BYTE *LoadDirectory(struct DefragDataStruct *Data, struct FatDiskInfoStruct *DiskInfo, uint64_t StartCluster, uint64_t *OutLength);
+	void AnalyzeFatDirectory(struct DefragDataStruct *Data, struct FatDiskInfoStruct *DiskInfo, BYTE *Buffer, uint64_t Length, struct ItemStruct *ParentDirectory);
 
 	// static member that is an instance of itself
 	static JKScanFat *m_jkScanFat;
 
-	JKDefragLib *m_jkLib;
+	DefragLib *m_jkLib;
 };
 
 #endif
