@@ -1,5 +1,16 @@
-# JKDefrag-Original
-[C++] Latest Visual-Studio 2005/2008 Project Of JKDefrag Source-Code. Fixed (Will Compile 100%)
+# JKDefrag Evolution
+
+Built on top of last known open-source version of JKDefrag. Still works on Windows 10 and most certainly 11.
+
+* Modernizing source to build on latest Visual Studio 2019 + C++ 2017 standard. Slowly migrating data structures to C++ modern smart pointers and smart storage.
+* Created CMakelists and moved on to CLion.
+* Updated project to VS 2019.
+* [C++] Latest Visual-Studio 2005/2008 Project Of JKDefrag Source-Code. Fixed (Will Compile 100%)
+
+## Ideas
+
+* Continue modernizing the source.
+* Clean but simple UI.
 
 
 <hr/>
