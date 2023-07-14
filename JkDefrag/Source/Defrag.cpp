@@ -298,7 +298,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     DefragLib *defrag_lib = instance_->defrag_lib_;
 
     // Setup the defaults
-    optimize_mode.mode_ = OptimizeMode::AnalyzeFixupFastopt;
+    optimize_mode = OptimizeMode::AnalyzeFixupFastopt;
     // Range 0...100 
     int speed = 100;
     double free_space = 1;
@@ -329,7 +329,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     }
 
     /* Show some standard information in the logfile. */
-    log->log_message(defrag_struct->versiontext_);
+    log->log_string(defrag_struct->versiontext_.c_str());
     time(&now);
 
     localtime_s(&now_tm, &now);
@@ -357,37 +357,37 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     continue;
                 }
 
-                optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum) _wtol(argv[i]);
+                optimize_mode = (OptimizeMode) _wtol(argv[i]);
 
-                if (optimize_mode.mode_ < OptimizeMode::AnalyzeOnly || optimize_mode.mode_ >= OptimizeMode::Max) {
+                if (optimize_mode < OptimizeMode::AnalyzeOnly || optimize_mode >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
-                    optimize_mode.mode_ = OptimizeMode::DeprecatedAnalyzeFixupFull;
+                    optimize_mode = OptimizeMode::DeprecatedAnalyzeFixupFull;
                 }
 
                 // optimize_mode.mode_ = optimize_mode.mode_ - 1;
 
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-a' accepted, optimizemode = %u",
-                                optimize_mode.mode_ + 1);
+                                (int)optimize_mode + 1);
 
                 continue;
             }
 
             if (wcsncmp(argv[i], L"-a", 2) == 0) {
-                optimize_mode.mode_ = (OptimizeMode::OptimizeModeEnum) _wtol(&argv[i][2]);
+                optimize_mode = (OptimizeMode) _wtol(&argv[i][2]);
 
-                if (optimize_mode.mode_ < OptimizeMode::AnalyzeOnly || optimize_mode.mode_ >= OptimizeMode::Max) {
+                if (optimize_mode < OptimizeMode::AnalyzeOnly || optimize_mode >= OptimizeMode::Max) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
-                    optimize_mode.mode_ = OptimizeMode::DeprecatedAnalyzeFixupFull;
+                    optimize_mode = OptimizeMode::DeprecatedAnalyzeFixupFull;
                 }
 
                 // optimize_mode.mode_ = optimize_mode.mode_ - 1;
 
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-a' accepted, optimizemode = %u",
-                                optimize_mode.mode_ + 1);
+                                (int)optimize_mode + 1);
 
                 continue;
             }

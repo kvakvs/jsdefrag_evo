@@ -24,7 +24,7 @@ public:
     // Constructor and destructor
     DefragGui();
 
-    ~DefragGui();
+    ~DefragGui() = default;
 
     // Get instance of the class
     static DefragGui *get_instance();
@@ -43,7 +43,7 @@ public:
 
     void show_move(const ItemStruct *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
 
-    void ShowDiskmap(DefragDataStruct *Data);
+    void show_diskmap(DefragDataStruct *data);
 
     int initialize(HINSTANCE instance, int cmd_show, DefragLog *log, DebugLevel debug_level);
 
@@ -75,7 +75,7 @@ private:
     uint64_t progress_todo_{};            /* Number of clusters to do. */
     uint64_t progress_done_;            /* Number of clusters already done. */
 
-    DefragStruct *defrag_struct_;
+    std::unique_ptr<DefragStruct> defrag_struct_;
 
     /* graphics data */
 
@@ -103,7 +103,7 @@ private:
     int num_disk_squares_;
 
     // Color of each square in disk area and status if it is "dirty"
-    ClusterSquareStruct cluster_squares_[1000000]{};
+    std::vector<ClusterSquareStruct> cluster_squares_;
 
     // Color of each disk cluster
     std::unique_ptr<uint8_t> cluster_info_;
@@ -133,5 +133,5 @@ private:
     DefragLib *defrag_lib_;
 
     // static member that is an instance of itself
-    inline static std::unique_ptr<DefragGui> instance_;
+    static DefragGui *instance_;
 };

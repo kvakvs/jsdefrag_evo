@@ -16,3 +16,6 @@ enum class DebugLevel {
     // Detailed gap-finding messages.
     DetailedGapFinding = 6
 };
+
+#define APP_NAME "JkDefragEvo"
+#define APP_NAME_W L"JkDefragEvo"

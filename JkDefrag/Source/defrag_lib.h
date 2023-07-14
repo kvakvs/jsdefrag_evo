@@ -41,83 +41,31 @@ enum class RunningState {
     STOPPED = 2
 };
 
-struct OptimizeMode {
-    enum OptimizeModeEnum {
-        // Analyze only, do not defragment and do not optimize.
-        AnalyzeOnly = 0,
-        // Analyze and fixup, do not optimize.
-        AnalyzeFixup = 1,
-        // Analyze, fixup, and fast optimization(default).
-        AnalyzeFixupFastopt = 2,
-        // Deprecated.Analyze, fixup, and full optimization.
-        DeprecatedAnalyzeFixupFull = 3,
-        // Analyze and force together.
-        AnalyzeGroup = 4,
-        // Analyze and move to end of disk.
-        AnalyzeMoveToEnd = 5,
-        // Analyze and sort files by name.
-        AnalyzeSortByName = 6,
-        // Analyze and sort files by size(smallest first).
-        AnalyzeSortBySize = 7,
-        // Analyze and sort files by last access(newest first).
-        AnalyzeSortByAccess = 8,
-        // Analyze and sort files by last change(oldest first).
-        AnalyzeSortByChanged = 9,
-        // Analyze and sort files by creation time(oldest first).
-        AnalyzeSortByCreated = 10,
-        // 11 (unused?) - move to beginning of disk
-        Max
-    };
-
-    OptimizeModeEnum mode_;
-};
-
-/* List in memory of the fragments of a file. */
-
-struct FragmentListStruct {
-    uint64_t lcn_; /* Logical cluster number, location on disk. */
-    uint64_t next_vcn_; /* Virtual cluster number of next fragment. */
-    FragmentListStruct *next_;
-};
-
-/**
- * \brief List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
- */
-struct ItemStruct {
-    ItemStruct *parent_;
-    // Next smaller item
-    ItemStruct *smaller_;
-    // Next bigger item
-    ItemStruct *bigger_;
-
-    wchar_t *long_filename_;
-    // Full path on disk, long filenames.
-    wchar_t *long_path_;
-    // Short filename(8.3 DOS)
-    wchar_t *short_filename_;
-    // Full path on disk, short filenames
-    wchar_t *short_path_;
-
-    uint64_t bytes_;
-    uint64_t clusters_count_;
-    // Unit: Microseconds
-    uint64_t creation_time_;
-    uint64_t mft_change_time_;
-    uint64_t last_access_time_;
-
-    // List of fragments
-    FragmentListStruct *fragments_;
-
-    // The Inode number of the parent directory
-    uint64_t parent_inode_;
-
-    ItemStruct *parent_directory_;
-
-    bool is_dir_;
-    bool is_unmovable_;
-    bool is_excluded_;
-    // file to be moved to the end of disk
-    bool is_hog_;
+enum class OptimizeMode {
+    // Analyze only, do not defragment and do not optimize.
+    AnalyzeOnly = 0,
+    // Analyze and fixup, do not optimize.
+    AnalyzeFixup = 1,
+    // Analyze, fixup, and fast optimization(default).
+    AnalyzeFixupFastopt = 2,
+    // Deprecated.Analyze, fixup, and full optimization.
+    DeprecatedAnalyzeFixupFull = 3,
+    // Analyze and force together.
+    AnalyzeGroup = 4,
+    // Analyze and move to end of disk.
+    AnalyzeMoveToEnd = 5,
+    // Analyze and sort files by name.
+    AnalyzeSortByName = 6,
+    // Analyze and sort files by size(smallest first).
+    AnalyzeSortBySize = 7,
+    // Analyze and sort files by last access(newest first).
+    AnalyzeSortByAccess = 8,
+    // Analyze and sort files by last change(oldest first).
+    AnalyzeSortByChanged = 9,
+    // Analyze and sort files by creation time(oldest first).
+    AnalyzeSortByCreated = 10,
+    // 11 (unused?) - move to beginning of disk
+    Max
 };
 
 enum class DiskType {
@@ -285,9 +233,9 @@ public:
     static bool match_mask(const wchar_t *string, const wchar_t *mask);
 
     // static wchar_t** add_array_string(wchar_t** array, const wchar_t* new_string);
-    wchar_t *get_short_path(const DefragDataStruct *data, const ItemStruct *item);
+    std::wstring get_short_path(const DefragDataStruct *data, const ItemStruct *item);
 
-    wchar_t *get_long_path(const DefragDataStruct *data, const ItemStruct *item);
+    std::wstring get_long_path(const DefragDataStruct *data, const ItemStruct *item);
 
     static void slow_down(DefragDataStruct *data);
 
@@ -323,9 +271,9 @@ public:
 private:
     static wchar_t lower_case(wchar_t c);
 
-    void append_to_short_path(const ItemStruct *item, wchar_t *path, size_t length);
+    void append_to_short_path(const ItemStruct *item, std::wstring &path);
 
-    void append_to_long_path(const ItemStruct *item, wchar_t *path, size_t length);
+    void append_to_long_path(const ItemStruct *item, std::wstring &path);
 
     static uint64_t find_fragment_begin(const ItemStruct *item, uint64_t lcn);
 
@@ -392,9 +340,9 @@ private:
 
     [[maybe_unused]] void compare_items(DefragDataStruct *data, const ItemStruct *item) const;
 
-    int compare_items(ItemStruct *Item1, ItemStruct *Item2, int SortField);
+    int compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field);
 
-    void scan_dir(DefragDataStruct *Data, wchar_t *Mask, ItemStruct *ParentDirectory);
+    void scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct *parent_directory);
 
     void analyze_volume(DefragDataStruct *data);
 

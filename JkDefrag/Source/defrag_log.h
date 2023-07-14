@@ -16,7 +16,6 @@ public:
 
 private:
     std::wstring log_file_;
-    DefragLib *defrag_lib_;
 
     errno_t open_log_append(FILE *&fout) const;
 

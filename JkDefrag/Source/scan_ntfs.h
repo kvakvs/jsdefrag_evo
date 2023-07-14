@@ -366,14 +366,14 @@ private:
                                  uint32_t run_data_length, uint64_t offset, uint64_t wanted_length) const;
 
     static BOOL translate_rundata_to_fragmentlist(
-        const DefragDataStruct* data,
-        InodeDataStruct* inode_data,
-        wchar_t* stream_name,
-        ATTRIBUTE_TYPE stream_type,
-        const BYTE* run_data,
-        uint32_t run_data_length,
-        uint64_t starting_vcn,
-        uint64_t bytes);
+            const DefragDataStruct* data,
+            InodeDataStruct* inode_data,
+            const wchar_t *stream_name,
+            const ATTRIBUTE_TYPE stream_type,
+            const BYTE* run_data,
+            const uint32_t run_data_length,
+            const uint64_t starting_vcn,
+            const uint64_t bytes);
 
     void cleanup_streams(InodeDataStruct* InodeData, BOOL CleanupFragments);
 
@@ -397,17 +397,17 @@ private:
         int Depth);
 
     BOOL interpret_mft_record(
-        DefragDataStruct* Data,
-        NtfsDiskInfoStruct* DiskInfo,
-        ItemStruct** InodeArray,
-        uint64_t InodeNumber,
-        uint64_t MaxInode,
-        FragmentListStruct** MftDataFragments,
-        uint64_t* MftDataBytes,
-        FragmentListStruct** MftBitmapFragments,
+        DefragDataStruct* data,
+        NtfsDiskInfoStruct* disk_info,
+        ItemStruct** inode_array,
+        uint64_t inode_number,
+        uint64_t max_inode,
+        FragmentListStruct** mft_data_fragments,
+        uint64_t* mft_data_bytes,
+        FragmentListStruct** mft_bitmap_fragments,
         uint64_t* MftBitmapBytes,
-        BYTE* Buffer,
-        uint64_t BufLength);
+        BYTE* buffer,
+        uint64_t buf_length);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanNTFS> instance_;

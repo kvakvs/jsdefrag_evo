@@ -90,7 +90,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
             ((item_lcn >= data->mft_excludes_[0].start_ && item_lcn < data->mft_excludes_[0].end_) ||
              (item_lcn >= data->mft_excludes_[1].start_ && item_lcn < data->mft_excludes_[1].end_) ||
              (item_lcn >= data->mft_excludes_[2].start_ && item_lcn < data->mft_excludes_[2].end_))
-            && (data->disk_.type_ != DiskType::NTFS || !match_mask(item->long_path_, L"?:\\$MFT"))) {
+            && (data->disk_.type_ != DiskType::NTFS || !match_mask(item->get_long_path(), L"?:\\$MFT"))) {
             // "I am in MFT reserved space."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[54].c_str());
 
@@ -119,7 +119,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
 
         /* Ignore files that have been modified less than 15 minutes ago. */
         if (!item->is_dir_) {
-            result = GetFileAttributesExW(item->long_path_, GetFileExInfoStandard, &attributes);
+            result = GetFileAttributesExW(item->get_long_path(), GetFileExInfoStandard, &attributes);
 
             if (result != 0) {
                 u.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
@@ -497,7 +497,7 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
         }
 
         gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"data found at LCN=%I64u, %s", BiggerBegin,
-                        BiggerItem->long_path_);
+                        BiggerItem->get_long_path());
 
         /* Find the first gap above the lcn. */
         bool result = find_gap(data, lcn, 0, 0, true, false, &test_gap_begin, &test_gap_end, ignore_mft_excludes);
@@ -768,7 +768,7 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct *data) {
 
     /* Locate the Item for the MFT. If not found then exit. */
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
-        if (match_mask(item->long_path_, L"?:\\$MFT") == true) break;
+        if (match_mask(item->get_long_path(), L"?:\\$MFT")) break;
     }
 
     if (item == nullptr) {
@@ -1379,15 +1379,17 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     gui->show_debug(DebugLevel::Fatal, nullptr, L"Input mask: %s", data->include_mask_);
 
     /* Defragment and optimize. */
-    gui->ShowDiskmap(data);
+    gui->show_diskmap(data);
 
     if (*data->running_ == RunningState::RUNNING) analyze_volume(data);
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 1) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeFixup) {
         defragment(data);
     }
 
-    if (*data->running_ == RunningState::RUNNING && (opt_mode.mode_ == 2 || opt_mode.mode_ == 3)) {
+    if (*data->running_ == RunningState::RUNNING
+        && (opt_mode == OptimizeMode::AnalyzeFixupFastopt
+            || opt_mode == OptimizeMode::DeprecatedAnalyzeFixupFull)) {
         defragment(data);
 
         if (*data->running_ == RunningState::RUNNING) fixup(data);
@@ -1395,31 +1397,31 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         if (*data->running_ == RunningState::RUNNING) fixup(data); /* Again, in case of new zone startpoint. */
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 4) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeGroup) {
         forced_fill(data);
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 5) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeMoveToEnd) {
         optimize_up(data);
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 6) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByName) {
         optimize_sort(data, 0); /* Filename */
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 7) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortBySize) {
         optimize_sort(data, 1); /* Filesize */
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 8) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
         optimize_sort(data, 2); /* Last access */
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 9) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
         optimize_sort(data, 3); /* Last change */
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode.mode_ == 10) {
+    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
         optimize_sort(data, 4); /* Creation */
     }
     /*

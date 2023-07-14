@@ -15,6 +15,7 @@ set(HEADER_FILES
         ${SRC}/std_afx.h
         ${SRC}/scan_ntfs.h
         ${SRC}/scan_fat.h
+        ${SRC}/itemstruct.h
         ${SRC}/defrag_struct.h
         ${SRC}/defrag_log.h
         ${SRC}/defrag_lib.h
@@ -30,6 +31,7 @@ set(SOURCE_FILES
         ${SRC}/scan_fat.cpp
         ${SRC}/scan_ntfs.cpp
         ${SRC}/std_afx.cpp
+        ${SRC}/itemstruct.cpp
         ${SRC}/defrag_lib_finding.cpp
         ${SRC}/defrag_lib_methods.cpp
         ${SRC}/defrag_lib_moving.cpp

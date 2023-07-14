@@ -26,6 +26,8 @@ http://www.kessels.com/
 #include <optional>
 
 #include "defrag_data_struct.h"
+#include "defrag_lib.h"
+
 
 DefragLib::DefragLib() = default;
 
@@ -239,16 +241,11 @@ bool DefragLib::match_mask(const wchar_t *string, const wchar_t *mask) {
 
 
 /* Subfunction of GetShortPath(). */
-void DefragLib::append_to_short_path(const ItemStruct *item, wchar_t *path, const size_t length) {
-    if (item->parent_directory_ != nullptr) append_to_short_path(item->parent_directory_, path, length);
+void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path) {
+    if (item->parent_directory_ != nullptr) append_to_short_path(item->parent_directory_, path);
 
-    wcscat_s(path, length, L"\\");
-
-    if (item->short_filename_ != nullptr) {
-        wcscat_s(path, length, item->short_filename_);
-    } else if (item->long_filename_ != nullptr) {
-        wcscat_s(path, length, item->long_filename_);
-    }
+    path += L"\\";
+    path += item->get_short_fn(); // will append short if not empty otherwise will append long
 }
 
 /*
@@ -257,82 +254,53 @@ Return a string with the full path of an item, constructed from the short names.
 Return nullptr if error. The caller must free() the new string.
 
 */
-wchar_t *DefragLib::get_short_path(const DefragDataStruct *data, const ItemStruct *item) {
+std::wstring DefragLib::get_short_path(const DefragDataStruct *data, const ItemStruct *item) {
     /* Sanity check. */
-    if (item == nullptr) return nullptr;
+    if (item == nullptr) return {};
 
     /* Count the size of all the ShortFilename's. */
     size_t length = wcslen(data->disk_.mount_point_) + 1;
 
     for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
-        if (temp_item->short_filename_ != nullptr) {
-            length = length + wcslen(temp_item->short_filename_) + 1;
-        } else if (temp_item->long_filename_ != nullptr) {
-            length = length + wcslen(temp_item->long_filename_) + 1;
-        } else {
-            length = length + 1;
-        }
+        length = length + wcslen(temp_item->get_short_fn()) + 1;
     }
 
-    /* Allocate new string. */
-    const auto path = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    // Allocate new string
+    std::wstring path = data->disk_.mount_point_;
 
-    if (path == nullptr) return nullptr;
-
-    wcscpy_s(path, length, data->disk_.mount_point_);
-
-    /* Append all the strings. */
-    append_to_short_path(item, path, length);
+    // Append all the strings
+    append_to_short_path(item, path);
 
     return path;
 }
 
 /* Subfunction of GetLongPath(). */
-void DefragLib::append_to_long_path(const ItemStruct *item, wchar_t *path, const size_t length) {
-    if (item->parent_directory_ != nullptr) append_to_long_path(item->parent_directory_, path, length);
+void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) {
+    if (item->parent_directory_ != nullptr) append_to_long_path(item->parent_directory_, path);
 
-    wcscat_s(path, length, L"\\");
-
-    if (item->long_filename_ != nullptr) {
-        wcscat_s(path, length, item->long_filename_);
-    } else if (item->short_filename_ != nullptr) {
-        wcscat_s(path, length, item->short_filename_);
-    }
+    path += L"\\";
+    path += item->get_short_fn(); // will append long if not empty otherwise will append short
 }
 
 /*
-
 Return a string with the full path of an item, constructed from the long names.
 Return nullptr if error. The caller must free() the new string.
-
 */
-wchar_t *DefragLib::get_long_path(const DefragDataStruct *data, const ItemStruct *item) {
-    /* Sanity check. */
-    if (item == nullptr) return nullptr;
+std::wstring DefragLib::get_long_path(const DefragDataStruct *data, const ItemStruct *item) {
+    // Sanity check
+    if (item == nullptr) return {};
 
-    /* Count the size of all the LongFilename's. */
+    // Count the size of all the LongFilename's
     size_t length = wcslen(data->disk_.mount_point_) + 1;
 
-    for (const ItemStruct *temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
-        if (temp_item->long_filename_ != nullptr) {
-            length = length + wcslen(temp_item->long_filename_) + 1;
-        } else if (item->short_filename_ != nullptr) {
-            length = length + wcslen(temp_item->short_filename_) + 1;
-        } else {
-            length = length + 1;
-        }
+    for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
+        length += wcslen(temp_item->get_long_fn()) + 1;
     }
 
-    /* Allocate new string. */
-    const auto path = (wchar_t *) malloc(sizeof(wchar_t) * length);
+    std::wstring path = data->disk_.mount_point_;
 
-    if (path == nullptr) return nullptr;
-
-    wcscpy_s(path, length, data->disk_.mount_point_);
-
-    /* Append all the strings. */
-    append_to_long_path(item, path, length);
-
+    // Append all the strings
+    append_to_long_path(item, path);
     return path;
 }
 
@@ -393,10 +361,10 @@ opened then show an error message and return nullptr.
 HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruct *item) {
     HANDLE file_handle;
     wchar_t error_string[BUFSIZ];
-    const size_t length = wcslen(item->long_path_) + 5;
+    const size_t length = wcslen(item->get_long_path()) + 5;
     auto path = (wchar_t *) malloc(sizeof(wchar_t) * length);
 
-    swprintf_s(path, length, L"\\\\?\\%s", item->long_path_);
+    swprintf_s(path, length, L"\\\\?\\%s", item->get_long_path());
 
     if (item->is_dir_) {
         file_handle = CreateFileW(path, GENERIC_READ,
@@ -417,7 +385,7 @@ HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruc
 
     DefragGui *jkGui = DefragGui::get_instance();
 
-    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15].c_str(), item->long_path_,
+    jkGui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15].c_str(), item->get_long_path(),
                       error_string);
 
     return nullptr;
@@ -484,7 +452,7 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
     }
 
     /* Show debug message: "Getting cluster bitmap: %s" */
-    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[10].c_str(), item->long_path_);
+    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[10].c_str(), item->get_long_path());
 
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
@@ -578,7 +546,7 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
         /* Show debug message: "Cannot process clustermap of '%s': %s" */
         system_error_str(error_code, error_string, BUFSIZ);
 
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[43].c_str(), item->long_path_,
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[43].c_str(), item->get_long_path(),
                         error_string);
 
         return false;
@@ -1029,9 +997,8 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     data->count_fragmented_clusters_ = 0;
 
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
-        if (item->long_filename_ != nullptr &&
-            (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
-             _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+        if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
+             _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
         }
 
@@ -1085,9 +1052,8 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     int64_t count = 0;
 
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
-        if (item->long_filename_ != nullptr &&
-            (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
-             _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+        if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
+             _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
         }
 
@@ -1101,9 +1067,8 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
         int64_t sum = 0;
 
         for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
-            if (item->long_filename_ != nullptr &&
-                (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
-                 _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+            if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
+                 _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;
             }
 
@@ -1369,3 +1334,4 @@ void DefragLib::stop_jk_defrag(RunningState *run_state, int time_out) {
         if (time_out > 0) time_waited = time_waited + 100;
     }
 }
+

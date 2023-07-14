@@ -154,39 +154,32 @@ link. */
 
     BY_HANDLE_FILE_INFORMATION file_information;
     uint64_t vcn;
-
-    FragmentListStruct *Fragment;
-    FragmentListStruct *LastFragment;
-
-    uint32_t ErrorCode;
-
-    wchar_t ErrorString[BUFSIZ];
-
-    int MaxLoop;
-
+    FragmentListStruct *fragment;
+    FragmentListStruct *last_fragment;
+    uint32_t error_code;
+    wchar_t error_string[BUFSIZ];
+    int max_loop;
     ULARGE_INTEGER u;
-
     uint32_t i;
     DWORD w;
+    DefragGui *gui = DefragGui::get_instance();
 
-    DefragGui *jkGui = DefragGui::get_instance();
-
-    jkGui->show_debug(DebugLevel::Fatal, nullptr, L"%I64u %s", get_item_lcn(item), item->long_filename_);
+    gui->show_debug(DebugLevel::Fatal, nullptr, L"%I64u %s", get_item_lcn(item), item->get_long_fn());
 
     if (!item->is_dir_) {
-        file_handle = CreateFileW(item->long_path_, FILE_READ_ATTRIBUTES,
+        file_handle = CreateFileW(item->get_long_path(), FILE_READ_ATTRIBUTES,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr);
     } else {
-        file_handle = CreateFileW(item->long_path_, GENERIC_READ,
+        file_handle = CreateFileW(item->get_long_path(), GENERIC_READ,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     }
 
     if (file_handle == INVALID_HANDLE_VALUE) {
-        system_error_str(GetLastError(), ErrorString, BUFSIZ);
+        system_error_str(GetLastError(), error_string, BUFSIZ);
 
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Could not open: %s", ErrorString);
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"  Could not open: %s", error_string);
 
         return;
     }
@@ -197,41 +190,41 @@ link. */
         u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
         if (item->creation_time_ != u.QuadPart) {
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different CreationTime %I64u <> %I64u = %I64u",
-                              item->creation_time_, u.QuadPart, item->creation_time_ - u.QuadPart);
+            gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different CreationTime %I64u <> %I64u = %I64u",
+                            item->creation_time_, u.QuadPart, item->creation_time_ - u.QuadPart);
         }
 
         u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
         u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
         if (item->last_access_time_ != u.QuadPart) {
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LastAccessTime %I64u <> %I64u = %I64u",
-                              item->last_access_time_, u.QuadPart, item->last_access_time_ - u.QuadPart);
+            gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LastAccessTime %I64u <> %I64u = %I64u",
+                            item->last_access_time_, u.QuadPart, item->last_access_time_ - u.QuadPart);
         }
     }
 
 #ifdef jk
     Vcn = 0;
-    for (Fragment = Item->Fragments; Fragment != nullptr; Fragment = Fragment->Next) {
-        if (Fragment->Lcn != VIRTUALFRAGMENT) {
+    for (fragment = Item->Fragments; fragment != nullptr; fragment = fragment->Next) {
+        if (fragment->Lcn != VIRTUALFRAGMENT) {
             Data->ShowDebug(DebugLevel::Fatal,nullptr,L"  Extent 1: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u",
-                Fragment->Lcn,Vcn,Fragment->NextVcn);
+                fragment->Lcn,Vcn,fragment->NextVcn);
         } else {
             Data->ShowDebug(DebugLevel::Fatal,nullptr,L"  Extent 1 (virtual): Vcn=%I64u, NextVcn=%I64u",
-                Vcn,Fragment->NextVcn);
+                Vcn,fragment->NextVcn);
         }
-        Vcn = Fragment->NextVcn;
+        Vcn = fragment->NextVcn;
     }
 #endif
 
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
     fixed size, so we may have to loop a couple of times. */
-    Fragment = item->fragments_;
+    fragment = item->fragments_;
     clusters = 0;
     vcn = 0;
-    MaxLoop = 1000;
-    LastFragment = nullptr;
+    max_loop = 1000;
+    last_fragment = nullptr;
 
     do {
         /* I strongly suspect that the FSCTL_GET_RETRIEVAL_POINTERS system call
@@ -240,29 +233,29 @@ link. */
         therefore added a loop counter that will limit the loop to 1000
         iterations. This means the defragger cannot handle files with more
         than 100000 fragments, though. */
-        if (MaxLoop <= 0) {
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
+        if (max_loop <= 0) {
+            gui->show_debug(DebugLevel::Fatal, nullptr, L"  FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
 
             return;
         }
 
-        MaxLoop = MaxLoop - 1;
+        max_loop = max_loop - 1;
 
         /* Ask Windows for the (next segment of the) clustermap of this file. If error
         then leave the loop. */
         retrieve_param.StartingVcn.QuadPart = vcn;
 
-        ErrorCode = DeviceIoControl(file_handle, FSCTL_GET_RETRIEVAL_POINTERS,
-                                    &retrieve_param, sizeof retrieve_param, &extent_data, sizeof extent_data, &w,
-                                    nullptr);
+        error_code = DeviceIoControl(file_handle, FSCTL_GET_RETRIEVAL_POINTERS,
+                                     &retrieve_param, sizeof retrieve_param, &extent_data, sizeof extent_data, &w,
+                                     nullptr);
 
-        if (ErrorCode != 0) {
-            ErrorCode = NO_ERROR;
+        if (error_code != 0) {
+            error_code = NO_ERROR;
         } else {
-            ErrorCode = GetLastError();
+            error_code = GetLastError();
         }
 
-        if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) break;
+        if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
         /* Walk through the clustermap, count the total number of clusters, and
         save all fragments in memory. */
@@ -287,20 +280,20 @@ link. */
             }
 
             /* Compare the fragment. */
-            if (Fragment == nullptr) {
-                jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
+            if (fragment == nullptr) {
+                gui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             } else {
-                if (Fragment->lcn_ != extent_data.extents_[i].lcn_) {
-                    jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LCN in fragment: %I64u <> %I64u",
-                                      Fragment->lcn_, extent_data.extents_[i].lcn_);
+                if (fragment->lcn_ != extent_data.extents_[i].lcn_) {
+                    gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LCN in fragment: %I64u <> %I64u",
+                                    fragment->lcn_, extent_data.extents_[i].lcn_);
                 }
 
-                if (Fragment->next_vcn_ != extent_data.extents_[i].next_vcn_) {
-                    jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different NextVcn in fragment: %I64u <> %I64u",
-                                      Fragment->next_vcn_, extent_data.extents_[i].next_vcn_);
+                if (fragment->next_vcn_ != extent_data.extents_[i].next_vcn_) {
+                    gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different NextVcn in fragment: %I64u <> %I64u",
+                                    fragment->next_vcn_, extent_data.extents_[i].next_vcn_);
                 }
 
-                Fragment = Fragment->next_;
+                fragment = fragment->next_;
             }
 
             /* The Vcn of the next fragment is the NextVcn field in this record. */
@@ -308,102 +301,94 @@ link. */
         }
 
         /* Loop until we have processed the entire clustermap of the file. */
-    } while (ErrorCode == ERROR_MORE_DATA);
+    } while (error_code == ERROR_MORE_DATA);
 
     /* If there was an error while reading the clustermap then return false. */
-    if (ErrorCode != NO_ERROR && ErrorCode != ERROR_HANDLE_EOF) {
-        system_error_str(ErrorCode, ErrorString, BUFSIZ);
+    if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
+        system_error_str(error_code, error_string, BUFSIZ);
 
-        jkGui->show_debug(DebugLevel::Fatal, item, L"  Error while processing clustermap: %s", ErrorString);
+        gui->show_debug(DebugLevel::Fatal, item, L"  Error while processing clustermap: %s", error_string);
 
         return;
     }
 
-    if (Fragment != nullptr) {
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment from MFT");
+    if (fragment != nullptr) {
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment from MFT");
     }
 
     if (item->clusters_count_ != clusters) {
-        jkGui->show_debug(DebugLevel::Fatal, nullptr, L"  Different cluster count: %I64u <> %I64u",
-                          item->clusters_count_, clusters);
+        gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different cluster count: %I64u <> %I64u",
+                        item->clusters_count_, clusters);
     }
 }
 
 /* Compare two items.
-SortField=0    Filename
-SortField=1    Filesize, smallest first
-SortField=2    Date/Time LastAccess, oldest first
-SortField=3    Date/Time LastChange, oldest first
-SortField=4    Date/Time Creation, oldest first
+sort_field=0    Filename
+sort_field=1    Filesize, smallest first
+sort_field=2    Date/Time LastAccess, oldest first
+sort_field=3    Date/Time LastChange, oldest first
+sort_field=4    Date/Time Creation, oldest first
 Return values:
--1   Item1 is smaller than Item2
+-1   item_1 is smaller than item_2
 0    Equal
-1    Item1 is bigger than Item2
+1    item_1 is bigger than item_2
 */
-int DefragLib::compare_items(ItemStruct *Item1, ItemStruct *Item2, int SortField) {
-    int Result;
+int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field) {
+    int result;
 
     /* If one of the items is nullptr then the other item is bigger. */
-    if (Item1 == nullptr) return -1;
-    if (Item2 == nullptr) return 1;
+    if (item_1 == nullptr) return -1;
+    if (item_2 == nullptr) return 1;
 
     /* Return zero if the items are exactly the same. */
-    if (Item1 == Item2) return 0;
+    if (item_1 == item_2) return 0;
 
-    /* Compare the SortField of the items and return 1 or -1 if they are not equal. */
-    if (SortField == 0) {
-        if (Item1->long_path_ == nullptr && Item2->long_path_ == nullptr) return 0;
-        if (Item1->long_path_ == nullptr) return -1;
-        if (Item2->long_path_ == nullptr) return 1;
-
-        Result = _wcsicmp(Item1->long_path_, Item2->long_path_);
-
-        if (Result != 0) return Result;
+    /* Compare the sort_field of the items and return 1 or -1 if they are not equal. */
+    if (sort_field == 0) {
+        result = _wcsicmp(item_1->get_long_path(), item_2->get_long_path());
+        if (result != 0) return result;
     }
 
-    if (SortField == 1) {
-        if (Item1->bytes_ < Item2->bytes_) return -1;
-        if (Item1->bytes_ > Item2->bytes_) return 1;
+    if (sort_field == 1) {
+        if (item_1->bytes_ < item_2->bytes_) return -1;
+        if (item_1->bytes_ > item_2->bytes_) return 1;
     }
 
-    if (SortField == 2) {
-        if (Item1->last_access_time_ > Item2->last_access_time_) return -1;
-        if (Item1->last_access_time_ < Item2->last_access_time_) return 1;
+    if (sort_field == 2) {
+        if (item_1->last_access_time_ > item_2->last_access_time_) return -1;
+        if (item_1->last_access_time_ < item_2->last_access_time_) return 1;
     }
 
-    if (SortField == 3) {
-        if (Item1->mft_change_time_ < Item2->mft_change_time_) return -1;
-        if (Item1->mft_change_time_ > Item2->mft_change_time_) return 1;
+    if (sort_field == 3) {
+        if (item_1->mft_change_time_ < item_2->mft_change_time_) return -1;
+        if (item_1->mft_change_time_ > item_2->mft_change_time_) return 1;
     }
 
-    if (SortField == 4) {
-        if (Item1->creation_time_ < Item2->creation_time_) return -1;
-        if (Item1->creation_time_ > Item2->creation_time_) return 1;
+    if (sort_field == 4) {
+        if (item_1->creation_time_ < item_2->creation_time_) return -1;
+        if (item_1->creation_time_ > item_2->creation_time_) return 1;
     }
 
-    /* The SortField of the items is equal, so we must compare all the other fields
+    /* The sort_field of the items is equal, so we must compare all the other fields
     to see if they are really equal. */
-    if (Item1->long_path_ != nullptr && Item2->long_path_ != nullptr) {
-        if (Item1->long_path_ == nullptr) return -1;
-        if (Item2->long_path_ == nullptr) return 1;
+    if (item_1->have_long_path() && item_2->have_long_path()) {
+        result = _wcsicmp(item_1->get_long_path(), item_2->get_long_path());
 
-        Result = _wcsicmp(Item1->long_path_, Item2->long_path_);
-
-        if (Result != 0) return Result;
+        if (result != 0) return result;
     }
 
-    if (Item1->bytes_ < Item2->bytes_) return -1;
-    if (Item1->bytes_ > Item2->bytes_) return 1;
-    if (Item1->last_access_time_ < Item2->last_access_time_) return -1;
-    if (Item1->last_access_time_ > Item2->last_access_time_) return 1;
-    if (Item1->mft_change_time_ < Item2->mft_change_time_) return -1;
-    if (Item1->mft_change_time_ > Item2->mft_change_time_) return 1;
-    if (Item1->creation_time_ < Item2->creation_time_) return -1;
-    if (Item1->creation_time_ > Item2->creation_time_) return 1;
+    if (item_1->bytes_ < item_2->bytes_) return -1;
+    if (item_1->bytes_ > item_2->bytes_) return 1;
+    if (item_1->last_access_time_ < item_2->last_access_time_) return -1;
+    if (item_1->last_access_time_ > item_2->last_access_time_) return 1;
+    if (item_1->mft_change_time_ < item_2->mft_change_time_) return -1;
+    if (item_1->mft_change_time_ > item_2->mft_change_time_) return 1;
+    if (item_1->creation_time_ < item_2->creation_time_) return -1;
+    if (item_1->creation_time_ > item_2->creation_time_) return 1;
 
     /* As a last resort compare the location on harddisk. */
-    if (get_item_lcn(Item1) < get_item_lcn(Item2)) return -1;
-    if (get_item_lcn(Item1) > get_item_lcn(Item2)) return 1;
+    if (get_item_lcn(item_1) < get_item_lcn(item_2)) return -1;
+    if (get_item_lcn(item_1) > get_item_lcn(item_2)) return 1;
 
     return 0;
 }
@@ -411,303 +396,233 @@ int DefragLib::compare_items(ItemStruct *Item1, ItemStruct *Item2, int SortField
 /* Scan all files in a directory and all it's subdirectories (recursive)
 and store the information in a tree in memory for later use by the
 optimizer. */
-void DefragLib::scan_dir(DefragDataStruct *Data, wchar_t *Mask, ItemStruct *ParentDirectory) {
-    ItemStruct *Item;
-
-    FragmentListStruct *Fragment;
-
-    HANDLE FindHandle;
-
-    WIN32_FIND_DATAW FindFileData;
-
-    wchar_t *RootPath;
-    wchar_t *TempPath;
-
-    HANDLE FileHandle;
-
+void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct *parent_directory) {
+    ItemStruct *item;
+    FragmentListStruct *fragment;
+    HANDLE find_handle;
+    WIN32_FIND_DATAW find_file_data;
+    wchar_t *root_path;
+    wchar_t *temp_path;
+    HANDLE file_handle;
     uint64_t SystemTime;
-
-    SYSTEMTIME Time1;
-
-    FILETIME Time2;
-
-    ULARGE_INTEGER Time3;
-
-    int Result;
-
-    size_t Length;
-
+    SYSTEMTIME time_1;
+    FILETIME time_2;
+    ULARGE_INTEGER time_3;
+    int result;
+    size_t length;
     wchar_t *p1;
-
-    DefragGui *jkGui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     /* Slow the program down to the percentage that was specified on the
     command line. */
-    slow_down(Data);
+    slow_down(data);
 
     /* Determine the rootpath (base path of the directory) by stripping
-    everything after the last backslash in the Mask. The FindFirstFile()
+    everything after the last backslash in the mask. The FindFirstFile()
     system call only processes wildcards in the last section (i.e. after
     the last backslash). */
-    RootPath = _wcsdup(Mask);
+    root_path = _wcsdup(mask);
 
-    if (RootPath == nullptr) return;
+    if (root_path == nullptr) return;
 
-    p1 = wcsrchr(RootPath, '\\');
+    p1 = wcsrchr(root_path, '\\');
 
     if (p1 != nullptr) *p1 = 0;
 
     /* Show debug message: "Analyzing: %s". */
-    jkGui->show_debug(DebugLevel::DetailedProgress, nullptr, Data->debug_msg_[23].c_str(), Mask);
+    gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[23].c_str(), mask);
 
     /* Fetch the current time in the uint64_t format (1 second = 10000000). */
-    GetSystemTime(&Time1);
+    GetSystemTime(&time_1);
 
-    if (SystemTimeToFileTime(&Time1, &Time2) == FALSE) {
+    if (SystemTimeToFileTime(&time_1, &time_2) == FALSE) {
         SystemTime = 0;
     } else {
-        Time3.LowPart = Time2.dwLowDateTime;
-        Time3.HighPart = Time2.dwHighDateTime;
+        time_3.LowPart = time_2.dwLowDateTime;
+        time_3.HighPart = time_2.dwHighDateTime;
 
-        SystemTime = Time3.QuadPart;
+        SystemTime = time_3.QuadPart;
     }
 
     /* Walk through all the files. If nothing found then exit.
     Note: I am using FindFirstFileW() instead of _findfirst() because the latter
     will crash (exit program) on files with badly formed dates. */
-    FindHandle = FindFirstFileW(Mask, &FindFileData);
+    find_handle = FindFirstFileW(mask, &find_file_data);
 
-    if (FindHandle == INVALID_HANDLE_VALUE) {
-        free(RootPath);
+    if (find_handle == INVALID_HANDLE_VALUE) {
+        free(root_path);
         return;
     }
 
-    Item = nullptr;
+    item = nullptr;
+
+    wchar_t path_buf1[MAX_PATH];
+    wchar_t path_buf2[MAX_PATH];
 
     do {
-        if (*Data->running_ != RunningState::RUNNING) break;
+        if (*data->running_ != RunningState::RUNNING) break;
 
-        if (wcscmp(FindFileData.cFileName, L".") == 0) continue;
-        if (wcscmp(FindFileData.cFileName, L"..") == 0) continue;
+        if (wcscmp(find_file_data.cFileName, L".") == 0) continue;
+        if (wcscmp(find_file_data.cFileName, L"..") == 0) continue;
 
         /* Ignore reparse-points, a directory where a volume is mounted
         with the MOUNTVOL command. */
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
             continue;
         }
 
         /* Cleanup old item. */
-        if (Item != nullptr) {
-            if (Item->short_path_ != nullptr) free(Item->short_path_);
-            if (Item->short_filename_ != nullptr) free(Item->short_filename_);
-            if (Item->long_path_ != nullptr) free(Item->long_path_);
-            if (Item->long_filename_ != nullptr) free(Item->long_filename_);
-
-            while (Item->fragments_ != nullptr) {
-                Fragment = Item->fragments_->next_;
-
-                free(Item->fragments_);
-
-                Item->fragments_ = Fragment;
+        if (item != nullptr) {
+            while (item->fragments_ != nullptr) {
+                fragment = item->fragments_->next_;
+                free(item->fragments_);
+                item->fragments_ = fragment;
             }
 
-            free(Item);
-
-            Item = nullptr;
+            delete item;
         }
 
         /* Create new item. */
-        Item = (ItemStruct *) malloc(sizeof(ItemStruct));
+        item = new ItemStruct();
+        item->fragments_ = nullptr;
 
-        if (Item == nullptr) break;
+        length = wcslen(root_path) + wcslen(find_file_data.cFileName) + 2;
+        _ASSERT(MAX_PATH > length);
+        swprintf_s(path_buf1, length, L"%s\\%s", root_path, find_file_data.cFileName);
+//        item->long_path_ = path_buf1;
+//        item->long_filename_ = find_file_data.cFileName;
 
-        Item->short_path_ = nullptr;
-        Item->short_filename_ = nullptr;
-        Item->long_path_ = nullptr;
-        Item->long_filename_ = nullptr;
-        Item->fragments_ = nullptr;
+        length = wcslen(root_path) + wcslen(find_file_data.cAlternateFileName) + 2;
+        _ASSERT(MAX_PATH > length);
+        swprintf_s(path_buf2, length, L"%s\\%s", root_path, find_file_data.cAlternateFileName);
+//        item->short_path_ = path_buf2;
+//        item->short_filename_ = find_file_data.cAlternateFileName;
 
-        Length = wcslen(RootPath) + wcslen(FindFileData.cFileName) + 2;
+        item->set_names(path_buf1, find_file_data.cFileName, path_buf2, find_file_data.cAlternateFileName);
 
-        Item->long_path_ = (wchar_t *) malloc(sizeof(wchar_t) * Length);
+        item->bytes_ = find_file_data.nFileSizeHigh * ((uint64_t) MAXDWORD + 1) +
+                       find_file_data.nFileSizeLow;
 
-        if (Item->long_path_ == nullptr) break;
+        item->clusters_count_ = 0;
+        item->creation_time_ = 0;
+        item->last_access_time_ = 0;
+        item->mft_change_time_ = 0;
+        item->parent_directory_ = parent_directory;
+        item->is_dir_ = false;
 
-        swprintf_s(Item->long_path_, Length, L"%s\\%s", RootPath, FindFileData.cFileName);
-
-        Item->long_filename_ = _wcsdup(FindFileData.cFileName);
-
-        if (Item->long_filename_ == nullptr) break;
-
-        Length = wcslen(RootPath) + wcslen(FindFileData.cAlternateFileName) + 2;
-
-        Item->short_path_ = (wchar_t *) malloc(sizeof(wchar_t) * Length);
-
-        if (Item->short_path_ == nullptr) break;
-
-        swprintf_s(Item->short_path_, Length, L"%s\\%s", RootPath, FindFileData.cAlternateFileName);
-
-        Item->short_filename_ = _wcsdup(FindFileData.cAlternateFileName);
-
-        if (Item->short_filename_ == nullptr) break;
-
-        Item->bytes_ = FindFileData.nFileSizeHigh * ((uint64_t) MAXDWORD + 1) +
-                       FindFileData.nFileSizeLow;
-
-        Item->clusters_count_ = 0;
-        Item->creation_time_ = 0;
-        Item->last_access_time_ = 0;
-        Item->mft_change_time_ = 0;
-        Item->parent_directory_ = ParentDirectory;
-        Item->is_dir_ = false;
-
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-            Item->is_dir_ = true;
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            item->is_dir_ = true;
         }
-        Item->is_unmovable_ = false;
-        Item->is_excluded_ = false;
-        Item->is_hog_ = false;
+        item->is_unmovable_ = false;
+        item->is_excluded_ = false;
+        item->is_hog_ = false;
 
         /* Analyze the item: Clusters and Fragments, and the CreationTime, LastAccessTime,
         and MftChangeTime. If the item could not be opened then ignore the item. */
-        FileHandle = open_item_handle(Data, Item);
+        file_handle = open_item_handle(data, item);
 
-        if (FileHandle == nullptr) continue;
+        if (file_handle == nullptr) continue;
 
-        Result = get_fragments(Data, Item, FileHandle);
+        result = get_fragments(data, item, file_handle);
 
-        CloseHandle(FileHandle);
+        CloseHandle(file_handle);
 
-        if (Result == false) continue;
+        if (result == false) continue;
 
         /* Increment counters. */
-        Data->count_all_files_ = Data->count_all_files_ + 1;
-        Data->count_all_bytes_ = Data->count_all_bytes_ + Item->bytes_;
-        Data->count_all_clusters_ = Data->count_all_clusters_ + Item->clusters_count_;
+        data->count_all_files_ = data->count_all_files_ + 1;
+        data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
+        data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
 
-        if (is_fragmented(Item, 0, Item->clusters_count_)) {
-            Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
-            Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + Item->bytes_;
-            Data->count_fragmented_clusters_ = Data->count_fragmented_clusters_ + Item->clusters_count_;
+        if (is_fragmented(item, 0, item->clusters_count_)) {
+            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
+            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + item->bytes_;
+            data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + item->clusters_count_;
         }
 
-        Data->phase_done_ = Data->phase_done_ + Item->clusters_count_;
+        data->phase_done_ = data->phase_done_ + item->clusters_count_;
 
         /* Show progress message. */
-        jkGui->show_analyze(Data, Item);
+        gui->show_analyze(data, item);
 
         /* If it's a directory then iterate subdirectories. */
-        if (Item->is_dir_) {
-            Data->count_directories_ = Data->count_directories_ + 1;
+        if (item->is_dir_) {
+            data->count_directories_ = data->count_directories_ + 1;
 
-            Length = wcslen(RootPath) + wcslen(FindFileData.cFileName) + 4;
+            length = wcslen(root_path) + wcslen(find_file_data.cFileName) + 4;
 
-            TempPath = (wchar_t *) malloc(sizeof(wchar_t) * Length);
+            temp_path = (wchar_t *) malloc(sizeof(wchar_t) * length);
 
-            if (TempPath != nullptr) {
-                swprintf_s(TempPath, Length, L"%s\\%s\\*", RootPath, FindFileData.cFileName);
-                scan_dir(Data, TempPath, Item);
-                free(TempPath);
+            if (temp_path != nullptr) {
+                swprintf_s(temp_path, length, L"%s\\%s\\*", root_path, find_file_data.cFileName);
+                scan_dir(data, temp_path, item);
+                free(temp_path);
             }
         }
 
         /* Ignore the item if it has no clusters or no LCN. Very small
         files are stored in the MFT and are reported by Windows as
         having zero clusters and no fragments. */
-        if (Item->clusters_count_ == 0 || Item->fragments_ == nullptr) continue;
+        if (item->clusters_count_ == 0 || item->fragments_ == nullptr) continue;
 
-        /* Draw the item on the screen. */
-        //		if (*Data->RedrawScreen == 0) {
-        colorize_item(Data, Item, 0, 0, false);
-        //		} else {
-        //			m_jkGui->ShowDiskmap(Data);
-        //		}
+        // Draw the item on the screen
+        colorize_item(data, item, 0, 0, false);
 
-        /* Show debug info about the file. */
-        /* Show debug message: "%I64d clusters at %I64d, %I64d bytes" */
-        jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[16].c_str(), Item->clusters_count_,
-                          get_item_lcn(Item), Item->bytes_);
+        // Show debug info about the file.
+        // Show debug message: "%I64d clusters at %I64d, %I64d bytes"
+        gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[16].c_str(), item->clusters_count_,
+                        get_item_lcn(item), item->bytes_);
 
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
             /* Show debug message: "Special file attribute: Compressed" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[17].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[17].c_str());
         }
 
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) != 0) {
             /* Show debug message: "Special file attribute: Encrypted" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[18].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[18].c_str());
         }
 
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) != 0) {
             /* Show debug message: "Special file attribute: Offline" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[19].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[19].c_str());
         }
 
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
             /* Show debug message: "Special file attribute: Read-only" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[20].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[20].c_str());
         }
 
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE) != 0) {
             /* Show debug message: "Special file attribute: Sparse-file" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[21].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[21].c_str());
         }
 
-        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0) {
+        if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0) {
             /* Show debug message: "Special file attribute: Temporary" */
-            jkGui->show_debug(DebugLevel::DetailedFileInfo, Item, Data->debug_msg_[22].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[22].c_str());
         }
-
-        /* Save some memory if short and long filename are the same. */
-        if (Item->long_filename_ != nullptr &&
-            Item->short_filename_ != nullptr &&
-            _wcsicmp(Item->long_filename_, Item->short_filename_) == 0) {
-            free(Item->short_filename_);
-            Item->short_filename_ = Item->long_filename_;
-        }
-
-        if (Item->long_filename_ == nullptr && Item->short_filename_ != nullptr)
-            Item->long_filename_ = Item->
-                    short_filename_;
-        if (Item->long_filename_ != nullptr && Item->short_filename_ == nullptr)
-            Item->short_filename_ = Item->
-                    long_filename_;
-
-        if (Item->long_path_ != nullptr &&
-            Item->short_path_ != nullptr &&
-            _wcsicmp(Item->long_path_, Item->short_path_) == 0) {
-            free(Item->short_path_);
-            Item->short_path_ = Item->long_path_;
-        }
-
-        if (Item->long_path_ == nullptr && Item->short_path_ != nullptr) Item->long_path_ = Item->short_path_;
-        if (Item->long_path_ != nullptr && Item->short_path_ == nullptr) Item->short_path_ = Item->long_path_;
 
         /* Add the item to the ItemTree in memory. */
-        tree_insert(Data, Item);
-        Item = nullptr;
-    } while (FindNextFileW(FindHandle, &FindFileData) != 0);
+        tree_insert(data, item);
+        item = nullptr;
+    } while (FindNextFileW(find_handle, &find_file_data) != 0);
 
-    FindClose(FindHandle);
+    FindClose(find_handle);
 
     /* Cleanup. */
-    free(RootPath);
+    free(root_path);
 
-    if (Item != nullptr) {
-        if (Item->short_path_ != nullptr) free(Item->short_path_);
-        if (Item->short_filename_ != nullptr) free(Item->short_filename_);
-        if (Item->long_path_ != nullptr) free(Item->long_path_);
-        if (Item->long_filename_ != nullptr) free(Item->long_filename_);
+    if (item != nullptr) {
+        while (item->fragments_ != nullptr) {
+            fragment = item->fragments_->next_;
 
-        while (Item->fragments_ != nullptr) {
-            Fragment = Item->fragments_->next_;
+            free(item->fragments_);
 
-            free(Item->fragments_);
-
-            Item->fragments_ = Fragment;
+            item->fragments_ = fragment;
         }
 
-        free(Item);
+        delete item;
     }
 }
 
@@ -779,37 +694,18 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         if (*data->running_ != RunningState::RUNNING) break;
 
         /* If requested then redraw the diskmap. */
-        //		if (*Data->RedrawScreen == 1) m_jkGui->ShowDiskmap(Data);
+        //		if (*Data->RedrawScreen == 1) m_jkGui->show_diskmap(Data);
 
         /* Construct the full path's of the item. The MFT contains only the filename, plus
         a pointer to the directory. We have to construct the full paths's by joining
         all the names of the directories, and the name of the file. */
-        if (item->long_path_ == nullptr) item->long_path_ = get_long_path(data, item);
-        if (item->short_path_ == nullptr) item->short_path_ = get_short_path(data, item);
+        if (!item->have_long_path()) item->set_long_path(get_long_path(data, item).c_str());
+        if (!item->have_short_path()) item->set_short_path(get_short_path(data, item).c_str());
 
-        /* Save some memory if the short and long paths are the same. */
-        if (item->long_path_ != nullptr &&
-            item->short_path_ != nullptr &&
-            item->long_path_ != item->short_path_ &&
-            _wcsicmp(item->long_path_, item->short_path_) == 0) {
-            free(item->short_path_);
-            item->short_path_ = item->long_path_;
-        }
-
-        if (item->long_path_ == nullptr && item->short_path_ != nullptr) item->long_path_ = item->short_path_;
-        if (item->long_path_ != nullptr && item->short_path_ == nullptr) item->short_path_ = item->long_path_;
-
-        /* For debugging only: compare the data with the output from the
-        FSCTL_GET_RETRIEVAL_POINTERS function call. */
-        /*
-        CompareItems(Data,Item);
-        */
-
-        /* Apply the Mask and set the Exclude flag of all items that do not match. */
-        if (!match_mask(item->long_path_, data->include_mask_) &&
-            !match_mask(item->short_path_, data->include_mask_)) {
+        // Apply the Mask and set the Exclude flag of all items that do not match
+        if (!match_mask(item->get_long_path(), data->include_mask_) &&
+            !match_mask(item->get_short_path(), data->include_mask_)) {
             item->is_excluded_ = true;
-
             colorize_item(data, item, 0, 0, false);
         }
 
@@ -817,8 +713,8 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         Exclude masks. */
         if (!item->is_excluded_) {
             for (auto &s: data->excludes_) {
-                if (match_mask(item->long_path_, s.c_str()) ||
-                    match_mask(item->short_path_, s.c_str())) {
+                if (match_mask(item->get_long_path(), s.c_str()) ||
+                    match_mask(item->get_short_path(), s.c_str())) {
                     item->is_excluded_ = true;
 
                     colorize_item(data, item, 0, 0, false);
@@ -830,10 +726,9 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
 
         /* Exclude my own logfile. */
         if (!item->is_excluded_ &&
-            item->long_filename_ != nullptr &&
-            (_wcsicmp(item->long_filename_, L"jkdefrag.log") == 0 ||
-             _wcsicmp(item->long_filename_, L"jkdefragcmd.log") == 0 ||
-             _wcsicmp(item->long_filename_, L"jkdefragscreensaver.log") == 0)) {
+            (_wcsicmp(item->get_long_fn(), L"jkdefrag.exe.log") == 0 ||
+             _wcsicmp(item->get_long_fn(), L"jkdefragcmd.log") == 0 ||
+             _wcsicmp(item->get_long_fn(), L"jkdefragscreensaver.log") == 0)) {
             item->is_excluded_ = true;
 
             colorize_item(data, item, 0, 0, false);
@@ -850,8 +745,8 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
                 item->is_hog_ = true;
             } else {
                 for (const auto &s: data->space_hogs_) {
-                    if (match_mask(item->long_path_, s.c_str()) ||
-                        match_mask(item->short_path_, s.c_str())) {
+                    if (match_mask(item->get_long_path(), s.c_str()) ||
+                        match_mask(item->get_short_path(), s.c_str())) {
                         item->is_hog_ = true;
                         break;
                     }
@@ -862,22 +757,22 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         }
 
         // Special exception for "http://www.safeboot.com/"
-        if (match_mask(item->long_path_, L"*\\safeboot.fs")) item->is_unmovable_ = true;
+        if (match_mask(item->get_long_path(), L"*\\safeboot.fs")) item->is_unmovable_ = true;
 
         // Special exception for Acronis OS Selector
-        if (match_mask(item->long_path_, L"?:\\bootwiz.sys")) item->is_unmovable_ = true;
-        if (match_mask(item->long_path_, L"*\\BOOTWIZ\\*")) item->is_unmovable_ = true;
+        if (match_mask(item->get_long_path(), L"?:\\bootwiz.sys")) item->is_unmovable_ = true;
+        if (match_mask(item->get_long_path(), L"*\\BOOTWIZ\\*")) item->is_unmovable_ = true;
 
         // Special exception for DriveCrypt by "http://www.securstar.com/"
-        if (match_mask(item->long_path_, L"?:\\BootAuth?.sys")) item->is_unmovable_ = true;
+        if (match_mask(item->get_long_path(), L"?:\\BootAuth?.sys")) item->is_unmovable_ = true;
 
         // Special exception for Symantec GoBack
-        if (match_mask(item->long_path_, L"*\\Gobackio.bin")) item->is_unmovable_ = true;
+        if (match_mask(item->get_long_path(), L"*\\Gobackio.bin")) item->is_unmovable_ = true;
 
         // The $BadClus file maps the entire disk and is always unmovable
-        if (item->long_filename_ != nullptr &&
-            (_wcsicmp(item->long_filename_, L"$BadClus") == 0 ||
-             _wcsicmp(item->long_filename_, L"$BadClus:$Bad:$DATA") == 0)) {
+        if (item->get_long_fn() != nullptr &&
+            (_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
+             _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             item->is_unmovable_ = true;
         }
 

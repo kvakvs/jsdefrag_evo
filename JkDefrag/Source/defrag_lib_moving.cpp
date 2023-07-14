@@ -225,7 +225,7 @@ uint32_t DefragLib::move_item2(DefragDataStruct *data, HANDLE file_handle, const
                 //				if (*Data->RedrawScreen == 0) {
                 colorize_item(data, item, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
                 //				} else {
-                //					m_jkGui->ShowDiskmap(Data);
+                //					m_jkGui->show_diskmap(Data);
                 //				}
 
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
@@ -306,7 +306,7 @@ int DefragLib::move_item3(DefragDataStruct *data, ItemStruct *item, HANDLE file_
     //		if (*Data->RedrawScreen == 0) {
     colorize_item(data, item, 0, 0, false);
     //		} else {
-    //			m_jkGui->ShowDiskmap(Data);
+    //			m_jkGui->show_diskmap(Data);
     //		}
 
     /* If Windows reported an error while moving the item then show the

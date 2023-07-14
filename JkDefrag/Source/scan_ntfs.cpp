@@ -21,7 +21,7 @@ ScanNTFS *ScanNTFS::get_instance() {
     return instance_.get();
 }
 
-const wchar_t * ScanNTFS::stream_type_names(const ATTRIBUTE_TYPE stream_type) {
+const wchar_t *ScanNTFS::stream_type_names(const ATTRIBUTE_TYPE stream_type) {
     switch (stream_type) {
         case ATTRIBUTE_TYPE::AttributeStandardInformation:
             return L"$STANDARD_INFORMATION";
@@ -306,7 +306,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
 
 /* Read the RunData list and translate into a list of fragments. */
 BOOL ScanNTFS::translate_rundata_to_fragmentlist(const DefragDataStruct *data, InodeDataStruct *inode_data,
-                                                 wchar_t *stream_name,
+                                                 const wchar_t *stream_name,
                                                  const ATTRIBUTE_TYPE stream_type, const BYTE *run_data,
                                                  const uint32_t run_data_length,
                                                  const uint64_t starting_vcn, const uint64_t bytes) {
@@ -1069,32 +1069,22 @@ BOOL ScanNTFS::process_attributes(
     return TRUE;
 }
 
-BOOL ScanNTFS::interpret_mft_record(
-        DefragDataStruct *Data,
-        NtfsDiskInfoStruct *DiskInfo,
-        ItemStruct **InodeArray,
-        uint64_t InodeNumber,
-        uint64_t MaxInode,
-        FragmentListStruct **MftDataFragments,
-        uint64_t *MftDataBytes,
-        FragmentListStruct **MftBitmapFragments,
-        uint64_t *MftBitmapBytes,
-        BYTE *Buffer,
-        uint64_t BufLength) {
+BOOL ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
+                                    uint64_t inode_number, uint64_t max_inode,
+                                    FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
+                                    FragmentListStruct **mft_bitmap_fragments, uint64_t *MftBitmapBytes,
+                                    BYTE *buffer, uint64_t buf_length) {
     InodeDataStruct inode_data{};
-
-    ItemStruct *Item;
-    StreamStruct *Stream;
-
-    uint64_t BaseInode;
-
+    ItemStruct *item;
+    StreamStruct *stream;
+    uint64_t base_inode;
     DefragGui *gui = DefragGui::get_instance();
 
     /* If the record is not in use then quietly exit. */
-    const FILE_RECORD_HEADER *file_record_header = (FILE_RECORD_HEADER *) Buffer;
+    const FILE_RECORD_HEADER *file_record_header = (FILE_RECORD_HEADER *) buffer;
 
     if ((file_record_header->flags_ & 1) != 1) {
-        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Inode %I64u is not in use.", InodeNumber);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Inode %I64u is not in use.", inode_number);
 
         return FALSE;
     }
@@ -1102,54 +1092,54 @@ BOOL ScanNTFS::interpret_mft_record(
     /* If the record has a BaseFileRecord then ignore it. It is used by an
     AttributeAttributeList as an extension of another Inode, it's not an
     Inode by itself. */
-    BaseInode = (uint64_t) file_record_header->base_file_record_.inode_number_low_part_ +
-                ((uint64_t) file_record_header->base_file_record_.inode_number_high_part_ << 32);
+    base_inode = (uint64_t) file_record_header->base_file_record_.inode_number_low_part_ +
+                 ((uint64_t) file_record_header->base_file_record_.inode_number_high_part_ << 32);
 
-    if (BaseInode != 0) {
+    if (base_inode != 0) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                        L"Ignoring Inode %I64u, it's an extension of Inode %I64u", InodeNumber, BaseInode);
+                        L"Ignoring Inode %I64u, it's an extension of Inode %I64u", inode_number, base_inode);
 
         return TRUE;
     }
 
-    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Processing Inode %I64u...", InodeNumber);
+    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Processing Inode %I64u...", inode_number);
 
     /* Show a warning if the Flags have an unknown value. */
     if ((file_record_header->flags_ & 252) != 0) {
-        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"  Inode %I64u has Flags = %u", InodeNumber,
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"  Inode %I64u has Flags = %u", inode_number,
                         file_record_header->flags_);
     }
 
-    /* I think the MFTRecordNumber should always be the InodeNumber, but it's an XP
+    /* I think the MFTRecordNumber should always be the inode_number, but it's an XP
     extension and I'm not sure about Win2K.
     Note: why is the MFTRecordNumber only 32 bit? Inode numbers are 48 bit. */
-    if (file_record_header->mft_record_number_ != InodeNumber) {
+    if (file_record_header->mft_record_number_ != inode_number) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         L"  Warning: Inode %I64u contains a different MFTRecordNumber %lu",
-                        InodeNumber, file_record_header->mft_record_number_);
+                        inode_number, file_record_header->mft_record_number_);
     }
 
     /* Sanity check. */
-    if (file_record_header->attribute_offset_ >= BufLength) {
+    if (file_record_header->attribute_offset_ >= buf_length) {
         gui->show_debug(
                 DebugLevel::Progress, nullptr,
                 L"Error: attributes in Inode %I64u are outside the FILE record, the MFT may be corrupt.",
-                InodeNumber);
+                inode_number);
 
         return FALSE;
     }
 
-    if (file_record_header->bytes_in_use_ > BufLength) {
+    if (file_record_header->bytes_in_use_ > buf_length) {
         gui->show_debug(
                 DebugLevel::Progress, nullptr,
                 L"Error: in Inode %I64u the record is bigger than the size of the buffer, the MFT may be corrupt.",
-                InodeNumber);
+                inode_number);
 
         return FALSE;
     }
 
     /* Initialize the InodeData struct. */
-    inode_data.inode_ = InodeNumber; /* The Inode number. */
+    inode_data.inode_ = inode_number; /* The Inode number. */
     inode_data.parent_inode_ = 5; /* The Inode number of the parent directory. */
     inode_data.is_directory_ = false;
 
@@ -1162,38 +1152,38 @@ BOOL ScanNTFS::interpret_mft_record(
     inode_data.last_access_time_ = 0;
     inode_data.bytes_ = 0; /* Size of the $DATA stream. */
     inode_data.streams_ = nullptr; /* List of StreamStruct. */
-    inode_data.mft_data_fragments_ = *MftDataFragments;
-    inode_data.mft_data_bytes_ = *MftDataBytes;
+    inode_data.mft_data_fragments_ = *mft_data_fragments;
+    inode_data.mft_data_bytes_ = *mft_data_bytes;
     inode_data.mft_bitmap_fragments_ = nullptr;
     inode_data.mft_bitmap_bytes_ = 0;
 
     /* Make sure that directories are always created. */
-    if (inode_data.is_directory_ == true) {
-        translate_rundata_to_fragmentlist(Data, &inode_data, L"$I30", ATTRIBUTE_TYPE::AttributeIndexAllocation, nullptr,
+    if (inode_data.is_directory_) {
+        translate_rundata_to_fragmentlist(data, &inode_data, L"$I30", ATTRIBUTE_TYPE::AttributeIndexAllocation, nullptr,
                                           0,
                                           0, 0);
     }
 
     /* Interpret the attributes. */
-    [[maybe_unused]] int result = process_attributes(Data, DiskInfo, &inode_data,
-                                                     &Buffer[file_record_header->attribute_offset_],
-                                                     BufLength - file_record_header->attribute_offset_, 65535, 0);
+    [[maybe_unused]] int result = process_attributes(data, disk_info, &inode_data,
+                                                     &buffer[file_record_header->attribute_offset_],
+                                                     buf_length - file_record_header->attribute_offset_, 65535, 0);
 
-    /* Save the MftDataFragments, MftDataBytes, MftBitmapFragments, and MftBitmapBytes. */
-    if (InodeNumber == 0) {
-        *MftDataFragments = inode_data.mft_data_fragments_;
-        *MftDataBytes = inode_data.mft_data_bytes_;
-        *MftBitmapFragments = inode_data.mft_bitmap_fragments_;
+    /* Save the mft_data_fragments, mft_data_bytes, mft_bitmap_fragments, and MftBitmapBytes. */
+    if (inode_number == 0) {
+        *mft_data_fragments = inode_data.mft_data_fragments_;
+        *mft_data_bytes = inode_data.mft_data_bytes_;
+        *mft_bitmap_fragments = inode_data.mft_bitmap_fragments_;
         *MftBitmapBytes = inode_data.mft_bitmap_bytes_;
     }
 
-    /* Create an item in the Data->ItemTree for every stream. */
-    Stream = inode_data.streams_;
+    /* Create an item in the data->ItemTree for every stream. */
+    stream = inode_data.streams_;
     do {
         /* Create and fill a new item record in memory. */
-        Item = (ItemStruct *) malloc(sizeof(ItemStruct));
+        item = new ItemStruct();
 
-        if (Item == nullptr) {
+        if (item == nullptr) {
             gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
 
             if (inode_data.long_filename_ != nullptr) free(inode_data.long_filename_);
@@ -1204,82 +1194,79 @@ BOOL ScanNTFS::interpret_mft_record(
             return FALSE;
         }
 
-        Item->long_filename_ = construct_stream_name(inode_data.long_filename_, inode_data.short_filename_, Stream);
-        Item->long_path_ = nullptr;
+//        item->long_filename_ = construct_stream_name(inode_data.long_filename_, inode_data.short_filename_, stream);
+//        item->long_path_ = nullptr;
+//        item->short_filename_ = construct_stream_name(inode_data.short_filename_, inode_data.long_filename_, stream);
+//        item->short_path_ = nullptr;
+        item->set_names(L"", construct_stream_name(inode_data.long_filename_, inode_data.short_filename_, stream),
+                        nullptr, construct_stream_name(inode_data.short_filename_, inode_data.long_filename_, stream));
 
-        Item->short_filename_ = construct_stream_name(inode_data.short_filename_, inode_data.long_filename_, Stream);
-        Item->short_path_ = nullptr;
+        item->bytes_ = inode_data.bytes_;
 
-        Item->bytes_ = inode_data.bytes_;
+        if (stream != nullptr) item->bytes_ = stream->bytes_;
 
-        if (Stream != nullptr) Item->bytes_ = Stream->bytes_;
+        item->clusters_count_ = 0;
 
-        Item->clusters_count_ = 0;
+        if (stream != nullptr) item->clusters_count_ = stream->clusters_;
 
-        if (Stream != nullptr) Item->clusters_count_ = Stream->clusters_;
+        item->creation_time_ = inode_data.creation_time_;
+        item->mft_change_time_ = inode_data.mft_change_time_;
+        item->last_access_time_ = inode_data.last_access_time_;
+        item->fragments_ = nullptr;
 
-        Item->creation_time_ = inode_data.creation_time_;
-        Item->mft_change_time_ = inode_data.mft_change_time_;
-        Item->last_access_time_ = inode_data.last_access_time_;
-        Item->fragments_ = nullptr;
+        if (stream != nullptr) item->fragments_ = stream->fragments_;
 
-        if (Stream != nullptr) Item->fragments_ = Stream->fragments_;
-
-        Item->parent_inode_ = inode_data.parent_inode_;
-        Item->is_dir_ = inode_data.is_directory_;
-        Item->is_unmovable_ = false;
-        Item->is_excluded_ = false;
-        Item->is_hog_ = false;
+        item->parent_inode_ = inode_data.parent_inode_;
+        item->is_dir_ = inode_data.is_directory_;
+        item->is_unmovable_ = false;
+        item->is_excluded_ = false;
+        item->is_hog_ = false;
 
         /* Increment counters. */
-        if (Item->is_dir_ == true) {
-            Data->count_directories_ = Data->count_directories_ + 1;
+        if (item->is_dir_ == true) {
+            data->count_directories_ = data->count_directories_ + 1;
         }
 
-        Data->count_all_files_ = Data->count_all_files_ + 1;
+        data->count_all_files_ = data->count_all_files_ + 1;
 
-        if (Stream != nullptr && Stream->stream_type_ == ATTRIBUTE_TYPE::AttributeData) {
-            Data->count_all_bytes_ = Data->count_all_bytes_ + inode_data.bytes_;
+        if (stream != nullptr && stream->stream_type_ == ATTRIBUTE_TYPE::AttributeData) {
+            data->count_all_bytes_ = data->count_all_bytes_ + inode_data.bytes_;
         }
 
-        if (Stream != nullptr) Data->count_all_clusters_ = Data->count_all_clusters_ + Stream->clusters_;
+        if (stream != nullptr) data->count_all_clusters_ = data->count_all_clusters_ + stream->clusters_;
 
-        if (DefragLib::get_fragment_count(Item) > 1) {
-            Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
-            Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + inode_data.bytes_;
+        if (DefragLib::get_fragment_count(item) > 1) {
+            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
+            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + inode_data.bytes_;
 
-            if (Stream != nullptr)
-                Data->count_fragmented_clusters_ = Data->count_fragmented_clusters_ + Stream->
+            if (stream != nullptr)
+                data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + stream->
                         clusters_;
         }
 
         /* Add the item record to the sorted item tree in memory. */
-        DefragLib::tree_insert(Data, Item);
+        DefragLib::tree_insert(data, item);
 
         /* Also add the item to the array that is used to construct the full pathnames.
         Note: if the array already contains an entry, and the new item has a shorter
         filename, then the entry is replaced. This is needed to make sure that
         the shortest form of the name of directories is used. */
 
-        if (InodeArray != nullptr &&
-            InodeNumber < MaxInode &&
-            (InodeArray[InodeNumber] == nullptr ||
-             (InodeArray[InodeNumber]->long_filename_ != nullptr &&
-              Item->long_filename_ != nullptr &&
-              wcscmp(InodeArray[InodeNumber]->long_filename_, Item->long_filename_) > 0))) {
-            InodeArray[InodeNumber] = Item;
+        if (inode_array != nullptr &&
+            inode_number < max_inode &&
+            (inode_array[inode_number] == nullptr ||
+             (inode_array[inode_number]->have_long_fn()
+              && item->have_long_fn()
+              && wcscmp(inode_array[inode_number]->get_long_fn(), item->get_long_fn()) > 0))) {
+            inode_array[inode_number] = item;
         }
 
-        /* Draw the item on the screen. */
-        gui->show_analyze(Data, Item);
-        //		if (*Data->RedrawScreen == false) {
-        defrag_lib_->colorize_item(Data, Item, 0, 0, false);
-        //		} else {
-        //			m_jkGui->ShowDiskmap(Data);
-        //		}
+        // Draw the item on the screen.
+        gui->show_analyze(data, item);
+        defrag_lib_->colorize_item(data, item, 0, 0, false);
 
-        if (Stream != nullptr) Stream = Stream->next_;
-    } while (Stream != nullptr);
+        if (stream != nullptr) stream = stream->next_;
+    } while (stream != nullptr);
 
     /* Cleanup and return TRUE. */
     if (inode_data.long_filename_ != nullptr) free(inode_data.long_filename_);

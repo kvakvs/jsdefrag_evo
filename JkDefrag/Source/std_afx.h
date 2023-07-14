@@ -18,7 +18,9 @@ using namespace Gdiplus;
 #endif
 
 #include "defrag_struct.h"
+#include "itemstruct.h"
 #include "defrag_data_struct.h"
+
 #include "defrag_lib.h"
 #include "defrag_log.h"
 #include "scan_fat.h"

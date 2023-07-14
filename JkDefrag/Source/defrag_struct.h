@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tchar.h>
+#include <string>
 
 /* The colors used by the defragger. */
 //#define COLOREMPTY        0     /* Empty diskspace. */
@@ -16,9 +17,10 @@
 class DefragStruct {
 public:
     DefragStruct();
+
     ~DefragStruct();
 
-    wchar_t versiontext_[100];
+    std::wstring versiontext_;
 
     enum colors {
         COLOREMPTY,
@@ -31,8 +33,4 @@ public:
         COLORSPACEHOG,
         COLORBACK
     };
-
-protected:
-
-private:
 };

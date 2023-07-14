@@ -15,7 +15,7 @@ ScanFAT::ScanFAT() {
 
 ScanFAT::~ScanFAT() = default;
 
-ScanFAT* ScanFAT::get_instance() {
+ScanFAT *ScanFAT::get_instance() {
     if (instance_ == nullptr) {
         instance_.reset(new ScanFAT());
     }
@@ -24,7 +24,7 @@ ScanFAT* ScanFAT::get_instance() {
 }
 
 /* Calculate the checksum of 8.3 filename. */
-UCHAR ScanFAT::calculate_short_name_check_sum(const UCHAR* name) {
+UCHAR ScanFAT::calculate_short_name_check_sum(const UCHAR *name) {
     UCHAR check_sum = 0;
 
     for (short index = 11; index != 0; index--) {
@@ -68,14 +68,14 @@ cluster numbers.
 the next cluster of the file.
 
 */
-void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfoStruct* disk_info,
-                                   ItemStruct* item, uint64_t cluster) {
-    FragmentListStruct* new_fragment;
-    FragmentListStruct* last_fragment;
+void ScanFAT::make_fragment_list(const DefragDataStruct *data, const FatDiskInfoStruct *disk_info,
+                                 ItemStruct *item, uint64_t cluster) {
+    FragmentListStruct *new_fragment;
+    FragmentListStruct *last_fragment;
 
     int max_iterate;
 
-    DefragGui* gui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     item->clusters_count_ = 0;
     item->fragments_ = nullptr;
@@ -104,7 +104,7 @@ void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfo
         /* If this is a new fragment then create a record for the previous fragment. If not then
             add the cluster to the counters and continue. */
         if (cluster != last_cluster + 1 && last_cluster != 0) {
-            new_fragment = (FragmentListStruct*)malloc(sizeof(FragmentListStruct));
+            new_fragment = (FragmentListStruct *) malloc(sizeof(FragmentListStruct));
 
             if (new_fragment == nullptr) {
                 gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
@@ -118,8 +118,7 @@ void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfo
 
             if (item->fragments_ == nullptr) {
                 item->fragments_ = new_fragment;
-            }
-            else {
+            } else {
                 if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
             }
 
@@ -131,20 +130,21 @@ void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfo
 
         /* Get next cluster from FAT. */
         switch (data->disk_.type_) {
-        case DiskType::FAT12:
-            if ((cluster & 1) == 1) {
-                cluster = *(WORD*)&disk_info->FatData.FAT12[cluster + cluster / 2] >> 4;
-            }
-            else {
-                cluster = *(WORD*)&disk_info->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
-            }
+            case DiskType::FAT12:
+                if ((cluster & 1) == 1) {
+                    cluster = *(WORD *) &disk_info->FatData.FAT12[cluster + cluster / 2] >> 4;
+                } else {
+                    cluster = *(WORD *) &disk_info->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
+                }
 
-            break;
+                break;
 
-        case DiskType::FAT16: cluster = disk_info->FatData.FAT16[cluster];
-            break;
-        case DiskType::FAT32: cluster = disk_info->FatData.FAT32[cluster] & 0xFFFFFFF;
-            break;
+            case DiskType::FAT16:
+                cluster = disk_info->FatData.FAT16[cluster];
+                break;
+            case DiskType::FAT32:
+                cluster = disk_info->FatData.FAT32[cluster] & 0xFFFFFFF;
+                break;
         }
     }
 
@@ -158,7 +158,7 @@ void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfo
 
     /* Create the last fragment. */
     if (last_cluster != 0) {
-        new_fragment = (FragmentListStruct*)malloc(sizeof(FragmentListStruct));
+        new_fragment = (FragmentListStruct *) malloc(sizeof(FragmentListStruct));
 
         if (new_fragment == nullptr) {
             gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
@@ -173,8 +173,7 @@ void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfo
 
         if (item->fragments_ == nullptr) {
             item->fragments_ = new_fragment;
-        }
-        else {
+        } else {
             if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
         }
     }
@@ -182,9 +181,9 @@ void ScanFAT::make_fragment_list(const DefragDataStruct* data, const FatDiskInfo
 
 /* Load a directory from disk into a new memory buffer. Return nullptr if error.
 Note: the caller is responsible for free'ing the buffer. */
-BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, uint64_t StartCluster,
-                                uint64_t* OutLength) {
-    BYTE* buffer;
+BYTE *ScanFAT::load_directory(DefragDataStruct *Data, FatDiskInfoStruct *DiskInfo, uint64_t StartCluster,
+                              uint64_t *OutLength) {
+    BYTE *buffer;
     uint64_t fragment_length;
     OVERLAPPED g_overlapped;
     ULARGE_INTEGER trans;
@@ -193,7 +192,7 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
     int result;
     int max_iterate;
     wchar_t s1[BUFSIZ];
-    DefragGui* gui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     /* Reset the OutLength to zero, in case we exit for an error. */
     if (OutLength != nullptr) *OutLength = 0;
@@ -220,26 +219,27 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
 
         /* Get next cluster from FAT. */
         switch (Data->disk_.type_) {
-        case DiskType::FAT12:
-            if ((cluster & 1) == 1) {
-                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] >> 4;
-            }
-            else {
-                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
-            }
-            break;
+            case DiskType::FAT12:
+                if ((cluster & 1) == 1) {
+                    cluster = *(WORD *) &DiskInfo->FatData.FAT12[cluster + cluster / 2] >> 4;
+                } else {
+                    cluster = *(WORD *) &DiskInfo->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
+                }
+                break;
 
-        case DiskType::FAT16: cluster = DiskInfo->FatData.FAT16[cluster];
-            break;
-        case DiskType::FAT32: cluster = DiskInfo->FatData.FAT32[cluster] & 0xFFFFFFF;
-            break;
+            case DiskType::FAT16:
+                cluster = DiskInfo->FatData.FAT16[cluster];
+                break;
+            case DiskType::FAT32:
+                cluster = DiskInfo->FatData.FAT32[cluster] & 0xFFFFFFF;
+                break;
         }
     }
 
     /* If too many iterations (infinite loop in FAT) then return nullptr. */
     if (max_iterate >= DiskInfo->CountofClusters + 1) {
         gui->show_debug(DebugLevel::Progress, nullptr,
-                          L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
+                        L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
 
         return nullptr;
     }
@@ -251,7 +251,7 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
         return nullptr;
     }
 
-    buffer = (BYTE*)malloc((size_t)buffer_length);
+    buffer = (BYTE *) malloc((size_t) buffer_length);
 
     if (buffer == nullptr) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
@@ -278,23 +278,26 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
         /* If this is a new fragment then load the previous fragment from disk. If not then
         add to the counters and continue. */
         if (cluster != last_cluster + 1 && last_cluster != 0) {
-            fragment_length = (last_cluster - first_cluster + 1) * DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
-            trans.QuadPart = (DiskInfo->FirstDataSector + (first_cluster - 2) * DiskInfo->SectorsPerCluster) * DiskInfo->
-                    BytesPerSector;
+            fragment_length =
+                    (last_cluster - first_cluster + 1) * DiskInfo->SectorsPerCluster * DiskInfo->BytesPerSector;
+            trans.QuadPart =
+                    (DiskInfo->FirstDataSector + (first_cluster - 2) * DiskInfo->SectorsPerCluster) * DiskInfo->
+                            BytesPerSector;
 
             g_overlapped.Offset = trans.LowPart;
             g_overlapped.OffsetHigh = trans.HighPart;
             g_overlapped.hEvent = nullptr;
 
             gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                              L"Reading directory fragment, %I64u bytes at offset=%I64u.", fragment_length,
-                              trans.QuadPart);
+                            L"Reading directory fragment, %I64u bytes at offset=%I64u.", fragment_length,
+                            trans.QuadPart);
 
-            result = ReadFile(Data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t)fragment_length, &bytes_read,
+            result = ReadFile(Data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
+                              &bytes_read,
                               &g_overlapped);
 
             if (result == 0) {
-                defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
+                defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
                 gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
@@ -312,19 +315,20 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
 
         /* Get next cluster from FAT. */
         switch (Data->disk_.type_) {
-        case DiskType::FAT12:
-            if ((cluster & 1) == 1) {
-                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] >> 4;
-            }
-            else {
-                cluster = *(WORD*)&DiskInfo->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
-            }
+            case DiskType::FAT12:
+                if ((cluster & 1) == 1) {
+                    cluster = *(WORD *) &DiskInfo->FatData.FAT12[cluster + cluster / 2] >> 4;
+                } else {
+                    cluster = *(WORD *) &DiskInfo->FatData.FAT12[cluster + cluster / 2] & 0xFFF;
+                }
 
-            break;
-        case DiskType::FAT16: cluster = DiskInfo->FatData.FAT16[cluster];
-            break;
-        case DiskType::FAT32: cluster = DiskInfo->FatData.FAT32[cluster] & 0xFFFFFFF;
-            break;
+                break;
+            case DiskType::FAT16:
+                cluster = DiskInfo->FatData.FAT16[cluster];
+                break;
+            case DiskType::FAT32:
+                cluster = DiskInfo->FatData.FAT32[cluster] & 0xFFFFFFF;
+                break;
         }
     }
 
@@ -339,14 +343,14 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
         g_overlapped.hEvent = nullptr;
 
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                          L"Reading directory fragment, %I64u bytes at offset=%I64u.", fragment_length,
-                          trans.QuadPart);
+                        L"Reading directory fragment, %I64u bytes at offset=%I64u.", fragment_length,
+                        trans.QuadPart);
 
-        result = ReadFile(Data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t)fragment_length, &bytes_read,
+        result = ReadFile(Data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length, &bytes_read,
                           &g_overlapped);
 
         if (result == 0) {
-            defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
+            defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
             gui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
@@ -362,285 +366,253 @@ BYTE* ScanFAT::load_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInf
 }
 
 /* Analyze a directory and add all the items to the item tree. */
-void ScanFAT::analyze_fat_directory(DefragDataStruct* Data, FatDiskInfoStruct* DiskInfo, BYTE* Buffer,
-                                      uint64_t Length, ItemStruct* ParentDirectory) {
-    FatDirStruct* Dir;
-    FatLongNameDirStruct* LDir;
-    ItemStruct* Item;
-
-    uint32_t Index;
-
-    wchar_t ShortName[13];
-    wchar_t LongName[820];
-
-    int LastLongNameSection;
-
-    UCHAR LongNameChecksum;
-
-    BYTE* SubDirBuf;
-
-    uint64_t SubDirLength;
-    uint64_t StartCluster;
-
-    wchar_t* p1;
-
+void ScanFAT::analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *disk_info, BYTE *buffer,
+                                    uint64_t length, ItemStruct *parent_directory) {
+    FatDirStruct *dir;
+    FatLongNameDirStruct *l_dir;
+    ItemStruct *item;
+    uint32_t index;
+    wchar_t short_name[13];
+    wchar_t long_name[820];
+    int last_long_name_section;
+    UCHAR long_name_checksum;
+    BYTE *sub_dir_buf;
+    uint64_t sub_dir_length;
+    uint64_t start_cluster;
+    wchar_t *p1;
     int i;
-
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui *gui = DefragGui::get_instance();
 
     /* Sanity check. */
-    if (Buffer == nullptr || Length == 0) return;
+    if (buffer == nullptr || length == 0) return;
 
     /* Slow the program down to the percentage that was specified on the
     command line. */
-    DefragLib::slow_down(Data);
+    DefragLib::slow_down(data);
 
-    //ShowHex(Data,Buffer,256);
+    //ShowHex(data,buffer,256);
 
     /* Walk through all the directory entries, extract the info, and store in memory
     in the ItemTree. */
-    LastLongNameSection = 0;
+    last_long_name_section = 0;
 
-    for (Index = 0; Index + 31 < Length; Index = Index + 32) {
-        if (*Data->running_ != RunningState::RUNNING) break;
+    for (index = 0; index + 31 < length; index = index + 32) {
+        if (*data->running_ != RunningState::RUNNING) break;
 
-        Dir = (FatDirStruct*)&Buffer[Index];
+        dir = (FatDirStruct *) &buffer[index];
 
         /* Ignore free (not used) entries. */
-        if (Dir->DIR_Name[0] == 0xE5) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tFree (not used)", Index / 32);
+        if (dir->DIR_Name[0] == 0xE5) {
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tFree (not used)", index / 32);
 
             continue;
         }
 
         /* Exit at the end of the directory. */
-        if (Dir->DIR_Name[0] == 0) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tFree (not used), end of directory.",
-                              Index / 32);
+        if (dir->DIR_Name[0] == 0) {
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tFree (not used), end of directory.",
+                            index / 32);
 
             break;
         }
 
         /* If this is a long filename component then save the string and loop. */
-        if ((Dir->DIR_Attr & ATTR_LONG_NAME_MASK) == ATTR_LONG_NAME) {
-            LDir = (FatLongNameDirStruct*)&Buffer[Index];
+        if ((dir->DIR_Attr & ATTR_LONG_NAME_MASK) == ATTR_LONG_NAME) {
+            l_dir = (FatLongNameDirStruct *) &buffer[index];
 
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tLong filename part.", Index / 32);
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tLong filename part.", index / 32);
 
-            i = LDir->LDIR_Ord & 0x3F;
+            i = l_dir->LDIR_Ord & 0x3F;
 
             if (i == 0) {
-                LastLongNameSection = 0;
+                last_long_name_section = 0;
 
                 continue;
             }
 
-            if ((LDir->LDIR_Ord & 0x40) == 0x40) {
-                wmemset(LongName, L'\0', 820);
+            if ((l_dir->LDIR_Ord & 0x40) == 0x40) {
+                wmemset(long_name, L'\0', 820);
 
-                LastLongNameSection = i;
-                LongNameChecksum = LDir->LDIR_Chksum;
-            }
-            else {
-                if (i + 1 != LastLongNameSection || LongNameChecksum != LDir->LDIR_Chksum) {
-                    LastLongNameSection = 0;
+                last_long_name_section = i;
+                long_name_checksum = l_dir->LDIR_Chksum;
+            } else {
+                if (i + 1 != last_long_name_section || long_name_checksum != l_dir->LDIR_Chksum) {
+                    last_long_name_section = 0;
 
                     continue;
                 }
 
-                LastLongNameSection = i;
+                last_long_name_section = i;
             }
 
             i = (i - 1) * 13;
 
-            LongName[i++] = LDir->LDIR_Name1[0];
-            LongName[i++] = LDir->LDIR_Name1[1];
-            LongName[i++] = LDir->LDIR_Name1[2];
-            LongName[i++] = LDir->LDIR_Name1[3];
-            LongName[i++] = LDir->LDIR_Name1[4];
-            LongName[i++] = LDir->LDIR_Name2[0];
-            LongName[i++] = LDir->LDIR_Name2[1];
-            LongName[i++] = LDir->LDIR_Name2[2];
-            LongName[i++] = LDir->LDIR_Name2[3];
-            LongName[i++] = LDir->LDIR_Name2[4];
-            LongName[i++] = LDir->LDIR_Name2[5];
-            LongName[i++] = LDir->LDIR_Name3[0];
-            LongName[i++] = LDir->LDIR_Name3[1];
+            long_name[i++] = l_dir->LDIR_Name1[0];
+            long_name[i++] = l_dir->LDIR_Name1[1];
+            long_name[i++] = l_dir->LDIR_Name1[2];
+            long_name[i++] = l_dir->LDIR_Name1[3];
+            long_name[i++] = l_dir->LDIR_Name1[4];
+            long_name[i++] = l_dir->LDIR_Name2[0];
+            long_name[i++] = l_dir->LDIR_Name2[1];
+            long_name[i++] = l_dir->LDIR_Name2[2];
+            long_name[i++] = l_dir->LDIR_Name2[3];
+            long_name[i++] = l_dir->LDIR_Name2[4];
+            long_name[i++] = l_dir->LDIR_Name2[5];
+            long_name[i++] = l_dir->LDIR_Name3[0];
+            long_name[i++] = l_dir->LDIR_Name3[1];
 
             continue;
         }
 
         /* If we are here and the long filename counter is not 1 then something is wrong
         with the long filename. Ignore the long filename. */
-        if (LastLongNameSection != 1) {
-            LongName[0] = '\0';
-        }
-        else if (calculate_short_name_check_sum(Dir->DIR_Name) != LongNameChecksum) {
-            jkGui->show_debug(DebugLevel::Fatal, nullptr, L"%u.\tError: long filename is out of sync");
-            LongName[0] = '\0';
+        if (last_long_name_section != 1) {
+            long_name[0] = '\0';
+        } else if (calculate_short_name_check_sum(dir->DIR_Name) != long_name_checksum) {
+            gui->show_debug(DebugLevel::Fatal, nullptr, L"%u.\tError: long filename is out of sync");
+            long_name[0] = '\0';
         }
 
-        LastLongNameSection = 0;
+        last_long_name_section = 0;
 
         /* Extract the short name. */
-        for (i = 0; i < 8; i++) ShortName[i] = Dir->DIR_Name[i];
+        for (i = 0; i < 8; i++) short_name[i] = dir->DIR_Name[i];
 
-        for (i = 7; i > 0; i--) if (ShortName[i] != ' ') break;
+        for (i = 7; i > 0; i--) if (short_name[i] != ' ') break;
 
-        if (ShortName[i] != ' ') i++;
+        if (short_name[i] != ' ') i++;
 
-        ShortName[i] = '.';
-        ShortName[i + 1] = Dir->DIR_Name[8];
-        ShortName[i + 2] = Dir->DIR_Name[9];
-        ShortName[i + 3] = Dir->DIR_Name[10];
+        short_name[i] = '.';
+        short_name[i + 1] = dir->DIR_Name[8];
+        short_name[i + 2] = dir->DIR_Name[9];
+        short_name[i + 3] = dir->DIR_Name[10];
 
-        if (ShortName[i + 3] != ' ') {
-            ShortName[i + 4] = '\0';
+        if (short_name[i + 3] != ' ') {
+            short_name[i + 4] = '\0';
+        } else if (short_name[i + 2] != ' ') {
+            short_name[i + 3] = '\0';
+        } else if (short_name[i + 1] != ' ') {
+            short_name[i + 2] = '\0';
+        } else {
+            short_name[i] = '\0';
         }
-        else if (ShortName[i + 2] != ' ') {
-            ShortName[i + 3] = '\0';
-        }
-        else if (ShortName[i + 1] != ' ') {
-            ShortName[i + 2] = '\0';
-        }
-        else {
-            ShortName[i] = '\0';
-        }
-        if (ShortName[0] == 0x05) ShortName[0] = 0xE5;
+        if (short_name[0] == 0x05) short_name[0] = 0xE5;
 
         /* If this is a VolumeID then loop. We have no use for it. */
-        if ((Dir->DIR_Attr & (ATTR_DIRECTORY | ATTR_VOLUME_ID)) == ATTR_VOLUME_ID) {
-            p1 = wcschr(ShortName, L'.');
+        if ((dir->DIR_Attr & (ATTR_DIRECTORY | ATTR_VOLUME_ID)) == ATTR_VOLUME_ID) {
+            p1 = wcschr(short_name, L'.');
 
             if (p1 != nullptr) wcscpy_s(p1, wcslen(p1), p1 + 1);
 
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'%s' (volume ID)", Index / 32, ShortName);
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'%s' (volume ID)", index / 32, short_name);
 
             continue;
         }
 
-        if ((Dir->DIR_Attr & (ATTR_DIRECTORY | ATTR_VOLUME_ID)) == (ATTR_DIRECTORY | ATTR_VOLUME_ID)) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tInvalid directory entry");
+        if ((dir->DIR_Attr & (ATTR_DIRECTORY | ATTR_VOLUME_ID)) == (ATTR_DIRECTORY | ATTR_VOLUME_ID)) {
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\tInvalid directory entry");
 
             continue;
         }
 
         /* Ignore "." and "..". */
-        if (wcscmp(ShortName, L".") == 0) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'.'", Index / 32);
+        if (wcscmp(short_name, L".") == 0) {
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'.'", index / 32);
 
             continue;
         }
 
-        if (wcscmp(ShortName, L"..") == 0) {
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'..'", Index / 32);
+        if (wcscmp(short_name, L"..") == 0) {
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'..'", index / 32);
 
             continue;
         }
 
         /* Create and fill a new item record in memory. */
-        Item = (ItemStruct*)malloc(sizeof(ItemStruct));
+        item = new ItemStruct();
 
-        if (Item == nullptr) {
-            jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
+        if (item == nullptr) {
+            gui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
             break;
         }
 
-        if (wcscmp(ShortName, L".") == 0) {
-            Item->short_filename_ = nullptr;
-        }
-        else {
-            Item->short_filename_ = _wcsdup(ShortName);
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'%s'", Index / 32, ShortName);
-        }
-
-        if (LongName[0] == '\0') {
-            Item->long_filename_ = nullptr;
-        }
-        else {
-            Item->long_filename_ = _wcsdup(LongName);
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"\tLong filename = '%s'", LongName);
+        if (wcscmp(short_name, L".") == 0) {
+            item->clear_short_fn();
+        } else {
+            item->set_short_fn(short_name);
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"%u.\t'%s'", index / 32, short_name);
         }
 
-        if (Item->long_filename_ != nullptr &&
-            Item->short_filename_ != nullptr &&
-            _wcsicmp(Item->long_filename_, Item->short_filename_) == 0) {
-            free(Item->short_filename_);
-
-            Item->short_filename_ = Item->long_filename_;
+        if (long_name[0] == '\0') {
+            item->clear_long_fn();
+        } else {
+            item->set_long_fn(long_name);
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"\tLong filename = '%s'", long_name);
         }
 
-        if (Item->long_filename_ == nullptr && Item->short_filename_ != nullptr)
-            Item->long_filename_ = Item->
-                    short_filename_;
-        if (Item->long_filename_ != nullptr && Item->short_filename_ == nullptr)
-            Item->short_filename_ = Item->
-                    long_filename_;
+        item->clear_short_path();
+        item->clear_long_path();
+        item->bytes_ = dir->DIR_FileSize;
 
-        Item->short_path_ = nullptr;
-        Item->long_path_ = nullptr;
-        Item->bytes_ = Dir->DIR_FileSize;
-
-        if (Data->disk_.type_ == DiskType::FAT32) {
-            StartCluster = MAKELONG(Dir->DIR_FstClusLO, Dir->DIR_FstClusHI);
-        }
-        else {
-            StartCluster = Dir->DIR_FstClusLO;
+        if (data->disk_.type_ == DiskType::FAT32) {
+            start_cluster = MAKELONG(dir->DIR_FstClusLO, dir->DIR_FstClusHI);
+        } else {
+            start_cluster = dir->DIR_FstClusLO;
         }
 
-        make_fragment_list(Data, DiskInfo, Item, StartCluster);
+        make_fragment_list(data, disk_info, item, start_cluster);
 
-        Item->creation_time_ = convert_time(Dir->DIR_CrtDate, Dir->DIR_CrtTime, Dir->DIR_CrtTimeTenth);
-        Item->mft_change_time_ = convert_time(Dir->DIR_WrtDate, Dir->DIR_WrtTime, 0);
-        Item->last_access_time_ = convert_time(Dir->DIR_LstAccDate, 0, 0);
-        Item->parent_inode_ = 0;
-        Item->parent_directory_ = ParentDirectory;
-        Item->is_dir_ = false;
+        item->creation_time_ = convert_time(dir->DIR_CrtDate, dir->DIR_CrtTime, dir->DIR_CrtTimeTenth);
+        item->mft_change_time_ = convert_time(dir->DIR_WrtDate, dir->DIR_WrtTime, 0);
+        item->last_access_time_ = convert_time(dir->DIR_LstAccDate, 0, 0);
+        item->parent_inode_ = 0;
+        item->parent_directory_ = parent_directory;
+        item->is_dir_ = false;
 
-        if ((Dir->DIR_Attr & (ATTR_DIRECTORY | ATTR_VOLUME_ID)) == ATTR_DIRECTORY) Item->is_dir_ = true;
+        if ((dir->DIR_Attr & (ATTR_DIRECTORY | ATTR_VOLUME_ID)) == ATTR_DIRECTORY) item->is_dir_ = true;
 
-        Item->is_unmovable_ = false;
-        Item->is_excluded_ = false;
-        Item->is_hog_ = false;
+        item->is_unmovable_ = false;
+        item->is_excluded_ = false;
+        item->is_hog_ = false;
 
-        jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"\tSize = %I64u clusters, %I64u bytes",
-                          Item->clusters_count_, Item->bytes_);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"\tSize = %I64u clusters, %I64u bytes",
+                        item->clusters_count_, item->bytes_);
 
         /* Add the item record to the sorted item tree in memory. */
-        DefragLib::tree_insert(Data, Item);
+        DefragLib::tree_insert(data, item);
 
         /* Draw the item on the screen. */
-        jkGui->show_analyze(Data, Item);
-        //		if (*Data->RedrawScreen == false) {
-        defrag_lib_->colorize_item(Data, Item, 0, 0, false);
+        gui->show_analyze(data, item);
+        //		if (*data->RedrawScreen == false) {
+        defrag_lib_->colorize_item(data, item, 0, 0, false);
         //		} else {
-        //			ShowDiskmap(Data);
+        //			show_diskmap(data);
         //		}
 
         /* Increment counters. */
-        if (Item->is_dir_ == true) {
-            Data->count_directories_ = Data->count_directories_ + 1;
+        if (item->is_dir_) {
+            data->count_directories_ = data->count_directories_ + 1;
         }
 
-        Data->count_all_files_ = Data->count_all_files_ + 1;
-        Data->count_all_bytes_ = Data->count_all_bytes_ + Item->bytes_;
-        Data->count_all_clusters_ = Data->count_all_clusters_ + Item->clusters_count_;
+        data->count_all_files_ = data->count_all_files_ + 1;
+        data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
+        data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
 
-        if (DefragLib::get_fragment_count(Item) > 1) {
-            Data->count_fragmented_items_ = Data->count_fragmented_items_ + 1;
-            Data->count_fragmented_bytes_ = Data->count_fragmented_bytes_ + Item->bytes_;
-            Data->count_fragmented_clusters_ = Data->count_fragmented_clusters_ + Item->clusters_count_;
+        if (DefragLib::get_fragment_count(item) > 1) {
+            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
+            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + item->bytes_;
+            data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + item->clusters_count_;
         }
 
         /* If this is a directory then iterate. */
-        if (Item->is_dir_ == true) {
-            SubDirBuf = load_directory(Data, DiskInfo, StartCluster, &SubDirLength);
+        if (item->is_dir_ == true) {
+            sub_dir_buf = load_directory(data, disk_info, start_cluster, &sub_dir_length);
 
-            analyze_fat_directory(Data, DiskInfo, SubDirBuf, SubDirLength, Item);
+            analyze_fat_directory(data, disk_info, sub_dir_buf, sub_dir_length, item);
 
-            free(SubDirBuf);
+            free(sub_dir_buf);
 
-            jkGui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Finished with subdirectory.");
+            gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Finished with subdirectory.");
         }
     }
 }
@@ -679,7 +651,7 @@ case FAT16: if (FATContent == 0xFFF7) IsBadCluster = TRUE; break;
 case FAT32: if (FATContent == 0x0FFFFFF7) IsBadCluster = TRUE; break;
 }
 */
-BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
+BOOL ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
     FatBootSectorStruct BootSector;
     FatDiskInfoStruct DiskInfo;
 
@@ -691,7 +663,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
 
     size_t FatSize;
 
-    BYTE* RootDirectory;
+    BYTE *RootDirectory;
 
     uint64_t RootStart;
     uint64_t RootLength;
@@ -702,7 +674,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
 
     char s2[BUFSIZ];
 
-    DefragGui* jkGui = DefragGui::get_instance();
+    DefragGui *jkGui = DefragGui::get_instance();
 
     /* Read the boot block from the disk. */
     gOverlapped.Offset = 0;
@@ -713,7 +685,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
                       &gOverlapped);
 
     if (Result == 0 || BytesRead != 512) {
-        defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
+        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error while reading bootblock: %s", s1);
 
@@ -723,7 +695,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
     /* Test if the boot block is a FAT boot block. */
     if (BootSector.Signature != 0xAA55 ||
         ((BootSector.BS_jmpBoot[0] != 0xEB || BootSector.BS_jmpBoot[2] != 0x90) &&
-            BootSector.BS_jmpBoot[0] != 0xE9)) {
+         BootSector.BS_jmpBoot[0] != 0xE9)) {
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"This is not a FAT disk (different cookie).");
 
         return FALSE;
@@ -761,7 +733,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
             RootDirSectors;
 
     DiskInfo.DataSec = DiskInfo.TotalSectors - (BootSector.BPB_RsvdSecCnt + BootSector.BPB_NumFATs * DiskInfo.FATSz +
-        DiskInfo.RootDirSectors);
+                                                DiskInfo.RootDirSectors);
 
     DiskInfo.CountofClusters = DiskInfo.DataSec / BootSector.BPB_SecPerClus;
 
@@ -769,13 +741,11 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
         data->disk_.type_ = DiskType::FAT12;
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT12 disk.");
-    }
-    else if (DiskInfo.CountofClusters < 65525) {
+    } else if (DiskInfo.CountofClusters < 65525) {
         data->disk_.type_ = DiskType::FAT16;
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT16 disk.");
-    }
-    else {
+    } else {
         data->disk_.type_ = DiskType::FAT32;
 
         jkGui->show_debug(DebugLevel::Fatal, nullptr, L"This is a FAT32 disk.");
@@ -785,7 +755,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
     data->total_clusters_ = DiskInfo.CountofClusters;
 
     /* Output debug information. */
-    strncpy_s(s2,BUFSIZ, (char*)&BootSector.BS_OEMName[0], 8);
+    strncpy_s(s2, BUFSIZ, (char *) &BootSector.BS_OEMName[0], 8);
 
     s2[8] = '\0';
 
@@ -811,19 +781,18 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_BootSig: %u", BootSector.Fat16.BS_BootSig);
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BS_VolID: %u", BootSector.Fat16.BS_VolID);
 
-        strncpy_s(s2,BUFSIZ, (char*)&BootSector.Fat16.BS_VolLab[0], 11);
+        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat16.BS_VolLab[0], 11);
 
         s2[11] = '\0';
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  VolLab: %S", s2);
 
-        strncpy_s(s2,BUFSIZ, (char*)&BootSector.Fat16.BS_FilSysType[0], 8);
+        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat16.BS_FilSysType[0], 8);
 
         s2[8] = '\0';
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FilSysType: %S", s2);
-    }
-    else {
+    } else {
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FATSz32: %lu", BootSector.Fat32.BPB_FATSz32);
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  ExtFlags: %lu", BootSector.Fat32.BPB_ExtFlags);
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  FSVer: %lu", BootSector.Fat32.BPB_FSVer);
@@ -834,13 +803,13 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  BootSig: %lu", BootSector.Fat32.BS_BootSig);
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  VolID: %lu", BootSector.Fat32.BS_VolID);
 
-        strncpy_s(s2,BUFSIZ, (char*)&BootSector.Fat32.BS_VolLab[0], 11);
+        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat32.BS_VolLab[0], 11);
 
         s2[11] = '\0';
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"  VolLab: %S", s2);
 
-        strncpy_s(s2,BUFSIZ, (char*)&BootSector.Fat32.BS_FilSysType[0], 8);
+        strncpy_s(s2, BUFSIZ, (char *) &BootSector.Fat32.BS_FilSysType[0], 8);
 
         s2[8] = '\0';
 
@@ -849,19 +818,22 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
 
     /* Read the FAT from disk into memory. */
     switch (data->disk_.type_) {
-    case DiskType::FAT12: FatSize = (size_t)(DiskInfo.CountofClusters + 1 + (DiskInfo.CountofClusters + 1) / 2);
-        break;
-    case DiskType::FAT16: FatSize = (size_t)((DiskInfo.CountofClusters + 1) * 2);
-        break;
-    case DiskType::FAT32: FatSize = (size_t)((DiskInfo.CountofClusters + 1) * 4);
-        break;
+        case DiskType::FAT12:
+            FatSize = (size_t) (DiskInfo.CountofClusters + 1 + (DiskInfo.CountofClusters + 1) / 2);
+            break;
+        case DiskType::FAT16:
+            FatSize = (size_t) ((DiskInfo.CountofClusters + 1) * 2);
+            break;
+        case DiskType::FAT32:
+            FatSize = (size_t) ((DiskInfo.CountofClusters + 1) * 4);
+            break;
     }
 
     if (FatSize % DiskInfo.BytesPerSector > 0) {
-        FatSize = (size_t)(FatSize + DiskInfo.BytesPerSector - FatSize % DiskInfo.BytesPerSector);
+        FatSize = (size_t) (FatSize + DiskInfo.BytesPerSector - FatSize % DiskInfo.BytesPerSector);
     }
 
-    DiskInfo.FatData.FAT12 = (BYTE*)malloc(FatSize);
+    DiskInfo.FatData.FAT12 = (BYTE *) malloc(FatSize);
 
     if (DiskInfo.FatData.FAT12 == nullptr) {
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
@@ -877,10 +849,10 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
     jkGui->show_debug(DebugLevel::Progress, nullptr, L"Reading FAT, %lu bytes at offset=%I64u", FatSize,
                       Trans.QuadPart);
 
-    Result = ReadFile(data->disk_.volume_handle_, DiskInfo.FatData.FAT12, (uint32_t)FatSize, &BytesRead, &gOverlapped);
+    Result = ReadFile(data->disk_.volume_handle_, DiskInfo.FatData.FAT12, (uint32_t) FatSize, &BytesRead, &gOverlapped);
 
     if (Result == 0) {
-        defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
+        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
         jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 
@@ -892,8 +864,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
     /* Read the root directory from disk into memory. */
     if (data->disk_.type_ == DiskType::FAT32) {
         RootDirectory = load_directory(data, &DiskInfo, BootSector.Fat32.BPB_RootClus, &RootLength);
-    }
-    else {
+    } else {
         RootStart = (BootSector.BPB_RsvdSecCnt + BootSector.BPB_NumFATs * DiskInfo.FATSz) * DiskInfo.BytesPerSector;
         RootLength = BootSector.BPB_RootEntCnt * 32;
 
@@ -919,14 +890,14 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
         /* We have to round up the Length to the nearest sector. For some reason or other
         Microsoft has decided that raw reading from disk can only be done by whole sector,
         even though ReadFile() accepts it's parameters in bytes. */
-        BytesRead = (uint32_t)RootLength;
+        BytesRead = (uint32_t) RootLength;
 
         if (RootLength % DiskInfo.BytesPerSector > 0) {
-            BytesRead = (uint32_t)(RootLength + DiskInfo.BytesPerSector - RootLength % DiskInfo.BytesPerSector);
+            BytesRead = (uint32_t) (RootLength + DiskInfo.BytesPerSector - RootLength % DiskInfo.BytesPerSector);
         }
 
         /* Allocate buffer. */
-        RootDirectory = (BYTE*)malloc(BytesRead);
+        RootDirectory = (BYTE *) malloc(BytesRead);
         if (RootDirectory == nullptr) {
             jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: malloc() returned nullptr.");
             free(DiskInfo.FatData.FAT12);
@@ -946,7 +917,7 @@ BOOL ScanFAT::analyze_fat_volume(DefragDataStruct* data) {
         Result = ReadFile(data->disk_.volume_handle_, RootDirectory, BytesRead, &BytesRead, &gOverlapped);
 
         if (Result == 0) {
-            defrag_lib_->system_error_str(GetLastError(), s1,BUFSIZ);
+            defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
 
             jkGui->show_debug(DebugLevel::Progress, nullptr, L"Error: %s", s1);
 

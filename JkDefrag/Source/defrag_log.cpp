@@ -4,8 +4,6 @@
 #include <cstdarg>
 
 DefragLog::DefragLog() {
-    defrag_lib_ = DefragLib::get_instance();
-
     wchar_t name_buf[MAX_PATH];
     wchar_t s_name_buf[MAX_PATH];
 

@@ -318,38 +318,20 @@ void DefragLib::tree_detach(DefragDataStruct *data, const ItemStruct *item) {
     }
 }
 
-/* Delete the entire ItemTree. */
+/* Delete the entire ItemTree.
+ * TODO: top is owning pointer, to be freed
+ * */
 void DefragLib::delete_item_tree(ItemStruct *top) {
     if (top == nullptr) return;
     if (top->smaller_ != nullptr) delete_item_tree(top->smaller_);
     if (top->bigger_ != nullptr) delete_item_tree(top->bigger_);
 
-    if (top->short_path_ != nullptr &&
-        (top->long_path_ == nullptr ||
-         top->short_path_ != top->long_path_)) {
-        free(top->short_path_);
-
-        top->short_path_ = nullptr;
-    }
-
-    if (top->short_filename_ != nullptr &&
-        (top->long_filename_ == nullptr ||
-         top->short_filename_ != top->long_filename_)) {
-        free(top->short_filename_);
-
-        top->short_filename_ = nullptr;
-    }
-
-    if (top->long_path_ != nullptr) free(top->long_path_);
-    if (top->long_filename_ != nullptr) free(top->long_filename_);
-
     while (top->fragments_ != nullptr) {
         FragmentListStruct *fragment = top->fragments_->next_;
-
         free(top->fragments_);
 
         top->fragments_ = fragment;
     }
 
-    free(top);
+    std::free(top);
 }
