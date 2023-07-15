@@ -309,9 +309,10 @@ struct InodeDataStruct {
 
     bool is_directory_;
 
-    wchar_t *long_filename_;
-    // Short filename (8.3 DOS)
-    wchar_t *short_filename_;
+    // TODO: use std::wstring
+    std::unique_ptr<wchar_t[]> long_filename_;
+    // Short filename (8.3 DOS); TODO: use std::wstring
+    std::unique_ptr<wchar_t[]> short_filename_;
 
     uint64_t bytes_; /* Total number of bytes. */
     uint64_t creation_time_; /* 1 second = 10000000 */
@@ -362,8 +363,8 @@ private:
                            uint64_t buf_length) const;
 
     static BYTE *read_non_resident_data(
-        const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, const BYTE *run_data,
-        uint32_t run_data_length, uint64_t offset, uint64_t wanted_length);
+            const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, const BYTE *run_data,
+            uint32_t run_data_length, uint64_t offset, uint64_t wanted_length);
 
     static bool translate_rundata_to_fragmentlist(
             const DefragDataStruct *data, InodeDataStruct *inode_data,

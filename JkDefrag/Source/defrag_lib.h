@@ -32,7 +32,8 @@ http://www.kessels.com/
 
 #include "types.h"
 
-constexpr uint64_t VIRTUALFRAGMENT = 18446744073709551615UL; /* _UI64_MAX - 1 */
+#undef max
+constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
 
 // The three running states.
 enum class RunningState {
@@ -93,8 +94,7 @@ struct DiskStruct {
     uint64_t mft_locked_clusters_; /* Number of clusters at begin of MFT that cannot be moved. */
 };
 
-/* List of clusters used by the MFT. */
-
+// List of clusters used by the MFT
 struct ExcludesStruct {
     uint64_t start_;
     uint64_t end_;
