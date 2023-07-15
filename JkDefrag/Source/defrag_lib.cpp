@@ -256,14 +256,14 @@ std::wstring DefragLib::get_short_path(const DefragDataStruct *data, const ItemS
     if (item == nullptr) return {};
 
     /* Count the size of all the ShortFilename's. */
-    size_t length = wcslen(data->disk_.mount_point_) + 1;
+    size_t length = wcslen(data->disk_.mount_point_.get()) + 1;
 
     for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
         length = length + wcslen(temp_item->get_short_fn()) + 1;
     }
 
     // Allocate new string
-    std::wstring path = data->disk_.mount_point_;
+    std::wstring path = data->disk_.mount_point_.get();
 
     // Append all the strings
     append_to_short_path(item, path);
@@ -287,13 +287,13 @@ std::wstring DefragLib::get_long_path(const DefragDataStruct *data, const ItemSt
     if (item == nullptr) return {};
 
     // Count the size of all the LongFilename's
-    size_t length = wcslen(data->disk_.mount_point_) + 1;
+    size_t length = wcslen(data->disk_.mount_point_.get()) + 1;
 
     for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
         length += wcslen(temp_item->get_long_fn()) + 1;
     }
 
-    std::wstring path = data->disk_.mount_point_;
+    std::wstring path = data->disk_.mount_point_.get();
 
     // Append all the strings
     append_to_long_path(item, path);

@@ -327,7 +327,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
 
     /* Update Message 0 and 1. */
     if (data != nullptr) {
-        swprintf_s(messages_[0], MESSAGES_BUF_SIZE, L"%s", data->disk_.mount_point_);
+        swprintf_s(messages_[0], MESSAGES_BUF_SIZE, L"%s", data->disk_.mount_point_.get());
 
         switch (data->phase_) {
             case 1:

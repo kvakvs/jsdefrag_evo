@@ -1155,52 +1155,47 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     /* Try finding the MountPoint by treating the input path as a path to
     something on the disk. If this does not succeed then use the Path as
     a literal MountPoint name. */
-    data->disk_.mount_point_ = _wcsdup(path);
-    if (data->disk_.mount_point_ == nullptr) return;
+    data->disk_.mount_point_.reset(_wcsdup(path));
 
-    result = GetVolumePathNameW(path, data->disk_.mount_point_, (uint32_t) wcslen(data->disk_.mount_point_) + 1);
+    result = GetVolumePathNameW(path, data->disk_.mount_point_.get(),
+                                (uint32_t) wcslen(data->disk_.mount_point_.get()) + 1);
 
-    if (result == 0) wcscpy_s(data->disk_.mount_point_, wcslen(path) + 1, path);
+    if (result == FALSE) wcscpy_s(data->disk_.mount_point_.get(), wcslen(path) + 1, path);
 
     /* Make two versions of the MountPoint, one with a trailing backslash and one without. */
-    p1 = wcschr(data->disk_.mount_point_, 0);
+    p1 = wcschr(data->disk_.mount_point_.get(), 0);
 
-    if (p1 != data->disk_.mount_point_) {
+    if (p1 != data->disk_.mount_point_.get()) {
         p1--;
         if (*p1 == '\\') *p1 = 0;
     }
 
-    length = wcslen(data->disk_.mount_point_) + 2;
-    data->disk_.mount_point_slash_ = new wchar_t[length];
+    length = wcslen(data->disk_.mount_point_.get()) + 2;
+    data->disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
 
-    if (data->disk_.mount_point_slash_ == nullptr) {
-        delete data->disk_.mount_point_;
-        return;
-    }
+    swprintf_s(data->disk_.mount_point_slash_.get(), length, L"%s\\", data->disk_.mount_point_.get());
 
-    swprintf_s(data->disk_.mount_point_slash_, length, L"%s\\", data->disk_.mount_point_);
-
-    /* Determine the name of the volume (something like
-    "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\"). */
-    result = GetVolumeNameForVolumeMountPointW(data->disk_.mount_point_slash_,
+    // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
+    result = GetVolumeNameForVolumeMountPointW(data->disk_.mount_point_slash_.get(),
                                                data->disk_.volume_name_slash_, MAX_PATH);
 
-    if (result == 0) {
-        if (wcslen(data->disk_.mount_point_slash_) > 52 - 1 - 4) {
+    if (result == FALSE) {
+        if (wcslen(data->disk_.mount_point_slash_.get()) > 52 - 1 - 4) {
             // "Cannot find volume name for mountpoint '%s': %s"
             wchar_t s1[BUFSIZ];
             system_error_str(GetLastError(), s1, BUFSIZ);
 
-            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(), data->disk_.mount_point_slash_,
+            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(),
+                            data->disk_.mount_point_slash_.get(),
                             s1);
 
-            delete data->disk_.mount_point_;
-            delete data->disk_.mount_point_slash_;
+            data->disk_.mount_point_.reset();
+            data->disk_.mount_point_slash_.reset();
 
             return;
         }
 
-        swprintf_s(data->disk_.volume_name_slash_, 52, L"\\\\.\\%s", data->disk_.mount_point_slash_);
+        swprintf_s(data->disk_.volume_name_slash_, 52, L"\\\\.\\%s", data->disk_.mount_point_slash_.get());
     }
 
     /* Make a copy of the VolumeName without the trailing backslash. */
@@ -1213,20 +1208,19 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         if (*p1 == '\\') *p1 = 0;
     }
 
-    /* Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin
-    with 4 zero bytes). */
-    length = wcslen(data->disk_.mount_point_slash_) + 14;
+    // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
+    length = wcslen(data->disk_.mount_point_slash_.get()) + 14;
 
     p1 = new wchar_t[length];
 
     if (p1 == nullptr) {
-        delete data->disk_.mount_point_slash_;
-        delete data->disk_.mount_point_;
+        data->disk_.mount_point_slash_.reset();
+        data->disk_.mount_point_.reset();
 
         return;
     }
 
-    swprintf_s(p1, length, L"%s\\hiberfil.sys", data->disk_.mount_point_slash_);
+    swprintf_s(p1, length, L"%s\\hiberfil.sys", data->disk_.mount_point_slash_.get());
 
     result = _wfopen_s(&fin, p1, L"rb");
 
@@ -1236,8 +1230,8 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
             gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
 
-            delete data->disk_.mount_point_;
-            delete data->disk_.mount_point_slash_;
+            data->disk_.mount_point_.reset();
+            data->disk_.mount_point_slash_.reset();
             delete p1;
 
             return;
@@ -1248,7 +1242,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
     /* Show debug message: "Opening volume '%s' at mountpoint '%s'" */
     gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[29].c_str(), data->disk_.volume_name_,
-                    data->disk_.mount_point_);
+                    data->disk_.mount_point_.get());
 
     /* Open the VolumeHandle. If error then leave. */
     data->disk_.volume_handle_ = CreateFileW(data->disk_.volume_name_, GENERIC_READ,
@@ -1259,10 +1253,10 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         system_error_str(GetLastError(), last_error, BUFSIZ);
 
         gui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': reason %s",
-                        data->disk_.volume_name_, data->disk_.mount_point_, last_error);
+                        data->disk_.volume_name_, data->disk_.mount_point_.get(), last_error);
 
-        delete data->disk_.mount_point_;
-        delete data->disk_.mount_point_slash_;
+        data->disk_.mount_point_.reset();
+        data->disk_.mount_point_slash_.reset();
 
         return;
     }
@@ -1293,12 +1287,12 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
         /* Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'" */
         gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[32].c_str(), data->disk_.volume_name_,
-                        data->disk_.mount_point_);
+                        data->disk_.mount_point_.get());
 
         CloseHandle(data->disk_.volume_handle_);
 
-        delete data->disk_.mount_point_;
-        delete data->disk_.mount_point_slash_;
+        data->disk_.mount_point_.reset();
+        data->disk_.mount_point_slash_.reset();
 
         return;
     }
@@ -1440,8 +1434,8 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     /* Cleanup. */
     delete_item_tree(data->item_tree_);
 
-    delete data->disk_.mount_point_;
-    delete data->disk_.mount_point_slash_;
+    data->disk_.mount_point_.reset();
+    data->disk_.mount_point_slash_.reset();
 }
 
 /* Subfunction for DefragAllDisks(). It will ignore removable disks, and
