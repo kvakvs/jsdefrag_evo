@@ -55,3 +55,20 @@ enum class DrawColor : uint8_t {
     // Background color
     // Background
 };
+
+// Format string to use for numbers formatting with thousands separators
+#define NUM_FMT L"{:L}"
+// Format floating point with 0 decimals
+#define FLT0_FMT L"{:.0f}"
+// Format floating point with 4 decimals
+#define FLT4_FMT L"{:.4f}"
+// Format floating point with 2 decimals
+#define FLT2_FMT L"{:.2f}"
+
+#define GAP_FOUND_FMT           L"Gap found: LCN=" NUM_FMT ", Size=" NUM_FMT
+#define MOVING_1_CLUSTER_FMT    L"Moving 1 cluster from " NUM_FMT " to " NUM_FMT
+#define MOVING_CLUSTERS_FMT     L"Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT
+#define EXTENT_FMT              L"Extent: Lcn=" NUM_FMT ", Vcn=" NUM_FMT ", NextVcn=" NUM_FMT
+#define VEXTENT_FMT             L"Extent (virtual): Vcn=" NUM_FMT ", NextVcn=" NUM_FMT
+#define SKIPPING_GAP_FMT        L"Skipping gap, cannot fill: " NUM_FMT " [" NUM_FMT " clusters]"
+#define MFT_EXCL_FMT            L"MftExcludes[{}].Start=" NUM_FMT ", MftExcludes[{}].End=" NUM_FMT

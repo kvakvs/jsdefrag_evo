@@ -103,8 +103,8 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
     /* Exit if we're running inside a debugger. */
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
 
-    log->log_message(L"I have crashed!");
-    log->log_message(L"  Command line: %s", GetCommandLineW());
+    log->log(L"I have crashed!");
+    log->log(std::format(L"  Command line: {}", GetCommandLineW()).c_str());
 
     /* Show the type of exception. */
     switch (exception_info->ExceptionRecord->ExceptionCode) {
@@ -198,7 +198,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
             strcpy_s(s1, BUFSIZ, "(unknown exception)");
     }
 
-    log->log_message(L"  Exception: %S", s1);
+    log->log(std::format(L"  Exception: {}", Str::from_char(s1)));
 
     /* Try to show the linenumber of the sourcefile. */
     SymSetOptions(SymGetOptions() || SYMOPT_LOAD_LINES);
@@ -208,7 +208,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
         wchar_t s2[BUFSIZ];
         DefragLib::system_error_str(GetLastError(), s2, BUFSIZ);
 
-        log->log_message(L"  Failed to initialize SymInitialize(): %s", s2);
+        log->log(std::format(L"  Failed to initialize SymInitialize(): {}", s2).c_str());
 
         return EXCEPTION_EXECUTE_HANDLER;
     }
@@ -255,10 +255,10 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
             result = SymGetLineFromAddr64(GetCurrentProcess(), stack_frame.AddrPC.Offset,
                                           &line_displacement, &source_line);
             if (result == TRUE) {
-                log->log_message(L"  %i. At line %d in '%S'", frame_number, source_line.LineNumber,
-                                 source_line.FileName);
+                log->log(std::format(L"  Frame {}. At line {} in '{}'", frame_number, source_line.LineNumber,
+                                     Str::from_char(source_line.FileName)));
             } else {
-                log->log_message(L"  %i. At line (unknown) in (unknown)", frame_number);
+                log->log(std::format(L"  Frame {}. At line (unknown) in (unknown)", frame_number));
                 /*
                 SystemErrorStr(GetLastError(),s2,BUFSIZ);
                 LogMessage(L"  Error executing SymGetLineFromAddr64(): %s",s2);
@@ -329,18 +329,19 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     }
 
     /* Show some standard information in the logfile. */
-    log->log_string(defrag_struct->versiontext_.c_str());
+    log->log(defrag_struct->versiontext_.c_str());
     time(&now);
 
     localtime_s(&now_tm, &now);
-    log->log_message(L"Date: %04lu/%02lu/%02lu", 1900 + now_tm.tm_year, 1 + now_tm.tm_mon, now_tm.tm_mday);
+    log->log(std::format(L"Date: {:04}/{:02}/{:02}", 1900 + now_tm.tm_year, 1 + now_tm.tm_mon, now_tm.tm_mday));
 
     ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
     os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 
     if (GetVersionEx(&os_version) != 0) {
-        log->log_message(L"Windows version: v%lu.%lu build %lu %S", os_version.dwMajorVersion,
-                         os_version.dwMinorVersion, os_version.dwBuildNumber, os_version.szCSDVersion);
+        log->log(std::format(L"Windows version: v{}.{} build {} {}", os_version.dwMajorVersion,
+                             os_version.dwMinorVersion, os_version.dwBuildNumber,
+                             Str::from_char(os_version.szCSDVersion)));
     }
 
     /* Scan the commandline again for all the other arguments. */
@@ -366,10 +367,9 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     optimize_mode = OptimizeMode::DeprecatedAnalyzeFixupFull;
                 }
 
-                // optimize_mode.mode_ = optimize_mode.mode_ - 1;
-
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-a' accepted, optimizemode = %u",
-                                (int) optimize_mode + 1);
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-a' accepted, optimizemode = {}",
+                                            (int) optimize_mode));
 
                 continue;
             }
@@ -384,11 +384,9 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     optimize_mode = OptimizeMode::DeprecatedAnalyzeFixupFull;
                 }
 
-                // optimize_mode.mode_ = optimize_mode.mode_ - 1;
-
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-a' accepted, optimizemode = %u",
-                                (int) optimize_mode + 1);
-
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-a' accepted, optimizemode = {}",
+                                            (int) optimize_mode));
                 continue;
             }
 
@@ -412,7 +410,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     speed = 100;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-s' accepted, speed = %u%%", speed);
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-s' accepted, slowing down to {}%", speed));
 
                 continue;
             }
@@ -427,8 +426,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     speed = 100;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-s' accepted, speed = %u%%", speed);
-
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-s' accepted, speed = {}%", speed));
                 continue;
             }
 
@@ -452,9 +451,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     free_space = 1;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-f' accepted, freespace = %0.1f%%",
-                                free_space);
-
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-f' accepted, freespace = {:.1f}%", free_space));
                 continue;
             }
 
@@ -469,8 +467,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 }
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
-                                L"Command line argument '-f' accepted, free space = %0.1f%%",
-                                free_space);
+                                std::format(L"Command line argument '-f' accepted, free space = {:.1f}%", free_space));
 
                 continue;
             }
@@ -496,9 +493,9 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                     instance_->debug_level_ = DebugLevel::Warning;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-d' accepted, debug = %u",
-                                instance_->debug_level_);
-
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-d' accepted, debug level set to {}",
+                                            (int) instance_->debug_level_));
                 continue;
             }
 
@@ -506,9 +503,9 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 argv[i][2] >= '0' && argv[i][2] <= '6') {
                 instance_->debug_level_ = (DebugLevel) _wtol(&argv[i][2]);
 
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-d' accepted, debug = %u",
-                                instance_->debug_level_);
-
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Commandline argument '-d' accepted, debug level set to {}",
+                                            (int) instance_->debug_level_));
                 continue;
             }
 
@@ -526,8 +523,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 auto log_file = log->get_log_filename();
 
                 if (*log_file != '\0') {
-                    gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-l' accepted, logfile = %s",
-                                    log_file);
+                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                                    std::format(L"Commandline argument '-l' accepted, logfile = {}", log_file));
                 } else {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Commandline argument '-l' accepted, logfile turned off");
@@ -540,8 +537,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 auto log_file = log->get_log_filename();
 
                 if (*log_file != '\0') {
-                    gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-l' accepted, logfile = %s",
-                                    log_file);
+                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                                    std::format(L"Commandline argument '-l' accepted, logfile = {}", log_file));
                 } else {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
                                     L"Commandline argument '-l' accepted, logfile turned off");
@@ -564,7 +561,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 excludes.emplace_back(argv[i]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
-                                L"Commandline argument '-e' accepted, added '%s' to the excludes", argv[i]);
+                                std::format(L"Commandline argument '-e' accepted, added '{}' to the excludes",
+                                            argv[i]));
 
                 continue;
             }
@@ -573,8 +571,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 excludes.emplace_back(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
-                                L"Commandline argument '-e' accepted, added '%s' to the excludes",
-                                &argv[i][2]);
+                                std::format(L"Commandline argument '-e' accepted, added '{}' to the excludes",
+                                            &argv[i][2]));
 
                 continue;
             }
@@ -593,7 +591,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 space_hogs.emplace_back(argv[i]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
-                                L"Commandline argument '-u' accepted, added '%s' to the spacehogs", argv[i]);
+                                std::format(L"Commandline argument '-u' accepted, added '{}' to the spacehogs",
+                                            argv[i]));
 
                 continue;
             }
@@ -602,8 +601,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 space_hogs.emplace_back(&argv[i][2]);
 
                 gui->show_debug(DebugLevel::Fatal, nullptr,
-                                L"Commandline argument '-u' accepted, added '%s' to the spacehogs",
-                                &argv[i][2]);
+                                std::format(L"Commandline argument '-u' accepted, added '{}' to the spacehogs",
+                                            &argv[i][2]));
 
                 continue;
             }
@@ -617,7 +616,8 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             }
 
             if (argv[i][0] == '-') {
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Error: commandline argument not recognised: %s", argv[i]);
+                gui->show_debug(DebugLevel::Fatal, nullptr,
+                                std::format(L"Error: commandline argument not recognised: {}", argv[i]));
             }
         }
     }
@@ -644,7 +644,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
             if (*argv[i] == '\0') continue;
 
             defrag_lib->run_jk_defrag(argv[i], optimize_mode, speed, free_space, excludes, space_hogs,
-                                      &instance_->running_state_, std::nullopt);
+                                      &instance_->running_state_);
 
             do_all_volumes = false;
         }
@@ -653,7 +653,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     /* If no paths are specified on the commandline then defrag all fixed harddisks. */
     if (do_all_volumes && instance_->i_am_running_ == RunningState::RUNNING) {
         defrag_lib->run_jk_defrag(nullptr, optimize_mode, speed, free_space, excludes, space_hogs,
-                                  &instance_->running_state_, std::nullopt);
+                                  &instance_->running_state_);
     }
 
     /* If the "-q" command line argument was specified then exit the program. */
@@ -737,18 +737,4 @@ bool Defrag::is_already_running(void) const {
     /* Return false, not yet running. */
     CloseHandle(snapshot);
     return false;
-}
-
-
-int __stdcall WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show) {
-    Defrag *defrag = Defrag::get_instance();
-    WPARAM ret_value = 0;
-
-    if (defrag != nullptr) {
-        ret_value = defrag->start_program(instance, prev_instance, cmd_line, cmd_show);
-
-        Defrag::release_instance();
-    }
-
-    return (int) ret_value;
 }

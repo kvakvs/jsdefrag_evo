@@ -25,6 +25,7 @@ set(HEADER_FILES
         ${SRC}/defrag_data_struct.h
         ${SRC}/defrag.h)
 set(SOURCE_FILES
+        ${SRC}/main.cpp
         ${SRC}/defrag.cpp
         ${SRC}/defrag_gui.cpp
         ${SRC}/defrag_gui_colormap.cpp
