@@ -30,6 +30,7 @@ http://www.kessels.com/
 #include <optional>
 #include <tchar.h>
 
+#include "constants.h"
 #include "types.h"
 
 #undef max
@@ -40,33 +41,6 @@ enum class RunningState {
     RUNNING = 0,
     STOPPING = 1,
     STOPPED = 2
-};
-
-enum class OptimizeMode {
-    // Analyze only, do not defragment and do not optimize.
-    AnalyzeOnly = 0,
-    // Analyze and fixup, do not optimize.
-    AnalyzeFixup = 1,
-    // Analyze, fixup, and fast optimization(default).
-    AnalyzeFixupFastopt = 2,
-    // Deprecated.Analyze, fixup, and full optimization.
-    DeprecatedAnalyzeFixupFull = 3,
-    // Analyze and force together.
-    AnalyzeGroup = 4,
-    // Analyze and move to end of disk.
-    AnalyzeMoveToEnd = 5,
-    // Analyze and sort files by name.
-    AnalyzeSortByName = 6,
-    // Analyze and sort files by size(smallest first).
-    AnalyzeSortBySize = 7,
-    // Analyze and sort files by last access(newest first).
-    AnalyzeSortByAccess = 8,
-    // Analyze and sort files by last change(oldest first).
-    AnalyzeSortByChanged = 9,
-    // Analyze and sort files by creation time(oldest first).
-    AnalyzeSortByCreated = 10,
-    // 11 (unused?) - move to beginning of disk
-    Max
 };
 
 enum class DiskType {

@@ -181,8 +181,7 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
         if (clusters % 10 == 1) {
             log_->log(std::format(L"{}\n  " MOVING_1_CLUSTER_FMT, item->get_long_path(), from_lcn, to_lcn));
         } else {
-            log_->log(std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT,
-                                  item->get_long_path(), clusters, from_lcn, to_lcn));
+            log_->log(std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
         }
     }
     paint_image(dc_);

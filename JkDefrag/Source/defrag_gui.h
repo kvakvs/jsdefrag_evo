@@ -61,7 +61,9 @@ private:
 
     std::unique_ptr<DefragStruct> defrag_struct_;
 
-    /* graphics data */
+    //
+    // graphics data
+    //
 
     int top_height_{};
     int square_size_;
