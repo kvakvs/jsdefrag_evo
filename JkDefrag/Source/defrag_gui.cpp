@@ -110,18 +110,9 @@ WPARAM DefragGui::do_modal() {
 void DefragGui::set_display_data(HDC dc) {
     const Graphics graphics(dc);
     Rect client_window_size;
-
-    Status status = graphics.GetVisibleClipBounds(&client_window_size);
+    graphics.GetVisibleClipBounds(&client_window_size);
 
     client_window_size_ = client_window_size;
-
-    /*
-        if (m_clusterSquares != nullptr)
-        {
-            delete m_clusterSquares;
-        }
-    */
-
     top_height_ = 33;
 
     if (debug_level_ > DebugLevel::Warning) {
@@ -136,8 +127,6 @@ void DefragGui::set_display_data(HDC dc) {
 
     num_disk_squares_ = num_disk_squares_x_ * num_disk_squares_y_;
 
-    //	m_clusterSquares = new clusterSquareStruct[m_numDiskSquares];
-
     for (int ii = 0; ii < num_disk_squares_; ii++) {
         cluster_squares_[ii].color_ = 0;
         cluster_squares_[ii].dirty_ = true;
@@ -147,17 +136,6 @@ void DefragGui::set_display_data(HDC dc) {
     real_offset_y_ = (int) ((client_window_size_.Height - top_height_ - num_disk_squares_y_ * square_size_) * 0.5);
 
     bmp_ = std::make_unique<Bitmap>(client_window_size_.Width, client_window_size_.Height);
-
-    //	Color bottomPartColor;
-    //	bottomPartColor.SetFromCOLORREF(RGB(255,255,255));
-
-    //	SolidBrush bottomPartBrush(bottomPartColor);
-
-    //	Rect drawArea(0, 0, m_clientWindowSize.Width, m_clientWindowSize.Height);
-    //	graphics.FillRectangle(&bottomPartBrush, drawArea);
-
-    /* Ask defragger to completely redraw the screen. */
-    //	RedrawScreen = 0;
 }
 
 /* Callback: clear the screen. */

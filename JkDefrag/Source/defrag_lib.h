@@ -222,7 +222,7 @@ public:
     RunJkDefrag() subroutine.
     
     */
-    void stop_jk_defrag(RunningState *run_state, int time_out);
+    static void stop_jk_defrag(RunningState *run_state, int time_out);
 
     static const wchar_t *stristr_w(const wchar_t *haystack, const wchar_t *needle);
 

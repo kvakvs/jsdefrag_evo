@@ -1,4 +1,5 @@
 #pragma once
+
 #include <memory>
 
 constexpr size_t mftbuffersize = 256 * 1024; /* 256 KB seems to be the optimum. */
@@ -27,7 +28,7 @@ struct FILE_RECORD_HEADER {
     // Offset to the first Attribute 
     USHORT attribute_offset_;
     // Flags. bit 1 = in use, bit 2 = directory, bit 4 & 8 = unknown. 
-    USHORT flags_; 
+    USHORT flags_;
 
     ULONG bytes_in_use_; /* Real size of the FILE record */
     ULONG bytes_allocated_; /* Allocated size of the FILE record */
@@ -39,7 +40,7 @@ struct FILE_RECORD_HEADER {
 
     ULONG mft_record_number_; /* Number of this MFT Record (XP) */
 
-    USHORT update_seq_num_; 
+    USHORT update_seq_num_;
 };
 
 enum class ATTRIBUTE_TYPE {
@@ -71,7 +72,7 @@ struct ATTRIBUTE {
     UCHAR name_length_;
     USHORT name_offset_;
     // 0x0001 = Compressed, 0x4000 = Encrypted, 0x8000 = Sparse 
-    USHORT flags_; 
+    USHORT flags_;
     USHORT attribute_number_;
 };
 
@@ -80,7 +81,7 @@ struct RESIDENT_ATTRIBUTE {
     ULONG value_length_;
     USHORT value_offset_;
     // 0x0001 = Indexed
-    USHORT flags_; 
+    USHORT flags_;
 };
 
 struct NONRESIDENT_ATTRIBUTE {
@@ -106,7 +107,7 @@ struct STANDARD_INFORMATION {
     uint64_t last_access_time_;
 
     // READ_ONLY=0x01, HIDDEN=0x02, SYSTEM=0x04, VOLUME_ID=0x08, ARCHIVE=0x20, DEVICE=0x40 
-    ULONG file_attributes_; 
+    ULONG file_attributes_;
     ULONG maximum_versions_;
     ULONG version_number_;
     ULONG class_id_;
@@ -116,8 +117,8 @@ struct STANDARD_INFORMATION {
     //
 
     ULONG owner_id_;
-    ULONG security_id_; 
-    ULONGLONG quota_charge_; 
+    ULONG security_id_;
+    ULONGLONG quota_charge_;
     USN usn_;
 };
 
@@ -153,7 +154,7 @@ struct FILENAME_ATTRIBUTE {
 
     UCHAR name_length_;
     // NTFS=0x01, DOS=0x02 
-    UCHAR name_type_; 
+    UCHAR name_type_;
 
     wchar_t name_[1];
 };
@@ -186,7 +187,7 @@ struct DIRECTORY_INDEX {
     ULONG index_block_length_;
     ULONG allocated_size_;
     // SMALL=0x00, LARGE=0x01 
-    ULONG flags_; 
+    ULONG flags_;
 };
 
 struct DIRECTORY_ENTRY {
@@ -196,7 +197,7 @@ struct DIRECTORY_ENTRY {
     USHORT attribute_length_;
 
     // 0x01 = Has trailing VCN, 0x02 = Last entry
-    ULONG flags_; 
+    ULONG flags_;
 
     // FILENAME_ATTRIBUTE Name;
     // ULONGLONG Vcn;      // VCN in IndexAllocation of earlier entries
@@ -294,10 +295,10 @@ struct ATTRIBUTE_DEFINITION {
 */
 
 struct StreamStruct {
-    StreamStruct* next_;
+    StreamStruct *next_;
     std::wstring stream_name_;
     ATTRIBUTE_TYPE stream_type_;
-    FragmentListStruct* fragments_; /* The fragments of the stream. */
+    FragmentListStruct *fragments_; /* The fragments of the stream. */
     uint64_t clusters_; /* Total number of clusters. */
     uint64_t bytes_; /* Total number of bytes. */
 };
@@ -308,21 +309,21 @@ struct InodeDataStruct {
 
     bool is_directory_;
 
-    wchar_t* long_filename_;
+    wchar_t *long_filename_;
     // Short filename (8.3 DOS)
-    wchar_t* short_filename_;
+    wchar_t *short_filename_;
 
     uint64_t bytes_; /* Total number of bytes. */
     uint64_t creation_time_; /* 1 second = 10000000 */
     uint64_t mft_change_time_;
     uint64_t last_access_time_;
 
-    StreamStruct* streams_; /* List of StreamStruct. */
-    FragmentListStruct* mft_data_fragments_; /* The Fragments of the $MFT::$DATA stream. */
+    StreamStruct *streams_; /* List of StreamStruct. */
+    FragmentListStruct *mft_data_fragments_; /* The Fragments of the $MFT::$DATA stream. */
 
     uint64_t mft_data_bytes_; /* Length of the $MFT::$DATA. */
 
-    FragmentListStruct* mft_bitmap_fragments_; /* The Fragments of the $MFT::$BITMAP stream. */
+    FragmentListStruct *mft_bitmap_fragments_; /* The Fragments of the $MFT::$BITMAP stream. */
 
     uint64_t mft_bitmap_bytes_; /* Length of the $MFT::$BITMAP. */
 };
@@ -346,69 +347,51 @@ struct NtfsDiskInfoStruct {
 class ScanNTFS {
 public:
     ScanNTFS();
+
     ~ScanNTFS();
 
     // Get instance of the class
-    static ScanNTFS* get_instance();
+    static ScanNTFS *get_instance();
 
-    bool analyze_ntfs_volume(DefragDataStruct* data);
+    bool analyze_ntfs_volume(DefragDataStruct *data);
 
 private:
-    static const wchar_t * stream_type_names(const ATTRIBUTE_TYPE stream_type);
+    static const wchar_t *stream_type_names(ATTRIBUTE_TYPE stream_type);
 
-    bool fixup_raw_mftdata(DefragDataStruct* data, const NtfsDiskInfoStruct* disk_info, BYTE* buffer,
+    bool fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
                            uint64_t buf_length) const;
 
-    BYTE* read_non_resident_data(const DefragDataStruct* data, const NtfsDiskInfoStruct* disk_info, const BYTE* run_data,
-                                 uint32_t run_data_length, uint64_t offset, uint64_t wanted_length) const;
+    static BYTE *read_non_resident_data(
+        const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, const BYTE *run_data,
+        uint32_t run_data_length, uint64_t offset, uint64_t wanted_length);
 
-    static BOOL translate_rundata_to_fragmentlist(
-            const DefragDataStruct* data,
-            InodeDataStruct* inode_data,
-            const wchar_t *stream_name,
-            const ATTRIBUTE_TYPE stream_type,
-            const BYTE* run_data,
-            const uint32_t run_data_length,
-            const uint64_t starting_vcn,
-            const uint64_t bytes);
+    static bool translate_rundata_to_fragmentlist(
+            const DefragDataStruct *data, InodeDataStruct *inode_data,
+            const wchar_t *stream_name, ATTRIBUTE_TYPE stream_type,
+            const BYTE *run_data, uint32_t run_data_length, uint64_t starting_vcn,
+            uint64_t bytes);
 
-    static void cleanup_streams(InodeDataStruct* inode_data, BOOL cleanup_fragments);
+    static void cleanup_streams(InodeDataStruct *inode_data, bool cleanup_fragments);
 
-    std::wstring construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, StreamStruct* stream);
+    static std::wstring
+    construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, const StreamStruct *stream);
 
     bool process_attributes(
-        DefragDataStruct* data,
-        NtfsDiskInfoStruct* disk_info,
-        InodeDataStruct* inode_data,
-        BYTE* buffer,
-        uint64_t buf_length,
-        USHORT instance,
-        int depth);
+            DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
+            uint64_t buf_length, USHORT instance, int depth);
 
     void process_attribute_list(
-        DefragDataStruct* data,
-        NtfsDiskInfoStruct* disk_info,
-        InodeDataStruct* inode_data,
-        BYTE* buffer,
-        uint64_t buf_length,
-        int depth);
+            DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
+            uint64_t buf_length, int depth);
 
     bool interpret_mft_record(
-        DefragDataStruct* data,
-        NtfsDiskInfoStruct* disk_info,
-        ItemStruct** inode_array,
-        uint64_t inode_number,
-        uint64_t max_inode,
-        FragmentListStruct** mft_data_fragments,
-        uint64_t* mft_data_bytes,
-        FragmentListStruct** mft_bitmap_fragments,
-        uint64_t* MftBitmapBytes,
-        BYTE* buffer,
-        uint64_t buf_length);
+            DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array, uint64_t inode_number,
+            uint64_t max_inode, FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
+            FragmentListStruct **mft_bitmap_fragments, uint64_t *mft_bitmap_bytes, BYTE *buffer, uint64_t buf_length);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanNTFS> instance_;
 
     //	JKDefragGui *m_jkGui;
-    DefragLib* defrag_lib_{};
+    DefragLib *defrag_lib_{};
 };

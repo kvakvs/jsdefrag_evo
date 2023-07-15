@@ -1115,7 +1115,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     ignoring the item. */
 
     for (const auto &s: data->excludes_) {
-        if (this->match_mask(path, s.c_str()) == true) break;
+        if (DefragLib::match_mask(path, s.c_str()) == true) break;
         if (wcschr(s.c_str(), L'*') == nullptr &&
             s.length() <= 3 &&
             lower_case(path[0]) == lower_case(data->excludes_[i][0]))

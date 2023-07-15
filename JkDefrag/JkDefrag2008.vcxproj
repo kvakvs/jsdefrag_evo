@@ -169,8 +169,14 @@
     <ClCompile Include="Source\defrag.cpp" />
     <ClCompile Include="Source\defrag_gui.cpp" />
     <ClCompile Include="Source\defrag_lib.cpp" />
+    <ClCompile Include="Source\defrag_lib_finding.cpp" />
+    <ClCompile Include="Source\defrag_lib_methods.cpp" />
+    <ClCompile Include="Source\defrag_lib_moving.cpp" />
+    <ClCompile Include="Source\defrag_lib_scan.cpp" />
+    <ClCompile Include="Source\defrag_lib_tree.cpp" />
     <ClCompile Include="Source\defrag_log.cpp" />
     <ClCompile Include="Source\defrag_struct.cpp" />
+    <ClCompile Include="Source\itemstruct.cpp" />
     <ClCompile Include="Source\scan_fat.cpp" />
     <ClCompile Include="Source\scan_ntfs.cpp" />
     <ClCompile Include="Source\std_afx.cpp">
@@ -188,6 +194,7 @@
     <ClInclude Include="Source\defrag_lib.h" />
     <ClInclude Include="Source\defrag_log.h" />
     <ClInclude Include="Source\defrag_struct.h" />
+    <ClInclude Include="Source\itemstruct.h" />
     <ClInclude Include="Source\scan_fat.h" />
     <ClInclude Include="Source\scan_ntfs.h" />
     <ClInclude Include="Source\std_afx.h" />

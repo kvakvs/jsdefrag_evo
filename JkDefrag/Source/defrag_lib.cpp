@@ -1083,31 +1083,12 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
 
 /* Run the defragger/optimizer. See the .h file for a full explanation. */
 void DefragLib::run_jk_defrag(
-        wchar_t *path,
-        OptimizeMode optimize_mode,
-        int speed,
-        double free_space,
-        const Wstrings &excludes,
-        const Wstrings &space_hogs,
-        RunningState *run_state,
-        std::optional<Wstrings> debug_msg) {
+        wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space, const Wstrings &excludes,
+        const Wstrings &space_hogs, RunningState *run_state, std::optional<Wstrings> debug_msg) {
     DefragDataStruct data{};
-
-    //	int DefaultRedrawScreen;
-
-    uint32_t NtfsDisableLastAccessUpdate;
-
-    LONG Result;
-
-    HKEY Key;
-
-    DWORD KeyDisposition;
-    DWORD Length;
-
-    wchar_t s1[BUFSIZ];
-
-    int i;
-
+    uint32_t ntfs_disable_last_access_update;
+    DWORD key_disposition;
+    DWORD length;
     DefragGui *gui = DefragGui::get_instance();
 
     /* Copy the input values to the data struct. */
@@ -1123,16 +1104,7 @@ void DefragLib::run_jk_defrag(
     }
 
     *data.running_ = RunningState::RUNNING;
-
-    /*
-        if (RedrawScreen == nullptr) {
-            Data.RedrawScreen = &DefaultRedrawScreen;
-        } else {
-            Data.RedrawScreen = RedrawScreen;
-        }
-        *Data.RedrawScreen = 0;
-    */
-
+    
     if (!debug_msg.has_value() || debug_msg.value().empty()) {
         data.debug_msg_.clear();
         for (auto &def: default_debug_msg) {
@@ -1144,17 +1116,17 @@ void DefragLib::run_jk_defrag(
 
     // Make a copy of the SpaceHogs array
     data.space_hogs_.clear();
-    data.use_default_space_hogs_ = TRUE;
+    data.use_default_space_hogs_ = true;
 
     for (const auto &sh: space_hogs) {
         if (_wcsicmp(sh.c_str(), L"DisableDefaults") == 0) {
-            data.use_default_space_hogs_ = FALSE;
+            data.use_default_space_hogs_ = false;
         } else {
             data.space_hogs_.push_back(sh);
         }
     }
 
-    if (data.use_default_space_hogs_ == TRUE) {
+    if (data.use_default_space_hogs_) {
         data.space_hogs_.emplace_back(L"?:\\$RECYCLE.BIN\\*"); /* Vista */
         data.space_hogs_.emplace_back(L"?:\\RECYCLED\\*"); /* FAT on 2K/XP */
         data.space_hogs_.emplace_back(L"?:\\RECYCLER\\*"); /* NTFS on 2K/XP */
@@ -1221,21 +1193,23 @@ void DefragLib::run_jk_defrag(
     data.use_last_access_time_ = TRUE;
 
     if (data.use_default_space_hogs_ == TRUE) {
-        Result = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-                                 L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0,
-                                 nullptr, REG_OPTION_NON_VOLATILE, KEY_READ, nullptr, &Key, &KeyDisposition);
+        LONG result;
+        HKEY key;
+        result = RegCreateKeyExW(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0,
+            nullptr, REG_OPTION_NON_VOLATILE, KEY_READ, nullptr, &key, &key_disposition);
 
-        if (Result == ERROR_SUCCESS) {
-            Length = sizeof NtfsDisableLastAccessUpdate;
+        if (result == ERROR_SUCCESS) {
+            length = sizeof ntfs_disable_last_access_update;
 
-            Result = RegQueryValueExW(Key, L"NtfsDisableLastAccessUpdate", nullptr, nullptr,
-                                      (BYTE *) &NtfsDisableLastAccessUpdate, &Length);
+            result = RegQueryValueExW(key, L"NtfsDisableLastAccessUpdate", nullptr, nullptr,
+                                      (BYTE *) &ntfs_disable_last_access_update, &length);
 
-            if (Result == ERROR_SUCCESS && NtfsDisableLastAccessUpdate == 1) {
+            if (result == ERROR_SUCCESS && ntfs_disable_last_access_update == 1) {
                 data.use_last_access_time_ = FALSE;
             }
 
-            RegCloseKey(Key);
+            RegCloseKey(key);
         }
 
         if (data.use_last_access_time_ == TRUE) {
@@ -1264,6 +1238,7 @@ void DefragLib::run_jk_defrag(
             drives_size = GetLogicalDriveStringsW(drives_size, drives);
 
             if (drives_size == 0) {
+                wchar_t s1[BUFSIZ];
                 /* "Could not get list of volumes: %s" */
                 system_error_str(GetLastError(), s1, BUFSIZ);
 
@@ -1298,22 +1273,18 @@ negative then immediately return without waiting.
 
 */
 void DefragLib::stop_jk_defrag(RunningState *run_state, int time_out) {
-    int time_waited;
-
-    /* Sanity check. */
+    // Sanity check
     if (run_state == nullptr) return;
 
-    /* All loops in the library check if the Running variable is set to
-    RUNNING. If not then the loop will exit. In effect this will stop
-    the defragger. */
+    // All loops in the library check if the Running variable is set to RUNNING. If not then the loop will exit.
+    // In effect this will stop the defragger
     if (*run_state == RunningState::RUNNING) {
         *run_state = RunningState::STOPPING;
     }
 
-    /* Wait for a maximum of time_out milliseconds for the defragger to stop.
-    If time_out is zero then wait indefinitely. If time_out is negative then
-    immediately return without waiting. */
-    time_waited = 0;
+    // Wait for a maximum of time_out milliseconds for the defragger to stop.
+    // If time_out is zero then wait indefinitely. If time_out is negative then immediately return without waiting
+    int time_waited = 0;
 
     while (time_waited <= time_out) {
         if (*run_state == RunningState::STOPPED) break;
@@ -1323,4 +1294,3 @@ void DefragLib::stop_jk_defrag(RunningState *run_state, int time_out) {
         if (time_out > 0) time_waited = time_waited + 100;
     }
 }
-

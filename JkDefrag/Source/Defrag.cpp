@@ -72,7 +72,7 @@ WPARAM Defrag::start_program(const HINSTANCE instance,
     /* If the defragger is still running then ask & wait for it to stop. */
     i_am_running_ = RunningState::STOPPED;
 
-    defrag_lib_->stop_jk_defrag(&running_state_, 0);
+    DefragLib::stop_jk_defrag(&running_state_, 0);
 
     return w_param;
 }
@@ -206,7 +206,7 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
 
     if (result == FALSE) {
         wchar_t s2[BUFSIZ];
-        defrag_lib->system_error_str(GetLastError(), s2, BUFSIZ);
+        DefragLib::system_error_str(GetLastError(), s2, BUFSIZ);
 
         log->log_message(L"  Failed to initialize SymInitialize(): %s", s2);
 
@@ -680,7 +680,7 @@ bool Defrag::is_already_running(void) const {
 
     if (snapshot == INVALID_HANDLE_VALUE) {
         wchar_t s2[BUFSIZ];
-        defrag_lib_->system_error_str(GetLastError(), s1, BUFSIZ);
+        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
 
         swprintf_s(s2, BUFSIZ, L"Cannot get process snapshot: %s", s1);
 
