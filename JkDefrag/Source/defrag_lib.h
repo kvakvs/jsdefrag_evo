@@ -211,9 +211,7 @@ public:
         messages.
     */
     void run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
-                       const Wstrings &excludes, const Wstrings &space_hogs,
-                       RunningState *run_state,
-                       std::optional<Wstrings> debug_msg);
+                       const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state);
 
     /*
     

@@ -55,10 +55,10 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
             wchar_t s1[BUFSIZ];
-            /* Show debug message: "ERROR: could not get volume bitmap: %s" */
-            system_error_str(GetLastError(), s1, BUFSIZ);
 
-            gui->show_debug(DebugLevel::Warning, nullptr, data->debug_msg_[12].c_str(), s1);
+            // Show debug message: "ERROR: could not get volume bitmap: %s"
+            system_error_str(GetLastError(), s1, BUFSIZ);
+            gui->show_debug(DebugLevel::Warning, nullptr, std::format(L"ERROR: could not get volume bitmap: {}", s1));
 
             return false;
         }
@@ -88,9 +88,9 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
 
                 if (prev_in_use == 0 && in_use != 0) {
                     /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
-                    gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13].c_str(),
-                                    cluster_start,
-                                    lcn - cluster_start);
+                    gui->show_debug(
+                            DebugLevel::DetailedGapFinding, nullptr,
+                            std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
 
                     /* If the gap is bigger/equal than the mimimum size then return it,
                     or remember it, depending on the FindHighestGap parameter. */
@@ -137,8 +137,8 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
     /* Process the last gap. */
     if (prev_in_use == 0) {
         /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
-        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, data->debug_msg_[13].c_str(), cluster_start,
-                        lcn - cluster_start);
+        gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
+                        std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
 
         if (cluster_start >= minimum_lcn && lcn - cluster_start >= minimum_size) {
             if (!find_highest_gap) {
@@ -191,8 +191,9 @@ ItemStruct *DefragLib::find_highest_item(const DefragDataStruct *data, const uin
     DefragGui *gui = DefragGui::get_instance();
 
     /* "Looking for highest-fit %I64d[%I64d]" */
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for highest-fit %I64d[%I64d]",
-                    cluster_start, cluster_end - cluster_start);
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                    std::format(L"Looking for highest-fit start=" NUM_FMT " [" NUM_FMT " clusters]",
+                                cluster_start, cluster_end - cluster_start));
 
     /* Walk backwards through all the items on disk and select the first
     file that fits inside the free block. If we find an exact match then
@@ -226,6 +227,7 @@ ItemStruct *DefragLib::find_highest_item(const DefragDataStruct *data, const uin
 
     return nullptr;
 }
+
 /*
 
 Find the highest item on disk that fits inside the gap (cluster start - cluster
@@ -245,8 +247,9 @@ ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
 
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Looking for perfect fit %I64d[%I64d]",
-                    cluster_start, cluster_end - cluster_start);
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                    std::format(L"Looking for perfect fit start=" NUM_FMT " [" NUM_FMT " clusters]",
+                                cluster_start, cluster_end - cluster_start));
 
     /* Walk backwards through all the items on disk and select the first item that
     fits inside the free block, and combined with other items will fill the gap

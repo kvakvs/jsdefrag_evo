@@ -12,13 +12,13 @@ public:
     // Get instance of the class
     static DefragGui *get_instance();
 
-    void clear_screen(const wchar_t *format, ...);
+    void clear_screen(std::wstring &&text);
 
     void draw_cluster(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
 
     void fill_squares(uint64_t clusterStartSquareNum, uint64_t clusterEndSquareNum);
 
-    void show_debug(DebugLevel level, const ItemStruct *item, const wchar_t *format, ...);
+    void show_debug(DebugLevel level, const ItemStruct *item, std::wstring &&text);
 
     void show_status(const DefragDataStruct *data);
 
@@ -48,8 +48,9 @@ private:
     // UINT_PTR size_timer_;
 
     static constexpr size_t MESSAGES_BUF_SIZE = 32768;
+
     // The texts displayed on the screen
-    wchar_t messages_[6][MESSAGES_BUF_SIZE]{};
+    std::wstring messages_[6];
 
     DebugLevel debug_level_;
 

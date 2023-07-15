@@ -50,7 +50,7 @@ a different array. Do not change this default array, simply create a new
 array in your program and specify it as a parameter.
 
 */
-const wchar_t *default_debug_msg[] =
+const wchar_t *DEPRECATED_default_debug_msg[] =
         {
                 /*  0 */ L"",
                 /*  1 */ L"",
@@ -62,55 +62,54 @@ const wchar_t *default_debug_msg[] =
                 /*  7 */ L"",
                 /*  8 */ L"",
                 /*  9 */ L"",
-                /* 10 */ L"Getting cluster bitmap: %s",
-                /* 11 */ L"Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u",
+//                /* 10 */ L"Getting cluster bitmap: %s",
+//                /* 11 */ L"Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u",
                 /* 12 */ L"ERROR: could not get volume bitmap: %s",
-                /* 13 */ L"Gap found: LCN=%I64d, Size=%I64d",
+//                /* 13 */ L"Gap found: LCN=%I64d, Size=%I64d",
                 /* 14 */ L"Processing '%s'",
-                /* 15 */ L"Could not open '%s': %s",
-                /* 16 */ L"%I64d clusters at %I64d, %I64d bytes",
-                /* 17 */ L"Special file attribute: Compressed",
-                /* 18 */ L"Special file attribute: Encrypted",
-                /* 19 */ L"Special file attribute: Offline",
-                /* 20 */ L"Special file attribute: Read-only",
-                /* 21 */ L"Special file attribute: Sparse-file",
-                /* 22 */ L"Special file attribute: Temporary",
-                /* 23 */ L"Analyzing: %s",
+//                /* 15 */ L"Could not open '%s': %s",
+//                /* 16 */ L"%I64d clusters at %I64d, %I64d bytes",
+//                /* 17 */ L"Special file attribute: Compressed",
+//                /* 18 */ L"Special file attribute: Encrypted",
+//                /* 19 */ L"Special file attribute: Offline",
+//                /* 20 */ L"Special file attribute: Read-only",
+//                /* 21 */ L"Special file attribute: Sparse-file",
+//                /* 22 */ L"Special file attribute: Temporary",
+//                /* 23 */ L"Analyzing: %s",
                 /* 24 */ L"",
-                /* 25 */ L"Cannot move file away because no gap is big enough: %I64d[%I64d]",
+//                /* 25 */ L"Cannot move file away because no gap is big enough: %I64d[%I64d]",
                 /* 26 */ L"Don't know which file is at the end of the gap: %I64d[%I64d]",
                 /* 27 */ L"Enlarging gap %I64d[%I64d] by moving %I64d[%I64d]",
-                /* 28 */ L"Skipping gap, cannot fill: %I64d[%I64d]",
-                /* 29 */ L"Opening volume '%s' at mountpoint '%s'",
+//                /* 28 */ L"Skipping gap, cannot fill: %I64d[%I64d]",
+//                /* 29 */ L"Opening volume '%s' at mountpoint '%s'",
                 /* 30 */ L"",
-                /* 31 */ L"Volume '%s' at mountpoint '%s' is not mounted.",
-                /* 32 */ L"Cannot defragment volume '%s' at mountpoint '%s'",
-                /* 33 */
-                         L"MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d",
-                /* 34 */ L"MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d",
+//                /* 31 */ L"Volume '%s' at mountpoint '%s' is not mounted.",
+//                /* 32 */ L"Cannot defragment volume '%s' at mountpoint '%s'",
+//                /* 33 */ L"MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d",
+//                /* 34 */ L"MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d",
                 /* 35 */ L"",
-                /* 36 */ L"Ignoring volume '%s' because it is read-only.",
+//                /* 36 */ L"Ignoring volume '%s' because it is read-only.",
                 /* 37 */ L"Analyzing volume '%s'",
-                /* 38 */ L"Finished.",
-                /* 39 */ L"Could not get list of volumes: %s",
-                /* 40 */ L"Cannot find volume name for mountpoint '%s': %s",
+//                /* 38 */ L"Finished.",
+//                /* 39 */ L"Could not get list of volumes: %s",
+//                /* 40 */ L"Cannot find volume name for mountpoint '%s': %s",
                 /* 41 */ L"Cannot enlarge gap at %I64d[%I64d] because of unmovable data.",
                 /* 42 */ L"Windows could not move the file, trying alternative method.",
-                /* 43 */ L"Cannot process clustermap of '%s': %s",
-                /* 44 */ L"Disk is full, cannot defragment.",
+//                /* 43 */ L"Cannot process clustermap of '%s': %s",
+//                /* 44 */ L"Disk is full, cannot defragment.",
                 /* 45 */ L"Alternative method failed, leaving file where it is.",
-                /* 46 */ L"Extent (virtual): Vcn=%I64u, NextVcn=%I64u",
-                /* 47 */ L"Ignoring volume '%s' because of exclude mask '%s'.",
+//                /* 46 */ L"Extent (virtual): Vcn=%I64u, NextVcn=%I64u",
+//                /* 47 */ L"Ignoring volume '%s' because of exclude mask '%s'.",
                 /* 48 */ L"Vacating %I64u clusters starting at LCN=%I64u",
                 /* 49 */ L"Vacated %I64u clusters (until %I64u) from LCN=%I64u",
                 /* 50 */ L"Finished vacating %I64u clusters, until LCN=%I64u",
                 /* 51 */ L"",
                 /* 52 */ L"",
                 /* 53 */ L"I am fragmented.",
-                /* 54 */ L"I am in MFT reserved space.",
-                /* 55 */ L"I am a regular file in zone 1.",
-                /* 56 */ L"I am a spacehog in zone 1 or 2.",
-                /* 57 */ L"Ignoring volume '%s' because it is not a harddisk."
+//                /* 54 */ L"I am in MFT reserved space.",
+//                /* 55 */ L"I am a regular file in zone 1.",
+//                /* 56 */ L"I am a spacehog in zone 1 or 2.",
+//                /* 57 */ L"Ignoring volume '%s' because it is not a harddisk."
         };
 
 /* Search case-insensitive for a substring. */
@@ -194,7 +193,7 @@ void DefragLib::show_hex([[maybe_unused]] DefragDataStruct *data, const BYTE *bu
             }
         }
 
-        gui->show_debug(DebugLevel::Progress, nullptr, L"%s", s1);
+        gui->show_debug(DebugLevel::Progress, nullptr, s1);
     }
 }
 
@@ -336,7 +335,7 @@ void DefragLib::slow_down(DefragDataStruct *data) {
 
 /* Return the location on disk (LCN, Logical Cluster Number) of an item. */
 uint64_t DefragLib::get_item_lcn(const ItemStruct *item) {
-    /* Sanity check. */
+    // Sanity check
     if (item == nullptr) return 0;
 
     const FragmentListStruct *fragment = item->fragments_;
@@ -344,10 +343,7 @@ uint64_t DefragLib::get_item_lcn(const ItemStruct *item) {
     while (fragment != nullptr && fragment->lcn_ == VIRTUALFRAGMENT) {
         fragment = fragment->next_;
     }
-
-    if (fragment == nullptr) return 0;
-
-    return fragment->lcn_;
+    return fragment == nullptr ? 0 : fragment->lcn_;
 }
 
 
@@ -379,8 +375,8 @@ HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruc
     system_error_str(GetLastError(), error_string, BUFSIZ);
 
     DefragGui *gui = DefragGui::get_instance();
-    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[15].c_str(), item->get_long_path(),
-                    error_string);
+    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
+                    std::format(L"Could not open '{}': {}", item->get_long_path(), error_string));
 
     return nullptr;
 }
@@ -444,7 +440,8 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
     }
 
     /* Show debug message: "Getting cluster bitmap: %s" */
-    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[10].c_str(), item->get_long_path());
+    gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
+                    std::format(L"Getting cluster bitmap: {}", item->get_long_path()));
 
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
@@ -490,14 +487,14 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
             /* Show debug message. */
             if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
                 /* "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u" */
-                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[11].c_str(),
-                                extent_data.extents_[i].lcn_,
-                                vcn,
-                                extent_data.extents_[i].next_vcn_);
+                gui->show_debug(
+                        DebugLevel::DetailedFileInfo, nullptr,
+                        std::format(EXTENT_FMT, extent_data.extents_[i].lcn_, vcn, extent_data.extents_[i].next_vcn_));
             } else {
                 /* "Extent (virtual): Vcn=%I64u, NextVcn=%I64u" */
-                gui->show_debug(DebugLevel::DetailedFileInfo, nullptr, data->debug_msg_[46].c_str(), vcn,
-                                extent_data.extents_[i].next_vcn_);
+                gui->show_debug(
+                        DebugLevel::DetailedFileInfo, nullptr,
+                        std::format(VEXTENT_FMT, vcn, extent_data.extents_[i].next_vcn_));
             }
 
             /* Add the size of the fragment to the total number of clusters.
@@ -536,8 +533,9 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
         /* Show debug message: "Cannot process clustermap of '%s': %s" */
         system_error_str(error_code, error_string, BUFSIZ);
 
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[43].c_str(), item->get_long_path(),
-                        error_string);
+        gui->show_debug(
+                DebugLevel::DetailedProgress, nullptr,
+                std::format(L"Cannot process clustermap of '{}': {}", item->get_long_path(), error_string));
 
         return false;
     }
@@ -1082,9 +1080,8 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
 }
 
 /* Run the defragger/optimizer. See the .h file for a full explanation. */
-void DefragLib::run_jk_defrag(
-        wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space, const Wstrings &excludes,
-        const Wstrings &space_hogs, RunningState *run_state, std::optional<Wstrings> debug_msg) {
+void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
+                              const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
     DefragDataStruct data{};
     uint32_t ntfs_disable_last_access_update;
     DWORD key_disposition;
@@ -1104,15 +1101,6 @@ void DefragLib::run_jk_defrag(
     }
 
     *data.running_ = RunningState::RUNNING;
-
-    if (!debug_msg.has_value() || debug_msg.value().empty()) {
-        data.debug_msg_.clear();
-        for (auto &def: default_debug_msg) {
-            data.debug_msg_.push_back(def);
-        }
-    } else {
-        data.debug_msg_ = debug_msg.value();
-    }
 
     // Make a copy of the SpaceHogs array
     data.space_hogs_.clear();
@@ -1242,7 +1230,8 @@ void DefragLib::run_jk_defrag(
                 /* "Could not get list of volumes: %s" */
                 system_error_str(GetLastError(), s1, BUFSIZ);
 
-                gui->show_debug(DebugLevel::Warning, nullptr, data.debug_msg_[39].c_str(), s1);
+                gui->show_debug(DebugLevel::Warning, nullptr,
+                                std::format(L"Could not get list of volumes: {}", s1));
             } else {
                 wchar_t *drive;
                 drive = drives;
@@ -1257,20 +1246,18 @@ void DefragLib::run_jk_defrag(
             delete drives;
         }
 
-        gui->clear_screen(data.debug_msg_[38].c_str());
+        gui->clear_screen(L"Finished.");
     }
 
-    /* Cleanup. */
+    // Cleanup
     *data.running_ = RunningState::STOPPED;
 }
 
 /*
-
 Stop the defragger. The "Running" variable must be the same as what was given to
 the RunJkDefrag() subroutine. Wait for a maximum of time_out milliseconds for the
 defragger to stop. If time_out is zero then wait indefinitely. If time_out is
 negative then immediately return without waiting.
-
 */
 void DefragLib::stop_jk_defrag(RunningState *run_state, int time_out) {
     // Sanity check

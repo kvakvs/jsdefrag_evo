@@ -81,7 +81,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
 
         if (is_fragmented(item, 0, item->clusters_count_)) {
             /* "I am fragmented." */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[53].c_str());
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am fragmented.");
 
             move_me = true;
         }
@@ -92,28 +92,24 @@ void DefragLib::fixup(DefragDataStruct *data) {
              (item_lcn >= data->mft_excludes_[2].start_ && item_lcn < data->mft_excludes_[2].end_))
             && (data->disk_.type_ != DiskType::NTFS || !match_mask(item->get_long_path(), L"?:\\$MFT"))) {
             // "I am in MFT reserved space."
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[54].c_str());
-
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am in MFT reserved space.");
             move_me = true;
         }
 
         if (file_zone == 1 && item_lcn < data->zones_[1] && move_me == false) {
             // "I am a regular file in zone 1."
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[55].c_str());
-
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a regular file in zone 1.");
             move_me = true;
         }
 
         if (file_zone == 2 && item_lcn < data->zones_[2] && move_me == false) {
             /* "I am a spacehog in zone 1 or 2." */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[56].c_str());
-
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a spacehog in zone 1 or 2.");
             move_me = true;
         }
 
         if (move_me == false) {
             data->phase_done_ = data->phase_done_ + item->clusters_count_;
-
             continue;
         }
 
@@ -141,8 +137,11 @@ void DefragLib::fixup(DefragDataStruct *data) {
 
             if (!result) {
                 /* Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]" */
-                gui->show_debug(DebugLevel::Progress, item, data->debug_msg_[25].c_str(), get_item_lcn(item),
-                                item->clusters_count_);
+                gui->show_debug(
+                        DebugLevel::Progress, item,
+                        std::format(
+                                L"Cannot move file away because no gap is big enough: lcn=" NUM_FMT "[" NUM_FMT " clusters]",
+                                get_item_lcn(item), item->clusters_count_));
 
                 gap_end[file_zone] = gap_begin[file_zone]; /* Force re-scan of gap. */
 
@@ -232,13 +231,11 @@ void DefragLib::defragment(DefragDataStruct *data) {
                           FALSE);
 
         if (result == false) {
-            /* Try finding a gap again, this time including the free area. */
+            // Try finding a gap again, this time including the free area
             result = find_gap(data, 0, 0, item->clusters_count_, false, false, &gap_begin, &gap_end, FALSE);
 
             if (result == false) {
-                /* Show debug message: "Disk is full, cannot defragment." */
-                gui->show_debug(DebugLevel::Progress, item, data->debug_msg_[44].c_str());
-
+                gui->show_debug(DebugLevel::Progress, item, L"Disk is full, cannot defragment.");
                 return;
             }
         }
@@ -403,27 +400,23 @@ encounter an unmovable file. */
 void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
     uint64_t test_gap_begin;
     uint64_t test_gap_end;
-    uint64_t MoveGapBegin;
-    uint64_t MoveGapEnd;
-
-    ItemStruct *Item;
-    FragmentListStruct *Fragment;
-
-    uint64_t Vcn;
-    uint64_t RealVcn;
-
-    ItemStruct *BiggerItem;
-
-    uint64_t BiggerBegin;
-    uint64_t BiggerEnd;
-    uint64_t BiggerRealVcn;
-    uint64_t MoveTo;
-    uint64_t DoneUntil;
+    uint64_t move_gap_begin;
+    uint64_t move_gap_end;
+    ItemStruct *item;
+    FragmentListStruct *fragment;
+    uint64_t vcn;
+    uint64_t real_vcn;
+    ItemStruct *bigger_item;
+    uint64_t bigger_begin;
+    uint64_t bigger_end;
+    uint64_t bigger_real_vcn;
+    uint64_t move_to;
+    uint64_t done_until;
 
     DefragGui *gui = DefragGui::get_instance();
 
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Vacating %I64u clusters starting at LCN=%I64u",
-                    clusters, lcn);
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                    std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT, clusters, lcn));
 
     /* Sanity check. */
     if (lcn >= data->total_clusters_) {
@@ -435,150 +428,153 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
     /* Determine the point to above which we will be moving the data. We want at least the
     end of the zone if everything was perfectly optimized, so data will not be moved
     again and again. */
-    MoveTo = lcn + clusters;
+    move_to = lcn + clusters;
 
-    if (data->zone_ == 0) MoveTo = data->zones_[1];
-    if (data->zone_ == 1) MoveTo = data->zones_[2];
+    if (data->zone_ == 0) move_to = data->zones_[1];
+    if (data->zone_ == 1) move_to = data->zones_[2];
 
     if (data->zone_ == 2) {
         /* Zone 2: end of disk minus all the free space. */
-        MoveTo = data->total_clusters_ - data->count_free_clusters_ +
-                 (uint64_t) (data->total_clusters_ * 2.0 * data->free_space_ / 100.0);
+        move_to = data->total_clusters_ - data->count_free_clusters_ +
+                  (uint64_t) (data->total_clusters_ * 2.0 * data->free_space_ / 100.0);
     }
 
-    if (MoveTo < lcn + clusters) MoveTo = lcn + clusters;
+    if (move_to < lcn + clusters) move_to = lcn + clusters;
 
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"MoveTo = %I64u", MoveTo);
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(L"move_to = " NUM_FMT, move_to));
 
     /* Loop forever. */
-    MoveGapBegin = 0;
-    MoveGapEnd = 0;
-    DoneUntil = lcn;
+    move_gap_begin = 0;
+    move_gap_end = 0;
+    done_until = lcn;
 
     while (*data->running_ == RunningState::RUNNING) {
-        /* Find the first movable data fragment at or above the DoneUntil lcn. If there is nothing
+        /* Find the first movable data fragment at or above the done_until lcn. If there is nothing
         then return, we have reached the end of the disk. */
-        BiggerItem = nullptr;
-        BiggerBegin = 0;
+        bigger_item = nullptr;
+        bigger_begin = 0;
 
-        for (Item = tree_smallest(data->item_tree_); Item != nullptr; Item = tree_next(Item)) {
-            if (Item->is_unmovable_ == true || Item->is_excluded_ == true || Item->clusters_count_ == 0) {
+        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+            if (item->is_unmovable_ == true || item->is_excluded_ == true || item->clusters_count_ == 0) {
                 continue;
             }
 
-            Vcn = 0;
-            RealVcn = 0;
+            vcn = 0;
+            real_vcn = 0;
 
-            for (Fragment = Item->fragments_; Fragment != nullptr; Fragment = Fragment->next_) {
-                if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-                    if (Fragment->lcn_ >= DoneUntil &&
-                        (BiggerBegin > Fragment->lcn_ || BiggerItem == nullptr)) {
-                        BiggerItem = Item;
-                        BiggerBegin = Fragment->lcn_;
-                        BiggerEnd = Fragment->lcn_ + Fragment->next_vcn_ - Vcn;
-                        BiggerRealVcn = RealVcn;
+            for (fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+                if (fragment->lcn_ != VIRTUALFRAGMENT) {
+                    if (fragment->lcn_ >= done_until &&
+                        (bigger_begin > fragment->lcn_ || bigger_item == nullptr)) {
+                        bigger_item = item;
+                        bigger_begin = fragment->lcn_;
+                        bigger_end = fragment->lcn_ + fragment->next_vcn_ - vcn;
+                        bigger_real_vcn = real_vcn;
 
-                        if (BiggerBegin == lcn) break;
+                        if (bigger_begin == lcn) break;
                     }
 
-                    RealVcn = RealVcn + Fragment->next_vcn_ - Vcn;
+                    real_vcn = real_vcn + fragment->next_vcn_ - vcn;
                 }
 
-                Vcn = Fragment->next_vcn_;
+                vcn = fragment->next_vcn_;
             }
 
-            if (BiggerBegin != 0 && BiggerBegin == lcn) break;
+            if (bigger_begin != 0 && bigger_begin == lcn) break;
         }
 
-        if (BiggerItem == nullptr) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No data found above LCN=%I64u", lcn);
-
-            return;
-        }
-
-        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"data found at LCN=%I64u, %s", BiggerBegin,
-                        BiggerItem->get_long_path());
-
-        /* Find the first gap above the lcn. */
-        bool result = find_gap(data, lcn, 0, 0, true, false, &test_gap_begin, &test_gap_end, ignore_mft_excludes);
-
-        if (result == false) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No gaps found above LCN=%I64u", lcn);
-
-            return;
-        }
-
-        /* Exit if the end of the first gap is below the first movable item, the gap cannot
-        be enlarged. */
-        if (test_gap_end < BiggerBegin) {
+        if (bigger_item == nullptr) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                            L"Cannot enlarge the gap from %I64u to %I64u (%I64u clusters) any further.",
-                            test_gap_begin, test_gap_end, test_gap_end - test_gap_begin);
+                            std::format(L"No data found above LCN=" NUM_FMT, lcn));
 
+            return;
+        }
+
+        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                        std::format(L"Data found at LCN=" NUM_FMT ", {}", bigger_begin, bigger_item->get_long_path()));
+
+        // Find the first gap above the lcn
+        bool result = find_gap(data, lcn, 0, 0, true, false,
+                               &test_gap_begin, &test_gap_end, ignore_mft_excludes);
+
+        if (!result) {
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            std::format(L"No gaps found above LCN=" NUM_FMT, lcn));
+            return;
+        }
+
+        // Exit if the end of the first gap is below the first movable item, the gap cannot be expanded.
+        if (test_gap_end < bigger_begin) {
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            std::format(
+                                    L"Cannot expand the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) any further.",
+                                    test_gap_begin, test_gap_end, test_gap_end - test_gap_begin));
             return;
         }
 
         /* Exit if the first movable item is at the end of the gap and the gap is big enough,
         no need to enlarge any further. */
-        if (test_gap_end == BiggerBegin && test_gap_end - test_gap_begin >= clusters) {
+        if (test_gap_end == bigger_begin && test_gap_end - test_gap_begin >= clusters) {
             gui->show_debug(
                     DebugLevel::DetailedGapFilling, nullptr,
-                    L"Finished vacating, the gap from %I64u to %I64u (%I64u clusters) is now bigger than %I64u clusters.",
-                    test_gap_begin, test_gap_end, test_gap_end - test_gap_begin, clusters);
+                    std::format(
+                            L"Finished vacating, the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) is now bigger than " NUM_FMT " clusters.",
+                            test_gap_begin, test_gap_end, test_gap_end - test_gap_begin, clusters));
 
             return;
         }
 
         /* Exit if we have moved the item before. We don't want a worm. */
-        if (lcn >= MoveTo) {
+        if (lcn >= move_to) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Stopping vacate because of possible worm.");
             return;
         }
 
         /* Determine where we want to move the fragment to. Maybe the previously used
         gap is big enough, otherwise we have to locate another gap. */
-        if (BiggerEnd - BiggerBegin >= MoveGapEnd - MoveGapBegin) {
+        if (bigger_end - bigger_begin >= move_gap_end - move_gap_begin) {
             result = false;
 
-            /* First try to find a gap above the MoveTo point. */
-            if (MoveTo < data->total_clusters_ && MoveTo >= BiggerEnd) {
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Finding gap above MoveTo=%I64u", MoveTo);
+            /* First try to find a gap above the move_to point. */
+            if (move_to < data->total_clusters_ && move_to >= bigger_end) {
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                                std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
 
-                result = find_gap(data, MoveTo, 0, BiggerEnd - BiggerBegin, true, false, &MoveGapBegin, &MoveGapEnd,
+                result = find_gap(data, move_to, 0, bigger_end - bigger_begin, true, false, &move_gap_begin,
+                                  &move_gap_end,
                                   FALSE);
             }
 
-            /* If no gap was found then try to find a gap as high on disk as possible, but
-            above the item. */
-            if (result == false) {
+            // If no gap was found then try to find a gap as high on disk as possible, but above the item.
+            if (!result) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                L"Finding gap from end of disk above BiggerEnd=%I64u", BiggerEnd);
+                                std::format(L"Finding gap from end of disk above bigger_end=" NUM_FMT, bigger_end));
 
-                result = find_gap(data, BiggerEnd, 0, BiggerEnd - BiggerBegin, true, true, &MoveGapBegin,
-                                  &MoveGapEnd, FALSE);
+                result = find_gap(data, bigger_end, 0, bigger_end - bigger_begin, true, true, &move_gap_begin,
+                                  &move_gap_end, FALSE);
             }
 
-            /* If no gap was found then exit, we cannot move the item. */
-            if (result == false) {
+            // If no gap was found then exit, we cannot move the item.
+            if (!result) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No gap found.");
 
                 return;
             }
         }
 
-        /* Move the fragment to the gap. */
-        result = move_item(data, BiggerItem, MoveGapBegin, BiggerRealVcn, BiggerEnd - BiggerBegin, 0);
+        // Move the fragment to the gap.
+        result = move_item(data, bigger_item, move_gap_begin, bigger_real_vcn, bigger_end - bigger_begin, 0);
 
-        if (result == true) {
-            if (MoveGapBegin < MoveTo) MoveTo = MoveGapBegin;
+        if (result) {
+            if (move_gap_begin < move_to) move_to = move_gap_begin;
 
-            MoveGapBegin = MoveGapBegin + BiggerEnd - BiggerBegin;
+            move_gap_begin = move_gap_begin + bigger_end - bigger_begin;
         } else {
-            MoveGapEnd = MoveGapBegin; /* Force re-scan of gap. */
+            move_gap_end = move_gap_begin; /* Force re-scan of gap. */
         }
 
-        /* Adjust the DoneUntil lcn. We don't want an infinite loop. */
-        DoneUntil = BiggerEnd;
+        /* Adjust the done_until lcn. We don't want an infinite loop. */
+        done_until = bigger_end;
     }
 }
 
@@ -646,7 +642,8 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
             }
 
             if (item == nullptr) {
-                gui->show_debug(DebugLevel::Progress, nullptr, L"Finished sorting zone %u.", data->zone_ + 1);
+                gui->show_debug(DebugLevel::Progress, nullptr,
+                                std::format(L"Finished sorting zone {}.", data->zone_ + 1));
 
                 break;
             }
@@ -661,17 +658,17 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
                 continue;
             }
 
-            /* Move the item to the Lcn. If the gap at Lcn is not big enough then fragment
-            the file into whatever gaps are available. */
+            // Move the item to the Lcn. If the gap at Lcn is not big enough then fragment
+            // the file into whatever gaps are available.
             uint64_t clusters_done = 0;
 
             while (*data->running_ == RunningState::RUNNING &&
                    clusters_done < item->clusters_count_ &&
-                   item->is_unmovable_ == false) {
+                   !item->is_unmovable_) {
                 if (clusters_done > 0) {
                     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                    L"Item partially placed, %I64u clusters more to do",
-                                    item->clusters_count_ - clusters_done);
+                                    std::format(L"Item partially placed, " NUM_FMT " clusters more to do",
+                                                item->clusters_count_ - clusters_done));
                 }
 
                 /* Call the Vacate() function to make a gap at Lcn big enough to hold the item.
@@ -797,8 +794,9 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct *data) {
 
     while (*data->running_ == RunningState::RUNNING && clusters_done < item->clusters_count_) {
         if (clusters_done > data->disk_.mft_locked_clusters_) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Partially placed, %I64u clusters more to do",
-                            item->clusters_count_ - clusters_done);
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            std::format(L"Partially placed, " NUM_FMT " clusters more to do",
+                                        item->clusters_count_ - clusters_done));
         }
 
         /* Call the Vacate() function to make a gap at Lcn big enough to hold the MFT.
@@ -938,8 +936,9 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
             /* If the gap could not be filled then skip. */
             if (gap_begin < gap_end) {
                 /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28].c_str(), gap_begin,
-                                gap_end - gap_begin);
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                                std::format(SKIPPING_GAP_FMT, gap_begin,
+                                            gap_end - gap_begin));
 
                 gap_begin = gap_end;
                 retry = 0;
@@ -1029,8 +1028,8 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
         /* If the gap could not be filled then skip. */
         if (gap_begin < gap_end) {
             /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, data->debug_msg_[28].c_str(), gap_begin,
-                            gap_end - gap_begin);
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            std::format(SKIPPING_GAP_FMT, gap_begin, gap_end - gap_begin));
 
             gap_end = gap_begin;
             retry = 0;
@@ -1124,13 +1123,14 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
     if (data->excludes_.size() >= i) {
         // Show debug message: "Ignoring volume '%s' because of exclude mask '%s'."
-        gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[47].c_str(), path, data->excludes_[i].c_str());
+        gui->show_debug(DebugLevel::Fatal, nullptr,
+                        std::format(L"Ignoring volume '{}' because of exclude mask '{}'.", path, data->excludes_[i]));
         return;
     }
 
 
     /* Clear the screen and show "Processing '%s'" message. */
-    gui->clear_screen(data->debug_msg_[14].c_str(), path);
+    gui->clear_screen(std::format(L"Processing {}", path));
 
     /* Try to change our permissions so we can access special files and directories
     such as "C:\System Volume Information". If this does not succeed then quietly
@@ -1185,9 +1185,9 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
             wchar_t s1[BUFSIZ];
             system_error_str(GetLastError(), s1, BUFSIZ);
 
-            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(),
-                            data->disk_.mount_point_slash_.get(),
-                            s1);
+            gui->show_debug(DebugLevel::Fatal, nullptr,
+                            std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
+                                        data->disk_.mount_point_slash_.get(), s1));
 
             data->disk_.mount_point_.reset();
             data->disk_.mount_point_slash_.reset();
@@ -1241,23 +1241,26 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     delete p1;
 
     /* Show debug message: "Opening volume '%s' at mountpoint '%s'" */
-    gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[29].c_str(), data->disk_.volume_name_,
-                    data->disk_.mount_point_.get());
+    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    std::format(L"Opening volume '{}' at mountpoint '{}'", data->disk_.volume_name_,
+                                data->disk_.mount_point_.get()));
 
-    /* Open the VolumeHandle. If error then leave. */
-    data->disk_.volume_handle_ = CreateFileW(data->disk_.volume_name_, GENERIC_READ,
-                                             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    // Open the VolumeHandle. If error then leave.
+    data->disk_.volume_handle_ = CreateFileW(
+            data->disk_.volume_name_, GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+            0, nullptr);
 
     if (data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
         wchar_t last_error[BUFSIZ];
         system_error_str(GetLastError(), last_error, BUFSIZ);
 
-        gui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': reason %s",
-                        data->disk_.volume_name_, data->disk_.mount_point_.get(), last_error);
+        gui->show_debug(DebugLevel::Warning, nullptr,
+                        std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
+                                    data->disk_.volume_name_, data->disk_.mount_point_.get(), last_error));
 
         data->disk_.mount_point_.reset();
         data->disk_.mount_point_slash_.reset();
-
         return;
     }
 
@@ -1286,8 +1289,9 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
     if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
         /* Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'" */
-        gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[32].c_str(), data->disk_.volume_name_,
-                        data->disk_.mount_point_.get());
+        gui->show_debug(DebugLevel::Fatal, nullptr,
+                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data->disk_.volume_name_,
+                                    data->disk_.mount_point_.get()));
 
         CloseHandle(data->disk_.volume_handle_);
 
@@ -1331,24 +1335,20 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
                                       ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
 
         /* Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d" */
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[33].c_str(),
-                        ntfs_data.MftStartLcn.QuadPart, ntfs_data.MftZoneStart.QuadPart,
-                        ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
-                        ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
+                        std::format(
+                                L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT ", MftValidDataLength=" NUM_FMT,
+                                ntfs_data.MftStartLcn.QuadPart, ntfs_data.MftZoneStart.QuadPart,
+                                ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
+                                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster));
 
         /* Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d" */
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34].c_str(), 0,
-                        data->mft_excludes_[0].start_,
-                        0,
-                        data->mft_excludes_[0].end_);
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34].c_str(), 1,
-                        data->mft_excludes_[1].start_,
-                        1,
-                        data->mft_excludes_[1].end_);
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[34].c_str(), 2,
-                        data->mft_excludes_[2].start_,
-                        2,
-                        data->mft_excludes_[2].end_);
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
+                        std::format(MFT_EXCL_FMT, 0, data->mft_excludes_[0].start_, 0, data->mft_excludes_[0].end_));
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
+                        std::format(MFT_EXCL_FMT, 1, data->mft_excludes_[1].start_, 1, data->mft_excludes_[1].end_));
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
+                        std::format(MFT_EXCL_FMT, 2, data->mft_excludes_[2].start_, 2, data->mft_excludes_[2].end_));
     }
 
     /* Fixup the input mask.
@@ -1369,7 +1369,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         swprintf_s(data->include_mask_, length, L"%s*", path);
     }
 
-    gui->show_debug(DebugLevel::Fatal, nullptr, L"Input mask: %s", data->include_mask_);
+    gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"Input mask: {}", data->include_mask_));
 
     /* Defragment and optimize. */
     gui->show_diskmap(data);
@@ -1459,34 +1459,35 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
 
     if (*data->running_ != RunningState::RUNNING) return;
 
-    /* Clear the screen and show message "Analyzing volume '%s'" */
-    gui->clear_screen(data->debug_msg_[37].c_str(), mount_point);
+    // Clear the text messages and show message "Analyzing volume '%s'"
+    gui->clear_screen(std::format(L"Analyzing volume '{}'", mount_point));
 
-    /* Return if this is not a fixed disk. */
-
+    // Return if this is not a fixed disk
     if (const int drive_type = GetDriveTypeW(mount_point); drive_type != DRIVE_FIXED) {
         if (drive_type == DRIVE_UNKNOWN) {
-            gui->clear_screen(L"Ignoring volume '%s' because the drive type cannot be determined.", mount_point);
+            gui->clear_screen(
+                    std::format(L"Ignoring volume '{}' because the drive type cannot be determined.", mount_point));
         }
 
         if (drive_type == DRIVE_NO_ROOT_DIR) {
-            gui->clear_screen(L"Ignoring volume '%s' because there is no volume mounted.", mount_point);
+            gui->clear_screen(std::format(L"Ignoring volume '{}' because there is no volume mounted.", mount_point));
         }
 
         if (drive_type == DRIVE_REMOVABLE) {
-            gui->clear_screen(L"Ignoring volume '%s' because it has removable media.", mount_point);
+            gui->clear_screen(std::format(L"Ignoring volume '{}' because it has removable media.", mount_point));
         }
 
         if (drive_type == DRIVE_REMOTE) {
-            gui->clear_screen(L"Ignoring volume '%s' because it is a remote (network) drive.", mount_point);
+            gui->clear_screen(
+                    std::format(L"Ignoring volume '{}' because it is a remote (network) drive.", mount_point));
         }
 
         if (drive_type == DRIVE_CDROM) {
-            gui->clear_screen(L"Ignoring volume '%s' because it is a CD-ROM drive.", mount_point);
+            gui->clear_screen(std::format(L"Ignoring volume '{}' because it is a CD-ROM drive.", mount_point));
         }
 
         if (drive_type == DRIVE_RAMDISK) {
-            gui->clear_screen(L"Ignoring volume '%s' because it is a RAM disk.", mount_point);
+            gui->clear_screen(std::format(L"Ignoring volume '{}' because it is a RAM disk.", mount_point));
         }
 
         return;
@@ -1500,15 +1501,15 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
         error_code = GetLastError();
 
         if (error_code == 3) {
-            /* "Ignoring volume '%s' because it is not a harddisk." */
-            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[57].c_str(), mount_point);
+            // "Ignoring volume '%s' because it is not a harddisk."
+            gui->show_debug(DebugLevel::Fatal, nullptr,
+                            std::format(L"Ignoring volume '{}' because it is not a harddisk.", mount_point));
         } else {
-            /* "Cannot find volume name for mountpoint: %s" */
+            // "Cannot find volume name for mountpoint: %s"
             system_error_str(error_code, s1, BUFSIZ);
-
-            gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[40].c_str(), mount_point, s1);
+            gui->show_debug(DebugLevel::Fatal, nullptr,
+                            std::format(L"Cannot find volume name for mountpoint '{}': reason {}", mount_point, s1));
         }
-
         return;
     }
 
@@ -1516,8 +1517,8 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
     GetVolumeInformationW(volume_name_slash, nullptr, 0, nullptr, nullptr, &file_system_flags, nullptr, 0);
 
     if ((file_system_flags & FILE_READ_ONLY_VOLUME) != 0) {
-        /* Clear the screen and show message "Ignoring disk '%s' because it is read-only." */
-        gui->clear_screen(data->debug_msg_[36].c_str(), mount_point);
+        // Clear the screen and show message "Ignoring disk '%s' because it is read-only."
+        gui->clear_screen(std::format(L"Ignoring volume '{}' because it is read-only.", mount_point));
 
         return;
     }
@@ -1540,15 +1541,18 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
     if (volume_handle == INVALID_HANDLE_VALUE) {
         system_error_str(GetLastError(), s1, BUFSIZ);
 
-        gui->show_debug(DebugLevel::Warning, nullptr, L"Cannot open volume '%s' at mountpoint '%s': %s",
-                        volume_name, mount_point, s1);
+        gui->show_debug(DebugLevel::Warning, nullptr,
+                        std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
+                                    volume_name, mount_point, s1));
 
         return;
     }
 
-    if (DeviceIoControl(volume_handle, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &w, nullptr) == 0) {
-        /* Show debug message: "Volume '%s' at mountpoint '%s' is not mounted." */
-        gui->show_debug(DebugLevel::Fatal, nullptr, data->debug_msg_[31].c_str(), volume_name, mount_point);
+    if (DeviceIoControl(volume_handle, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0,
+                        nullptr, 0, &w, nullptr) == 0) {
+        // Show debug message: "Volume '%s' at mountpoint '%s' is not mounted."
+        gui->show_debug(DebugLevel::Fatal, nullptr,
+                        std::format(L"Volume '{}' at mountpoint '{}' is not mounted.", volume_name, mount_point));
 
         CloseHandle(volume_handle);
 

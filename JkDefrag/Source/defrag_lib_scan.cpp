@@ -65,8 +65,9 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
 
         /* Show debug info. */
         gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
-                        L"Zone calculation, iteration %u: 0 - %I64d - %I64d - %I64d", iterate,
-                        zone_end[0], zone_end[1], zone_end[2]);
+                        std::format(
+                                L"Zone calculation, iteration {}: 0 - " NUM_FMT " - " NUM_FMT " - " NUM_FMT,
+                                iterate, zone_end[0], zone_end[1], zone_end[2]));
 
         /* Reset the SizeOfUnmovableFragments array. We are going to (re)calculate these numbers
         based on the just calculates ZoneEnd's. */
@@ -164,7 +165,8 @@ link. */
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-    gui->show_debug(DebugLevel::Fatal, nullptr, L"%I64u %s", get_item_lcn(item), item->get_long_fn());
+    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    std::format(NUM_FMT L" {}", get_item_lcn(item), item->get_long_fn()));
 
     if (!item->is_dir_) {
         file_handle = CreateFileW(item->get_long_path(), FILE_READ_ATTRIBUTES,
@@ -179,7 +181,7 @@ link. */
     if (file_handle == INVALID_HANDLE_VALUE) {
         system_error_str(GetLastError(), error_string, BUFSIZ);
 
-        gui->show_debug(DebugLevel::Fatal, nullptr, L"  Could not open: %s", error_string);
+        gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"  Could not open: {}", error_string));
 
         return;
     }
@@ -190,16 +192,20 @@ link. */
         u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
         if (item->creation_time_ != u.QuadPart) {
-            gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different CreationTime %I64u <> %I64u = %I64u",
-                            item->creation_time_, u.QuadPart, item->creation_time_ - u.QuadPart);
+            gui->show_debug(
+                    DebugLevel::Fatal, nullptr,
+                    std::format(L"  Different CreationTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
+                                item->creation_time_, u.QuadPart, item->creation_time_ - u.QuadPart));
         }
 
         u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
         u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
         if (item->last_access_time_ != u.QuadPart) {
-            gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LastAccessTime %I64u <> %I64u = %I64u",
-                            item->last_access_time_, u.QuadPart, item->last_access_time_ - u.QuadPart);
+            gui->show_debug(
+                    DebugLevel::Fatal, nullptr,
+                    std::format(L"  Different LastAccessTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
+                                item->last_access_time_, u.QuadPart, item->last_access_time_ - u.QuadPart));
         }
     }
 
@@ -284,13 +290,15 @@ link. */
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             } else {
                 if (fragment->lcn_ != extent_data.extents_[i].lcn_) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different LCN in fragment: %I64u <> %I64u",
-                                    fragment->lcn_, extent_data.extents_[i].lcn_);
+                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                                    std::format(L"  Different LCN in fragment: " NUM_FMT " <> " NUM_FMT,
+                                                fragment->lcn_, extent_data.extents_[i].lcn_));
                 }
 
                 if (fragment->next_vcn_ != extent_data.extents_[i].next_vcn_) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different NextVcn in fragment: %I64u <> %I64u",
-                                    fragment->next_vcn_, extent_data.extents_[i].next_vcn_);
+                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                                    std::format(L"  Different NextVcn in fragment: " NUM_FMT " <> " NUM_FMT,
+                                                fragment->next_vcn_, extent_data.extents_[i].next_vcn_));
                 }
 
                 fragment = fragment->next_;
@@ -306,8 +314,7 @@ link. */
     /* If there was an error while reading the clustermap then return false. */
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
         system_error_str(error_code, error_string, BUFSIZ);
-
-        gui->show_debug(DebugLevel::Fatal, item, L"  Error while processing clustermap: %s", error_string);
+        gui->show_debug(DebugLevel::Fatal, item, std::format(L"  Error while processing clustermap: {}", error_string));
 
         return;
     }
@@ -317,8 +324,9 @@ link. */
     }
 
     if (item->clusters_count_ != clusters) {
-        gui->show_debug(DebugLevel::Fatal, nullptr, L"  Different cluster count: %I64u <> %I64u",
-                        item->clusters_count_, clusters);
+        gui->show_debug(DebugLevel::Fatal, nullptr,
+                        std::format(L"  Different cluster count: " NUM_FMT " <> " NUM_FMT,
+                                    item->clusters_count_, clusters));
     }
 }
 
@@ -429,8 +437,8 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 
     if (p1 != nullptr) *p1 = 0;
 
-    /* Show debug message: "Analyzing: %s". */
-    gui->show_debug(DebugLevel::DetailedProgress, nullptr, data->debug_msg_[23].c_str(), mask);
+    // Show debug message: "Analyzing: %s"
+    gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(L"Analyzing: %s", mask));
 
     /* Fetch the current time in the uint64_t format (1 second = 10000000). */
     GetSystemTime(&time_1);
@@ -570,37 +578,38 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 
         // Show debug info about the file.
         // Show debug message: "%I64d clusters at %I64d, %I64d bytes"
-        gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[16].c_str(), item->clusters_count_,
-                        get_item_lcn(item), item->bytes_);
+        gui->show_debug(DebugLevel::DetailedFileInfo, item,
+                        std::format(L"%I64d clusters at " NUM_FMT ", " NUM_FMT " bytes",
+                                    item->clusters_count_, get_item_lcn(item), item->bytes_));
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
-            /* Show debug message: "Special file attribute: Compressed" */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[17].c_str());
+            // Show debug message: "Special file attribute: Compressed"
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Compressed");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) != 0) {
-            /* Show debug message: "Special file attribute: Encrypted" */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[18].c_str());
+            // Show debug message: "Special file attribute: Encrypted"
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Encrypted");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) != 0) {
-            /* Show debug message: "Special file attribute: Offline" */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[19].c_str());
+            // Show debug message: "Special file attribute: Offline"
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Offline");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
-            /* Show debug message: "Special file attribute: Read-only" */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[20].c_str());
+            // Show debug message: "Special file attribute: Read-only"
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Read-only");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE) != 0) {
-            /* Show debug message: "Special file attribute: Sparse-file" */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[21].c_str());
+            // Show debug message: "Special file attribute: Sparse-file"
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Sparse-file");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0) {
-            /* Show debug message: "Special file attribute: Temporary" */
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, data->debug_msg_[22].c_str());
+            // Show debug message: "Special file attribute: Temporary"
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Temporary");
         }
 
         /* Add the item to the ItemTree in memory. */

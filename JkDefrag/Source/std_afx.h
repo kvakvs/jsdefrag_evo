@@ -12,6 +12,11 @@
 using namespace Gdiplus;
 
 #include <tlhelp32.h>                  /* CreateToolhelp32Snapshot() */
+#include <format>
+#include <string>
+#include <memory>
+#include <optional>
+#include <cwctype>
 
 #ifdef _DEBUG
 

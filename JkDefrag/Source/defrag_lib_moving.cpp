@@ -355,7 +355,7 @@ int DefragLib::move_item4(DefragDataStruct *data, ItemStruct *item, HANDLE file_
     if (!is_fragmented(item, offset, size)) return true;
 
     /* Show debug message: "Windows could not move the file, trying alternative method." */
-    gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[42].c_str());
+    gui->show_debug(DebugLevel::DetailedProgress, item, L"Windows could not move the file, trying alternative method.");
 
     /* Find another gap on disk for the item. */
     if (direction == 0) {
@@ -389,7 +389,7 @@ int DefragLib::move_item4(DefragDataStruct *data, ItemStruct *item, HANDLE file_
     /* If the block is still fragmented then return false. */
     if (is_fragmented(item, offset, size)) {
         /* Show debug message: "Alternative method failed, leaving file where it is." */
-        gui->show_debug(DebugLevel::DetailedProgress, item, data->debug_msg_[45].c_str());
+        gui->show_debug(DebugLevel::DetailedProgress, item, L"Alternative method failed, leaving file where it is.");
 
         return false;
     }

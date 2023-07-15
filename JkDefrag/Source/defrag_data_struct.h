@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <vector>
 
@@ -9,18 +10,18 @@
 struct DefragDataStruct {
     int phase_; /* The current Phase (1...3). */
     int zone_; /* The current Zone (0..2) for Phase 3. */
-    RunningState* running_; /* If not RUNNING then stop defragging. */
+    RunningState *running_; /* If not RUNNING then stop defragging. */
     //	int *RedrawScreen;                     /* 0:no, 1:request, 2: busy. */
     bool use_last_access_time_; /* If TRUE then use LastAccessTime for SpaceHogs. */
     int cannot_move_dirs_; /* If bigger than 20 then do not move dirs. */
 
-    wchar_t* include_mask_; /* Example: "c:\t1\*" */
+    wchar_t *include_mask_; /* Example: "c:\t1\*" */
     DiskStruct disk_;
 
     double free_space_; /* Percentage of total disk size 0..100. */
 
     // Tree in memory with information about all the files. 
-    ItemStruct* item_tree_;
+    ItemStruct *item_tree_;
     int balance_count_;
     // Array with exclude masks
     Wstrings excludes_;
@@ -78,5 +79,5 @@ struct DefragDataStruct {
     //} throttle_;
 
     // The array with error messages
-    Wstrings debug_msg_;
+    // Wstrings debug_msg_;
 };

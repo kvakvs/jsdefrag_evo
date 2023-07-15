@@ -4,8 +4,11 @@ class DefragLog {
 public:
     DefragLog();
 
-    void log_message(const wchar_t *format, ...) const;
-    void log_string(const wchar_t *line) const;
+    void log(std::wstring &&text) const { log(text.c_str()); }
+
+    void log(std::wstring &text) const { log(text.c_str()); }
+
+    void log(const wchar_t *line) const;
 
     void set_log_filename(const wchar_t *file_name);
 

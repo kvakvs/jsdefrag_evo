@@ -1,5 +1,5 @@
 #pragma once
 
-namespace Fmt {
-    
+namespace Str {
+    std::wstring from_char(const char *input);
 }

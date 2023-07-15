@@ -3,6 +3,7 @@
 
 #include <cstdarg>
 #include <memory>
+#include <format>
 
 DefragGui *DefragGui::instance_ = nullptr;
 
@@ -131,26 +132,19 @@ void DefragGui::set_display_data(HDC dc) {
 }
 
 /* Callback: clear the screen. */
-void DefragGui::clear_screen(const wchar_t *format, ...) {
-    va_list var_args;
+void DefragGui::clear_screen(std::wstring &&text) {
+    // Save the message in messages[0]
+    messages_[0] = std::move(text);
 
-    /* If there is no message then return. */
-    if (format == nullptr) return;
-
-    /* Clear all the messages. */
-    for (auto &message: messages_) *message = '\0';
-
-    // Save the message in Messages 0.
-    /*---*/ va_start(var_args, format);
-    {
-        vswprintf_s(messages_[0], MESSAGES_BUF_SIZE, format, var_args);
-
-        /* If there is no logfile then return. */
-        if (log_ != nullptr) {
-            log_->log_message(format, var_args);
-        }
+    // Clear all the other messages
+    for (auto i = 1; i < sizeof(messages_) / sizeof(messages_[0]); i++) {
+        messages_[i].clear();
     }
-    /*---*/ va_end(var_args);
+
+    // If there is no logfile then return. */
+    if (log_ != nullptr) {
+        log_->log(messages_[0].c_str());
+    }
 
     paint_image(dc_);
 }
@@ -160,17 +154,16 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
                           const uint64_t to_lcn, const uint64_t from_vcn) {
     /* Save the message in Messages 3. */
     if (clusters == 1) {
-        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Moving 1 cluster from %I64d to %I64d.", from_lcn, to_lcn);
+        messages_[3] = std::format(MOVING_1_CLUSTER_FMT, from_lcn, to_lcn);
     } else {
-        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Moving %I64d clusters from %I64d to %I64d.",
-                   clusters, from_lcn, to_lcn);
+        messages_[3] = std::format(MOVING_CLUSTERS_FMT, clusters, from_lcn, to_lcn);
     }
 
     /* Save the name of the file in Messages 4. */
     if (item != nullptr && item->have_long_path()) {
-        swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"%s", item->get_long_path());
+        messages_[4] = item->get_long_path();
     } else {
-        *messages_[4] = '\0';
+        messages_[4].clear();
     }
 
     /* If debug mode then write a message to the logfile. */
@@ -178,19 +171,18 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
 
     if (from_vcn > 0) {
         if (clusters % 10 == 1) {
-            log_->log_message(L"%s\n  Moving 1 cluster from %I64d to %I64d, VCN=%I64d.",
-                              item->get_long_path(), from_lcn, to_lcn, from_vcn);
+            log_->log(std::format(L"{}\n  Moving 1 cluster from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
+                                  item->get_long_path(), from_lcn, to_lcn, from_vcn));
         } else {
-            log_->log_message(L"%s\n  Moving %I64d clusters from %I64d to %I64d, VCN=%I64d.",
-                              item->get_long_path(), clusters, from_lcn, to_lcn, from_vcn);
+            log_->log(std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
+                                  item->get_long_path(), clusters, from_lcn, to_lcn, from_vcn));
         }
     } else {
         if (clusters % 10 == 1) {
-            log_->log_message(L"%s\n  Moving 1 cluster from %I64d to %I64d.",
-                              item->get_long_path(), from_lcn, to_lcn);
+            log_->log(std::format(L"{}\n  " MOVING_1_CLUSTER_FMT, item->get_long_path(), from_lcn, to_lcn));
         } else {
-            log_->log_message(L"%s\n  Moving %I64d clusters from %I64d to %I64d.",
-                              item->get_long_path(), clusters, from_lcn, to_lcn);
+            log_->log(std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT,
+                                  item->get_long_path(), clusters, from_lcn, to_lcn));
         }
     }
     paint_image(dc_);
@@ -201,42 +193,34 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
 This subroutine is called one last time with Item=nullptr when analysis has finished. */
 void DefragGui::show_analyze(const DefragDataStruct *data, const ItemStruct *item) {
     if (data != nullptr && data->count_all_files_ != 0) {
-        swprintf_s(messages_[3], MESSAGES_BUF_SIZE,
-                   L"Files %I64d, Directories %I64d, Clusters %I64d",
-                   data->count_all_files_, data->count_directories_, data->count_all_clusters_);
+        messages_[3] = std::format(L"Files " NUM_FMT ", Directories " NUM_FMT ", Clusters " NUM_FMT,
+                                   data->count_all_files_, data->count_directories_, data->count_all_clusters_);
     } else {
-        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Applying Exclude and SpaceHogs masks....");
+        messages_[3] = L"Applying Exclude and SpaceHogs masks....";
     }
 
     /* Save the name of the file in Messages 4. */
     if (item != nullptr && item->have_long_path()) {
-        swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"%s", item->get_long_path());
+        messages_[4] = item->get_long_path();
     } else {
-        *messages_[4] = '\0';
+        messages_[4].clear();
     }
     paint_image(dc_);
 }
 
 /* Callback: show a debug message. */
-void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, const wchar_t *format, ...) {
+void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::wstring &&text) {
     if (debug_level_ < level) return;
 
-    // Save the name of the file in Messages 4.
+    // Save the name of the file in messages[4]
     if (item != nullptr && item->have_long_path()) {
-        swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"%s", item->get_long_path());
+        messages_[4] = item->get_long_path();
     }
 
-    // If there is no message then return.
-    if (format == nullptr) return;
-
     // Save the debug message in Messages 5.
-    std::va_list var_args;
-            va_start(var_args, format);
-    vswprintf_s(messages_[5], MESSAGES_BUF_SIZE, format, var_args);
-//    log_->log_message(format, var_args);
-            va_end(var_args);
+    messages_[5] = std::move(text);
+    log_->log(messages_[5].c_str());
 
-    log_->log_string(messages_[5]);
     paint_image(dc_);
 }
 
@@ -258,7 +242,7 @@ void DefragGui::draw_cluster(const DefragDataStruct *data, const uint64_t cluste
 #ifndef _WIN64
     // 32-bit drive is too big check
     if (data->total_clusters_ > 0x7FFFFFFF) {
-        swprintf_s(messages_[3], MESSAGES_BUF_SIZE, L"Drive is too big for the 32-bit version to be able to display");
+        messages_[3] = L"Drive is too big for the 32-bit version to load";
         paint_image(dc_);
         return;
     }
@@ -312,42 +296,42 @@ void DefragGui::show_status(const DefragDataStruct *data) {
     progress_done_ = 0;
     progress_todo_ = 0;
 
-    /* Reset all the messages. */
-    for (i = 0; i < 6; i++) *messages_[i] = '\0';
+    // Reset all the messages.
+    for (i = 0; i < 6; i++) messages_[i].clear();
 
     /* Update Message 0 and 1. */
     if (data != nullptr) {
-        swprintf_s(messages_[0], MESSAGES_BUF_SIZE, L"%s", data->disk_.mount_point_.get());
+        messages_[0] = data->disk_.mount_point_.get();
 
         switch (data->phase_) {
             case 1:
-                wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 1: Analyze");
+                messages_[1] = L"Phase 1: Analyze";
                 break;
             case 2:
-                wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 2: Defragment");
+                messages_[1] = L"Phase 2: Defragment";
                 break;
             case 3:
-                wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 3: ForcedFill");
+                messages_[1] = L"Phase 3: ForcedFill";
                 break;
             case 4:
-                swprintf_s(messages_[1], MESSAGES_BUF_SIZE, L"Zone %u: Sort", data->zone_ + 1);
+                messages_[1] = std::format(L"Zone {}: Sort", data->zone_ + 1);
                 break;
             case 5:
-                swprintf_s(messages_[1], MESSAGES_BUF_SIZE, L"Zone %u: Fast Optimize", data->zone_ + 1);
+                messages_[1] = std::format(L"Zone {}: Fast Optimize", data->zone_ + 1);
                 break;
             case 6:
-                wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 3: Move Up");
+                messages_[1] = L"Phase 3: Move Up";
                 break;
             case 7:
-                wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Finished.");
-                swprintf_s(messages_[4], MESSAGES_BUF_SIZE, L"Logfile: %s", log_->get_log_filename());
+                messages_[1] = L"Finished.";
+                messages_[4] = std::format(L"Logfile: {}", log_->get_log_filename());
                 break;
             case 8:
-                wcscpy_s(messages_[1], MESSAGES_BUF_SIZE, L"Phase 3: Fixup");
+                messages_[1] = L"Phase 3: Fixup";
                 break;
         }
 
-        log_->log_message(messages_[1]);
+        log_->log(messages_[1]);
     }
 
     /* Write some statistics to the logfile. */
@@ -358,117 +342,115 @@ void DefragGui::show_status(const DefragDataStruct *data) {
         uint64_t total_fragments;
         int fragments;
         ItemStruct *item;
-        log_->log_message(L"- Total disk space: %I64d bytes (%.04f gigabytes), %I64d clusters",
-                          data->bytes_per_cluster_ * data->total_clusters_,
-                          (double) (data->bytes_per_cluster_ * data->total_clusters_) / (1024 * 1024 * 1024),
-                          data->total_clusters_);
-
-        log_->log_message(L"- Bytes per cluster: %I64d bytes", data->bytes_per_cluster_);
-
-        log_->log_message(L"- Number of files: %I64d", data->count_all_files_);
-        log_->log_message(L"- Number of directories: %I64d", data->count_directories_);
-        log_->log_message(L"- Total size of analyzed items: %I64d bytes (%.04f gigabytes), %I64d clusters",
-                          data->count_all_clusters_ * data->bytes_per_cluster_,
-                          (double) (data->count_all_clusters_ * data->bytes_per_cluster_) / (1024 * 1024 * 1024),
-                          data->count_all_clusters_);
+        log_->log(std::format(L"- Total disk space: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
+                              data->bytes_per_cluster_ * data->total_clusters_,
+                              (double) (data->bytes_per_cluster_ * data->total_clusters_) / (1024 * 1024 * 1024),
+                              data->total_clusters_));
+        log_->log(std::format(L"- Bytes per cluster: " NUM_FMT " bytes", data->bytes_per_cluster_));
+        log_->log(std::format(L"- Number of files: " NUM_FMT, data->count_all_files_));
+        log_->log(std::format(L"- Number of directories: " NUM_FMT, data->count_directories_));
+        log_->log(std::format(
+                L"- Total size of analyzed items: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
+                data->count_all_clusters_ * data->bytes_per_cluster_,
+                (double) (data->count_all_clusters_ * data->bytes_per_cluster_) / (1024 * 1024 * 1024),
+                data->count_all_clusters_));
 
         if (data->count_all_files_ + data->count_directories_ > 0) {
-            log_->log_message(L"- Number of fragmented items: %I64d (%.04f%% of all items)",
-                              data->count_fragmented_items_,
-                              (double) (data->count_fragmented_items_ * 100)
-                              / (data->count_all_files_ + data->count_directories_));
+            log_->log(std::format(L"- Number of fragmented items: " NUM_FMT " (" FLT4_FMT "% of all items)",
+                                  data->count_fragmented_items_,
+                                  (double) (data->count_fragmented_items_ * 100)
+                                  / (data->count_all_files_ + data->count_directories_)));
         } else {
-            log_->log_message(L"- Number of fragmented items: %I64d", data->count_fragmented_items_);
+            log_->log(std::format(L"- Number of fragmented items: " NUM_FMT, data->count_fragmented_items_));
         }
 
         if (data->count_all_clusters_ > 0 && data->total_clusters_ > 0) {
-            log_->log_message(
-                    L"- Total size of fragmented items: %I64d bytes, %I64d clusters, %.04f%% of all items, %.04f%% of disk",
-                    data->count_fragmented_clusters_ * data->bytes_per_cluster_,
-                    data->count_fragmented_clusters_,
-                    (double) (data->count_fragmented_clusters_ * 100) / data->count_all_clusters_,
-                    (double) (data->count_fragmented_clusters_ * 100) / data->total_clusters_);
+            log_->log(
+                    std::format(
+                            L"- Total size of fragmented items: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of all items, " FLT4_FMT "% of disk",
+                            data->count_fragmented_clusters_ * data->bytes_per_cluster_,
+                            data->count_fragmented_clusters_,
+                            (double) (data->count_fragmented_clusters_ * 100) / data->count_all_clusters_,
+                            (double) (data->count_fragmented_clusters_ * 100) / data->total_clusters_));
         } else {
-            log_->log_message(L"- Total size of fragmented items: %I64d bytes, %I64d clusters",
-                              data->count_fragmented_clusters_ * data->bytes_per_cluster_,
-                              data->count_fragmented_clusters_);
+            log_->log(std::format(L"- Total size of fragmented items: " NUM_FMT " bytes, " NUM_FMT " clusters",
+                                  data->count_fragmented_clusters_ * data->bytes_per_cluster_,
+                                  data->count_fragmented_clusters_));
         }
 
         if (data->total_clusters_ > 0) {
-            log_->log_message(L"- Free disk space: %I64d bytes, %I64d clusters, %.04f%% of disk",
-                              data->count_free_clusters_ * data->bytes_per_cluster_,
-                              data->count_free_clusters_,
-                              (double) (data->count_free_clusters_ * 100) / data->total_clusters_);
+            log_->log(std::format(L"- Free disk space: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of disk",
+                                  data->count_free_clusters_ * data->bytes_per_cluster_,
+                                  data->count_free_clusters_,
+                                  (double) (data->count_free_clusters_ * 100) / data->total_clusters_));
         } else {
-            log_->log_message(L"- Free disk space: %I64d bytes, %I64d clusters",
-                              data->count_free_clusters_ * data->bytes_per_cluster_,
-                              data->count_free_clusters_);
+            log_->log(std::format(L"- Free disk space: " NUM_FMT " bytes, " NUM_FMT " clusters",
+                                  data->count_free_clusters_ * data->bytes_per_cluster_, data->count_free_clusters_));
         }
 
-        log_->log_message(L"- Number of gaps: %I64d", data->count_gaps_);
+        log_->log(std::format(L"- Number of gaps: " NUM_FMT, data->count_gaps_));
 
         if (data->count_gaps_ > 0) {
-            log_->log_message(L"- Number of small gaps: %I64d (%.04f%% of all gaps)",
-                              data->count_gaps_less16_,
-                              (double) (data->count_gaps_less16_ * 100) / data->count_gaps_);
+            log_->log(std::format(L"- Number of small gaps: " NUM_FMT " (" FLT4_FMT "% of all gaps)",
+                                  data->count_gaps_less16_,
+                                  (double) (data->count_gaps_less16_ * 100) / data->count_gaps_));
         } else {
-            log_->log_message(L"- Number of small gaps: %I64d",
-                              data->count_gaps_less16_);
+            log_->log(std::format(L"- Number of small gaps: " NUM_FMT, data->count_gaps_less16_));
         }
 
         if (data->count_free_clusters_ > 0) {
-            log_->log_message(L"- Size of small gaps: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
-                              data->count_clusters_less16_ * data->bytes_per_cluster_,
-                              data->count_clusters_less16_,
-                              (double) (data->count_clusters_less16_ * 100) / data->count_free_clusters_);
+            log_->log(std::format(
+                    L"- Size of small gaps: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of free disk space",
+                    data->count_clusters_less16_ * data->bytes_per_cluster_, data->count_clusters_less16_,
+                    (double) (data->count_clusters_less16_ * 100) / data->count_free_clusters_));
         } else {
-            log_->log_message(L"- Size of small gaps: %I64d bytes, %I64d clusters",
-                              data->count_clusters_less16_ * data->bytes_per_cluster_,
-                              data->count_clusters_less16_);
+            log_->log(std::format(L"- Size of small gaps: " NUM_FMT " bytes, " NUM_FMT " clusters",
+                                  data->count_clusters_less16_ * data->bytes_per_cluster_,
+                                  data->count_clusters_less16_));
         }
 
         if (data->count_gaps_ > 0) {
-            log_->log_message(L"- Number of big gaps: %I64d (%.04f%% of all gaps)",
-                              data->count_gaps_ - data->count_gaps_less16_,
-                              (double) ((data->count_gaps_ - data->count_gaps_less16_) * 100) / data->count_gaps_);
+            log_->log(std::format(L"- Number of big gaps: " NUM_FMT " (" FLT4_FMT "% of all gaps)",
+                                  data->count_gaps_ - data->count_gaps_less16_,
+                                  (double) ((data->count_gaps_ - data->count_gaps_less16_) * 100) / data->count_gaps_));
         } else {
-            log_->log_message(L"- Number of big gaps: %I64d",
-                              data->count_gaps_ - data->count_gaps_less16_);
+            log_->log(std::format(L"- Number of big gaps: " NUM_FMT, data->count_gaps_ - data->count_gaps_less16_));
         }
 
         if (data->count_free_clusters_ > 0) {
-            log_->log_message(L"- Size of big gaps: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
-                              (data->count_free_clusters_ - data->count_clusters_less16_) * data->bytes_per_cluster_,
-                              data->count_free_clusters_ - data->count_clusters_less16_,
-                              (double) ((data->count_free_clusters_ - data->count_clusters_less16_) * 100) / data->
-                                      count_free_clusters_);
+            log_->log(std::format(
+                    L"- Size of big gaps: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of free disk space",
+                    (data->count_free_clusters_ - data->count_clusters_less16_) * data->bytes_per_cluster_,
+                    data->count_free_clusters_ - data->count_clusters_less16_,
+                    (double) ((data->count_free_clusters_ - data->count_clusters_less16_) * 100) / data->
+                            count_free_clusters_));
         } else {
-            log_->log_message(L"- Size of big gaps: %I64d bytes, %I64d clusters",
-                              (data->count_free_clusters_ - data->count_clusters_less16_) * data->bytes_per_cluster_,
-                              data->count_free_clusters_ - data->count_clusters_less16_);
+            log_->log(std::format(L"- Size of big gaps: " NUM_FMT " bytes, " NUM_FMT " clusters",
+                                  (data->count_free_clusters_ - data->count_clusters_less16_) *
+                                  data->bytes_per_cluster_,
+                                  data->count_free_clusters_ - data->count_clusters_less16_));
         }
 
         if (data->count_gaps_ > 0) {
-            log_->log_message(L"- Average gap size: %.04f clusters",
-                              (double) data->count_free_clusters_ / data->count_gaps_);
+            log_->log(std::format(L"- Average gap size: " FLT4_FMT " clusters",
+                                  (double) data->count_free_clusters_ / data->count_gaps_));
         }
 
         if (data->count_free_clusters_ > 0) {
-            log_->log_message(L"- Biggest gap: %I64d bytes, %I64d clusters, %.04f%% of free disk space",
-                              data->biggest_gap_ * data->bytes_per_cluster_,
-                              data->biggest_gap_,
-                              (double) (data->biggest_gap_ * 100) / data->count_free_clusters_);
+            log_->log(std::format(
+                    L"- Biggest gap: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of free disk space",
+                    data->biggest_gap_ * data->bytes_per_cluster_, data->biggest_gap_,
+                    (double) (data->biggest_gap_ * 100) / data->count_free_clusters_));
         } else {
-            log_->log_message(L"- Biggest gap: %I64d bytes, %I64d clusters",
-                              data->biggest_gap_ * data->bytes_per_cluster_,
-                              data->biggest_gap_);
+            log_->log(std::format(L"- Biggest gap: " NUM_FMT " bytes, " NUM_FMT " clusters",
+                                  data->biggest_gap_ * data->bytes_per_cluster_, data->biggest_gap_));
         }
 
         if (data->total_clusters_ > 0) {
-            log_->log_message(L"- Average end-begin distance: %.0f clusters, %.4f%% of volume size",
-                              data->average_distance_, 100.0 * data->average_distance_ / data->total_clusters_);
+            log_->log(std::format(L"- Average end-begin distance: " FLT0_FMT " clusters, " FLT4_FMT "% of volume size",
+                                  data->average_distance_, 100.0 * data->average_distance_ / data->total_clusters_));
         } else {
-            log_->log_message(L"- Average end-begin distance: %.0f clusters", data->average_distance_);
+            log_->log(std::format(L"- Average end-begin distance: " FLT0_FMT " clusters", data->average_distance_));
         }
 
         for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
@@ -479,8 +461,8 @@ void DefragGui::show_status(const DefragDataStruct *data) {
         }
 
         if (item != nullptr) {
-            log_->log_message(L"These items could not be moved:");
-            log_->log_message(L"  Fragments       Bytes  Clusters Name");
+            log_->log(L"These items could not be moved:");
+            log_->log(L"  Fragments       Bytes  Clusters Name");
 
             total_fragments = 0;
             total_bytes = 0;
@@ -499,12 +481,11 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 fragments = DefragLib::get_fragment_count(item);
 
                 if (!item->have_long_path()) {
-                    log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->bytes_,
-                                      item->clusters_count_,
-                                      DefragLib::get_item_lcn(item));
+                    log_->log(std::format(L"  {:9} {:11} {:9} [at cluster " NUM_FMT "]", fragments, item->bytes_,
+                                          item->clusters_count_, DefragLib::get_item_lcn(item)));
                 } else {
-                    log_->log_message(L"  %9lu %11I64u %9I64u %s", fragments, item->bytes_, item->clusters_count_,
-                                      item->get_long_path());
+                    log_->log(std::format(L"  {:9} {:11} {:9} {}", fragments, item->bytes_, item->clusters_count_,
+                                          item->get_long_path()));
                 }
 
                 total_fragments = total_fragments + fragments;
@@ -512,8 +493,8 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 total_clusters = total_clusters + item->clusters_count_;
             }
 
-            log_->log_message(L"  --------- ----------- --------- -----");
-            log_->log_message(L"  %9I64u %11I64u %9I64u Total", total_fragments, total_bytes, total_clusters);
+            log_->log(L"  --------- ----------- --------- -----");
+            log_->log(std::format(L"  {:9} {:11} {:9} Total", total_fragments, total_bytes, total_clusters));
         }
 
         for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
@@ -528,8 +509,8 @@ void DefragGui::show_status(const DefragDataStruct *data) {
         }
 
         if (item != nullptr) {
-            log_->log_message(L"These items are still fragmented:");
-            log_->log_message(L"  Fragments       Bytes  Clusters Name");
+            log_->log(L"These items are still fragmented:");
+            log_->log(L"  Fragments       Bytes  Clusters Name");
 
             total_fragments = 0;
             total_bytes = 0;
@@ -545,12 +526,11 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 if (fragments <= 1) continue;
 
                 if (!item->have_long_path()) {
-                    log_->log_message(L"  %9lu %11I64u %9I64u [at cluster %I64u]", fragments, item->bytes_,
-                                      item->clusters_count_,
-                                      DefragLib::get_item_lcn(item));
+                    log_->log(std::format(L"  {:9} {:11} {:9} [at cluster " NUM_FMT "]", fragments, item->bytes_,
+                                          item->clusters_count_, DefragLib::get_item_lcn(item)));
                 } else {
-                    log_->log_message(L"  %9lu %11I64u %9I64u %s", fragments, item->bytes_, item->clusters_count_,
-                                      item->get_long_path());
+                    log_->log(std::format(L"  {:9} {:11} {:9} {}", fragments, item->bytes_, item->clusters_count_,
+                                          item->get_long_path()));
                 }
 
                 total_fragments = total_fragments + fragments;
@@ -558,8 +538,8 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 total_clusters = total_clusters + item->clusters_count_;
             }
 
-            log_->log_message(L"  --------- ----------- --------- -----");
-            log_->log_message(L"  %9I64u %11I64u %9I64u Total", total_fragments, total_bytes, total_clusters);
+            log_->log(L"  --------- ----------- --------- -----");
+            log_->log(std::format(L"  {:9} {:11} {:9} Total", total_fragments, total_bytes, total_clusters));
         }
 
         int last_largest = 0;
@@ -595,19 +575,19 @@ void DefragGui::show_status(const DefragDataStruct *data) {
         }
 
         if (last_largest > 0) {
-            log_->log_message(L"The 25 largest items on disk:");
-            log_->log_message(L"  Fragments       Bytes  Clusters Name");
+            log_->log(L"The 25 largest items on disk:");
+            log_->log(L"  Fragments       Bytes  Clusters Name");
 
             for (i = 0; i < last_largest; i++) {
                 if (!largest_items[i]->have_long_path()) {
-                    log_->log_message(L"  %9u %11I64u %9I64u [at cluster %I64u]",
-                                      DefragLib::get_fragment_count(largest_items[i]),
-                                      largest_items[i]->bytes_, largest_items[i]->clusters_count_,
-                                      DefragLib::get_item_lcn(largest_items[i]));
+                    log_->log(std::format(L"  {:9} {:11} {:9} [at cluster " NUM_FMT "]",
+                                          DefragLib::get_fragment_count(largest_items[i]),
+                                          largest_items[i]->bytes_, largest_items[i]->clusters_count_,
+                                          DefragLib::get_item_lcn(largest_items[i])));
                 } else {
-                    log_->log_message(L"  %9u %11I64u %9I64u %s", DefragLib::get_fragment_count(largest_items[i]),
-                                      largest_items[i]->bytes_, largest_items[i]->clusters_count_,
-                                      largest_items[i]->get_long_path());
+                    log_->log(std::format(L"  {:9} {:11} {:9L} {}", DefragLib::get_fragment_count(largest_items[i]),
+                                          largest_items[i]->bytes_, largest_items[i]->clusters_count_,
+                                          largest_items[i]->get_long_path()));
                 }
             }
         }
@@ -630,7 +610,7 @@ void DefragGui::paint_image(HDC dc) {
 
         if (done > 1.0) done = 1.0;
 
-        swprintf_s(messages_[2], MESSAGES_BUF_SIZE, L"%.2f%%", 100.0 * done);
+        messages_[2] = std::format(FLT2_FMT L"%", 100.0 * done);
     }
 
     Color back_color1;
@@ -657,31 +637,31 @@ void DefragGui::paint_image(HDC dc) {
 
     FontFamily font_family(L"Tahoma");
     Font font(&font_family, 12, FontStyleRegular, UnitPixel);
-    wchar_t *text;
+    const wchar_t *text;
     PointF point_f(2.0f, 0.0f);
 
-    text = messages_[0];
+    text = messages_[0].c_str();
     graphics->DrawString(text, -1, &font, point_f, &brush);
 
     point_f = PointF(40.0f, 0.0f);
-    text = messages_[1];
+    text = messages_[1].c_str();
     graphics->DrawString(text, -1, &font, point_f, &brush);
 
     point_f = PointF(200.0f, 0.0f);
-    text = messages_[2];
+    text = messages_[2].c_str();
     graphics->DrawString(text, -1, &font, point_f, &brush);
 
     point_f = PointF(280.0f, 0.0f);
-    text = messages_[3];
+    text = messages_[3].c_str();
     graphics->DrawString(text, -1, &font, point_f, &brush);
 
     point_f = PointF(2.0f, 17.0f);
-    text = messages_[4];
+    text = messages_[4].c_str();
     graphics->DrawString(text, -1, &font, point_f, &brush);
 
     if (debug_level_ > DebugLevel::Warning) {
         point_f = PointF(2.0f, 33.0f);
-        text = messages_[5];
+        text = messages_[5].c_str();
         graphics->DrawString(text, -1, &font, point_f, &brush);
     }
 
@@ -835,40 +815,7 @@ void DefragGui::paint_image(HDC dc) {
 }
 
 void DefragGui::on_paint(HDC dc) const {
-    /*
-        Bitmap bmp(m_clientWindowSize.Width, m_clientWindowSize.Height);
-    
-        std::unique_ptr<Graphics> graphics2(Graphics::FromImage(&bmp));
-    */
-
     Graphics graphics(dc);
-
-    /*
-        graphics2->DrawImage(m_bmp,0,0);
-    */
-
-    /*
-        Color busyColor(128,128,128,128);
-    
-        SolidBrush busyBrush(busyColor);
-    
-        Rect rr = Rect(100, 100, 400, 100);
-    
-        graphics2->FillRectangle(&busyBrush, rr);
-    
-        SolidBrush brush(Color::White);
-    
-        FontFamily fontFamily(L"Tahoma");
-        Font       font(&fontFamily,12,FontStyleRegular, UnitPixel);
-        PointF     pointF(132.0f, 120.0f);
-    
-        wchar_t      *text;
-    
-        text = Messages[2];
-    
-        graphics2->DrawString(text, -1, &font, pointF, &brush);
-    */
-
     graphics.DrawImage(bmp_.get(), 0, 0);
 }
 
@@ -881,49 +828,18 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             return 0;
 
         case WM_TIMER:
-
-            /*
-                    if (wParam == 333)
-                    {
-                        PAINTSTRUCT ps;
-            
-                        WaitForSingleObject(m_jkDefragGui->m_displayMutex,100);
-            
-                        m_jkDefragGui->m_displayMutex = CreateMutex(nullptr,FALSE,"JKDefrag");
-            
-                        m_jkDefragGui->m_hDC = BeginPaint(hWnd, &ps);
-            
-                        m_jkDefragGui->setDisplayData(m_jkDefragGui->m_hDC);
-            
-                        m_jkDefragGui->FillSquares( 0, m_jkDefragGui->m_numDiskSquares);
-            
-                        m_jkDefragGui->PaintImage(m_jkDefragGui->m_hDC);
-            
-                        EndPaint(hWnd, &ps);
-            
-                        ReleaseMutex(m_jkDefragGui->m_displayMutex);
-            
-                        KillTimer(m_jkDefragGui->m_hWnd, m_jkDefragGui->m_sizeTimer);
-                    }
-            */
-
-
             InvalidateRect(wnd, nullptr, FALSE);
-
             return 0;
 
         case WM_PAINT: {
             /* Grab the display mutex, to make sure that we are the only thread changing the window. */
             WaitForSingleObject(instance_->display_mutex_, 100);
-
             instance_->display_mutex_ = CreateMutex(nullptr, FALSE, DISPLAY_MUTEX);
 
             PAINTSTRUCT ps;
 
             instance_->dc_ = BeginPaint(wnd, &ps);
-
             instance_->on_paint(instance_->dc_);
-
             EndPaint(wnd, &ps);
 
             ReleaseMutex(instance_->display_mutex_);
@@ -931,22 +847,10 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 
             return 0;
 
-
         case WM_ERASEBKGND: {
-            //			m_jkDefragGui->RedrawScreen = 0;
             InvalidateRect(instance_->wnd_, nullptr, FALSE);
-        }
-
             return 0;
-            /*
-                case WM_WINDOWPOSCHANGED:
-                    {
-                        m_jkDefragGui->RedrawScreen = 0;
-                        InvalidateRect(m_jkDefragGui->m_hWnd,nullptr,FALSE);
-                    }
-            
-                    return 0;
-            */
+        }
 
         case WM_SIZE: {
             PAINTSTRUCT ps;
@@ -964,9 +868,8 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             }
 
             ReleaseMutex(instance_->display_mutex_);
-        }
-
             return 0;
+        }
     }
 
     return DefWindowProc(wnd, message, w_param, l_param);
@@ -996,19 +899,19 @@ void DefragGui::fill_squares(uint64_t clusterStartSquareNum, uint64_t clusterEnd
                     cluster_group_colors.unfragmented = true;
                     break;
                 case DrawColor::Unmovable:
-                    cluster_group_colors.unmovable = 1;
+                    cluster_group_colors.unmovable = true;
                     break;
                 case DrawColor::Fragmented:
-                    cluster_group_colors.fragmented = 1;
+                    cluster_group_colors.fragmented = true;
                     break;
                 case DrawColor::Busy:
-                    cluster_group_colors.busy = 1;
+                    cluster_group_colors.busy = true;
                     break;
                 case DrawColor::Mft:
-                    cluster_group_colors.mft = 1;
+                    cluster_group_colors.mft = true;
                     break;
                 case DrawColor::SpaceHog:
-                    cluster_group_colors.spacehog = 1;
+                    cluster_group_colors.spacehog = true;
                     break;
             }
         }
@@ -1066,7 +969,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
     }
 
     /* Clear screen. */
-    clear_screen(nullptr);
+    clear_screen({});
 
     /* Show the map of all the clusters in use. */
     Lcn = 0;
