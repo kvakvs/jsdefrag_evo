@@ -24,6 +24,7 @@ http://www.kessels.com/
 
 #include <memory>
 #include <optional>
+#include <cwctype>
 
 #include "defrag_data_struct.h"
 #include "defrag_lib.h"
@@ -49,7 +50,7 @@ a different array. Do not change this default array, simply create a new
 array in your program and specify it as a parameter.
 
 */
-wchar_t *default_debug_msg[] =
+const wchar_t *default_debug_msg[] =
         {
                 /*  0 */ L"",
                 /*  1 */ L"",
@@ -140,7 +141,7 @@ void DefragLib::system_error_str(const uint32_t error_code, wchar_t *out, const 
 
     while (p1 != buffer) {
         p1--;
-        if (!std::isspace(*p1)) break;
+        if (!std::iswspace(*p1)) break;
         *p1 = '\0';
     }
 
@@ -150,7 +151,7 @@ void DefragLib::system_error_str(const uint32_t error_code, wchar_t *out, const 
 
 /* Translate character to lowercase. */
 wchar_t DefragLib::lower_case(const wchar_t c) {
-    if (std::isupper(c)) return c - 'A' + 'a';
+    if (std::iswupper(c)) return c - 'A' + 'a';
 
     return c;
 }
@@ -642,8 +643,6 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
  */
 void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, const uint64_t busy_offset,
                               const uint64_t busy_size, const int un_draw) const {
-    int color;
-
     DefragGui *gui = DefragGui::get_instance();
 
     /* Determine if the item is fragmented. */
@@ -677,14 +676,15 @@ void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, co
 
         while (segment_begin < real_vcn + fragment->next_vcn_ - vcn) {
             uint64_t segment_end = real_vcn + fragment->next_vcn_ - vcn;
+            DrawColor color;
 
             // Determine the color with which to draw this segment.
             if (un_draw == false) {
-                if (item->is_excluded_) color = DefragStruct::COLORUNMOVABLE;
-                else if (item->is_unmovable_) color = DefragStruct::COLORUNMOVABLE;
-                else if (is_fragmented) color = DefragStruct::COLORFRAGMENTED;
-                else if (item->is_hog_) color = DefragStruct::COLORSPACEHOG;
-                else color = DefragStruct::COLORUNFRAGMENTED;
+                if (item->is_excluded_) color = DrawColor::Unmovable;
+                else if (item->is_unmovable_) color = DrawColor::Unmovable;
+                else if (is_fragmented) color = DrawColor::Fragmented;
+                else if (item->is_hog_) color = DrawColor::SpaceHog;
+                else color = DrawColor::Unfragmented;
 
                 if (vcn + segment_begin - real_vcn < busy_offset &&
                     vcn + segment_end - real_vcn > busy_offset) {
@@ -697,10 +697,10 @@ void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, co
                         segment_end = real_vcn + busy_offset + busy_size - vcn;
                     }
 
-                    color = DefragStruct::COLORBUSY;
+                    color = DrawColor::Busy;
                 }
             } else {
-                color = DefragStruct::COLOREMPTY;
+                color = DrawColor::Empty;
 
                 for (int i = 0; i < 3; i++) {
                     if (fragment->lcn_ + segment_begin - real_vcn < data->mft_excludes_[i].start_ &&
@@ -714,7 +714,7 @@ void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, co
                             segment_end = real_vcn + data->mft_excludes_[i].end_ - fragment->lcn_;
                         }
 
-                        color = DefragStruct::COLORMFT;
+                        color = DrawColor::Mft;
                     }
                 }
             }
@@ -816,22 +816,22 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 					if ((Lcn == Data->MftExcludes[0].End) ||
 						(Lcn == Data->MftExcludes[1].End) ||
 						(Lcn == Data->MftExcludes[2].End)) {
-							m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORUNMOVABLE);
+							m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Unmovable);
 					} else if (PrevInUse == 0) {
-						m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLOREMPTY);
+						m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Empty);
 					} else {
-						m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORALLOCATED);
+						m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Allocated);
 					}
 					InUse = 1;
 					PrevInUse = 1;
 					ClusterStart = Lcn;
 			}
 			if ((PrevInUse == 0) && (InUse != 0)) {          / * Free * /
-				m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLOREMPTY);
+				m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Empty);
 				ClusterStart = Lcn;
 			}
 			if ((PrevInUse != 0) && (InUse == 0)) {          / * In use * /
-				m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORALLOCATED);
+				m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Allocated);
 				ClusterStart = Lcn;
 			}
 			PrevInUse = InUse;
@@ -849,10 +849,10 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 
 	if ((Lcn > 0) && (*Data->RedrawScreen == 2)) {
 		if (PrevInUse == 0) {          / * Free * /
-			m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLOREMPTY);
+			m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Empty);
 		}
 		if (PrevInUse != 0) {          / * In use * /
-			m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::COLORALLOCATED);
+			m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Allocated);
 		}
 	}
 
@@ -860,7 +860,7 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 	for (i = 0; i < 3; i++) {
 		if (*Data->RedrawScreen != 2) break;
 		if (Data->MftExcludes[i].Start <= 0) continue;
-		m_jkGui->DrawCluster(Data,Data->MftExcludes[i].Start,Data->MftExcludes[i].End,JKDefragStruct::COLORMFT);
+		m_jkGui->DrawCluster(Data,Data->MftExcludes[i].Start,Data->MftExcludes[i].End,JKDefragStruct::Mft);
 	}
 
 	/ * Colorize all the files on the screen.
@@ -1104,7 +1104,7 @@ void DefragLib::run_jk_defrag(
     }
 
     *data.running_ = RunningState::RUNNING;
-    
+
     if (!debug_msg.has_value() || debug_msg.value().empty()) {
         data.debug_msg_.clear();
         for (auto &def: default_debug_msg) {
@@ -1196,8 +1196,8 @@ void DefragLib::run_jk_defrag(
         LONG result;
         HKEY key;
         result = RegCreateKeyExW(
-            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0,
-            nullptr, REG_OPTION_NON_VOLATILE, KEY_READ, nullptr, &key, &key_disposition);
+                HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0,
+                nullptr, REG_OPTION_NON_VOLATILE, KEY_READ, nullptr, &key, &key_disposition);
 
         if (result == ERROR_SUCCESS) {
             length = sizeof ntfs_disable_last_access_update;

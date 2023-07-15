@@ -20,9 +20,9 @@ http://www.kessels.com/
 
 #include "std_afx.h"
 #include "defrag.h"
-#include "types.h"
 
 #include <ctime>
+#include <memory>
 
 Defrag::Defrag()
         : running_state_(RunningState::STOPPED),
@@ -30,15 +30,15 @@ Defrag::Defrag()
           debug_level_(DebugLevel::Warning) {
     gui_ = DefragGui::get_instance();
     defrag_lib_ = DefragLib::get_instance();
-    log_.reset(new DefragLog());
-    defrag_struct_.reset(new DefragStruct());
+    log_ = std::make_unique<DefragLog>();
+    defrag_struct_ = std::make_unique<DefragStruct>();
 }
 
 Defrag::~Defrag() = default;
 
 Defrag *Defrag::get_instance() {
     if (instance_ == nullptr) {
-        instance_.reset(new Defrag());
+        instance_ = std::make_unique<Defrag>();
     }
 
     return instance_.get();
@@ -48,7 +48,7 @@ void Defrag::release_instance() {
     instance_.reset();
 }
 
-WPARAM Defrag::start_program(const HINSTANCE instance,
+WPARAM Defrag::start_program(HINSTANCE instance,
                              [[maybe_unused]] HINSTANCE prev_instance,
                              [[maybe_unused]] LPSTR cmd_line,
                              const int cmd_show) {
@@ -58,18 +58,18 @@ WPARAM Defrag::start_program(const HINSTANCE instance,
     if (this->is_already_running()) return 0;
 
 #ifdef _DEBUG
-    /* Setup crash report handler. */
+    // Setup crash report handler
     SetUnhandledExceptionFilter(&Defrag::crash_report);
 #endif
 
     gui_->initialize(instance, cmd_show, log_.get(), debug_level_);
 
-    /* Start up the defragmentation and timer threads. */
+    // Start up the defragmentation and timer threads
     if (CreateThread(nullptr, 0, &Defrag::defrag_thread, nullptr, 0, nullptr) == nullptr) return 0;
 
     const WPARAM w_param = gui_->do_modal();
 
-    /* If the defragger is still running then ask & wait for it to stop. */
+    // If the defragger is still running then ask & wait for it to stop
     i_am_running_ = RunningState::STOPPED;
 
     DefragLib::stop_jk_defrag(&running_state_, 0);
@@ -369,7 +369,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 // optimize_mode.mode_ = optimize_mode.mode_ - 1;
 
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-a' accepted, optimizemode = %u",
-                                (int)optimize_mode + 1);
+                                (int) optimize_mode + 1);
 
                 continue;
             }
@@ -387,7 +387,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                 // optimize_mode.mode_ = optimize_mode.mode_ - 1;
 
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-a' accepted, optimizemode = %u",
-                                (int)optimize_mode + 1);
+                                (int) optimize_mode + 1);
 
                 continue;
             }

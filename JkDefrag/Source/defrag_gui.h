@@ -2,23 +2,6 @@
 
 #include "constants.h"
 
-constexpr COLORREF display_colors[9] = {
-        RGB(150, 150, 150),     // 0 COLOREMPTY         Empty diskspace
-        RGB(200, 200, 200),     // 1 COLORALLOCATED     Used diskspace / system files
-        RGB(0, 150, 0),         // 2 COLORUNFRAGMENTED  Unfragmented files
-        RGB(128, 0, 0),         // 3 COLORUNMOVABLE     Unmovable files
-        RGB(200, 100, 60),      // 4 COLORFRAGMENTED    Fragmented files
-        RGB(0, 0, 255),         // 5 COLORBUSY          Busy color
-        RGB(255, 0, 255),       // 6 COLORMFT           MFT reserved zones
-        RGB(0, 150, 150),       // 7 COLORSPACEHOG      Spacehogs
-        RGB(255, 255, 255)      // 8 background
-};
-
-struct ClusterSquareStruct {
-    bool dirty_;
-    byte color_;
-};
-
 class DefragGui {
 public:
     // Constructor and destructor
@@ -31,9 +14,9 @@ public:
 
     void clear_screen(const wchar_t *format, ...);
 
-    void draw_cluster(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int color);
+    void draw_cluster(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
 
-    void fill_squares(int clusterStartSquareNum, int clusterEndSquareNum);
+    void fill_squares(uint64_t clusterStartSquareNum, uint64_t clusterEndSquareNum);
 
     void show_debug(DebugLevel level, const ItemStruct *item, const wchar_t *format, ...);
 
@@ -93,20 +76,10 @@ private:
     // Size of drawing area of disk
     Rect disk_area_size_;
 
-    // Number of squares in horizontal direction of disk area
-    int num_disk_squares_x_{};
-
-    // Number of squares in horizontal direction of disk area
-    int num_disk_squares_y_{};
-
-    // Total number of squares in disk area
-    int num_disk_squares_;
-
-    // Color of each square in disk area and status if it is "dirty"
-    std::vector<ClusterSquareStruct> cluster_squares_;
+    DiskColorMap color_map_;
 
     // Color of each disk cluster
-    std::unique_ptr<uint8_t> cluster_info_;
+    std::unique_ptr<DrawColor[]> cluster_info_;
 
     // Number of disk clusters
     uint64_t num_clusters_;
@@ -115,7 +88,7 @@ private:
     //	int RedrawScreen;
 
     // Current window size
-    Rect client_window_size_;
+    Rect client_size_;
 
     // Mutex to make the display single-threaded.
     HANDLE display_mutex_{};
@@ -126,10 +99,10 @@ private:
     // Bitmap used for double buffering
     std::unique_ptr<Bitmap> bmp_;
 
-    // pointer to logger
+    // Non-owning pointer to logger
     DefragLog *log_{};
 
-    // pointer to library
+    // Non-owning pointer to library
     DefragLib *defrag_lib_;
 
     // static member that is an instance of itself

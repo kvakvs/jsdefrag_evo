@@ -677,7 +677,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
 
     /* Update the diskmap with the colors. */
     data->phase_done_ = data->phase_todo_;
-    gui->draw_cluster(data, 0, 0, 0);
+    gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
     /* Setup the progress counter and the file/dir counters. */
     data->phase_done_ = 0;
@@ -779,12 +779,12 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         // Update the progress percentage
         data->phase_done_ = data->phase_done_ + 1;
 
-        if (data->phase_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, 0);
+        if (data->phase_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, DrawColor::Empty);
     }
 
     /* Force the percentage to 100%. */
     data->phase_done_ = data->phase_todo_;
-    gui->draw_cluster(data, 0, 0, 0);
+    gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
     /* Calculate the begin of the zone's. */
     calculate_zones(data);

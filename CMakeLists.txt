@@ -5,7 +5,7 @@ if (MSVC)
     set(OPTIONS WIN32)
 endif (MSVC)
 
-add_compile_options("/std:c++17")
+add_compile_options("/std:c++20")
 
 set(APP_NAME jkdefrag)
 set(SRC ${PROJECT_SOURCE_DIR}/JkDefrag/Source)
@@ -16,15 +16,18 @@ set(HEADER_FILES
         ${SRC}/scan_ntfs.h
         ${SRC}/scan_fat.h
         ${SRC}/itemstruct.h
+        ${SRC}/printing.h
         ${SRC}/defrag_struct.h
         ${SRC}/defrag_log.h
         ${SRC}/defrag_lib.h
         ${SRC}/defrag_gui.h
+        ${SRC}/defrag_gui_colormap.h
         ${SRC}/defrag_data_struct.h
         ${SRC}/defrag.h)
 set(SOURCE_FILES
         ${SRC}/defrag.cpp
         ${SRC}/defrag_gui.cpp
+        ${SRC}/defrag_gui_colormap.cpp
         ${SRC}/defrag_lib.cpp
         ${SRC}/defrag_log.cpp
         ${SRC}/defrag_struct.cpp
@@ -32,6 +35,7 @@ set(SOURCE_FILES
         ${SRC}/scan_ntfs.cpp
         ${SRC}/std_afx.cpp
         ${SRC}/itemstruct.cpp
+        ${SRC}/printing.cpp
         ${SRC}/defrag_lib_finding.cpp
         ${SRC}/defrag_lib_methods.cpp
         ${SRC}/defrag_lib_moving.cpp

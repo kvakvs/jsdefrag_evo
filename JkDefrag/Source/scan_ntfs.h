@@ -393,6 +393,6 @@ private:
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanNTFS> instance_;
 
-    //	JKDefragGui *m_jkGui;
+    // Non-owning
     DefragLib *defrag_lib_{};
 };

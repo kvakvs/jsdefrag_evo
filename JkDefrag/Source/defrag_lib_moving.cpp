@@ -134,7 +134,7 @@ uint32_t DefragLib::move_item1(DefragDataStruct *data, HANDLE file_handle, const
     /* Draw the item and the destination clusters on the screen in the BUSY	color. */
     colorize_item(data, item, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
 
-    gui->draw_cluster(data, new_lcn, new_lcn + size, DefragStruct::COLORBUSY);
+    gui->draw_cluster(data, new_lcn, new_lcn + size, DrawColor::Busy);
 
     /* Call Windows to perform the move. */
     uint32_t error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
@@ -150,7 +150,7 @@ uint32_t DefragLib::move_item1(DefragDataStruct *data, HANDLE file_handle, const
     data->phase_done_ = data->phase_done_ + move_params.ClusterCount;
 
     /* Undraw the destination clusters on the screen. */
-    gui->draw_cluster(data, new_lcn, new_lcn + size, DefragStruct::COLOREMPTY);
+    gui->draw_cluster(data, new_lcn, new_lcn + size, DrawColor::Empty);
 
     return error_code;
 }
@@ -230,7 +230,7 @@ uint32_t DefragLib::move_item2(DefragDataStruct *data, HANDLE file_handle, const
 
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
-                                  DefragStruct::COLORBUSY);
+                                  DrawColor::Busy);
 
                 /* Call Windows to perform the move. */
                 error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
@@ -248,7 +248,7 @@ uint32_t DefragLib::move_item2(DefragDataStruct *data, HANDLE file_handle, const
                 /* Undraw the destination clusters on the screen. */
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
-                                  DefragStruct::COLOREMPTY);
+                                  DrawColor::Empty);
 
                 /* If there was an error then exit. */
                 if (error_code != NO_ERROR) return error_code;
