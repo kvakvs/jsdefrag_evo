@@ -33,5 +33,5 @@ using namespace Gdiplus;
 #include "defrag_log.h"
 #include "tech/scan_fat.h"
 #include "tech/scan_ntfs.h"
-#include "gui/defrag_gui_colormap.h"
+#include "gui/colormap.h"
 #include "gui/defrag_gui.h"

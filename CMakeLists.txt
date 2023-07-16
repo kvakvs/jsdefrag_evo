@@ -26,14 +26,15 @@ set(HEADER_FILES
         ${SRC}/tech/defrag_lib.h
         ${SRC}/tech/defrag_data_struct.h
         ${SRC}/gui/defrag_gui.h
-        ${SRC}/gui/defrag_gui_colormap.h
+        ${SRC}/gui/colormap.h
         )
 set(SOURCE_FILES
         ${SRC}/precompiled_header.cpp
         ${SRC}/main.cpp
         ${SRC}/defrag.cpp
         ${SRC}/gui/defrag_gui.cpp
-        ${SRC}/gui/defrag_gui_colormap.cpp
+        ${SRC}/gui/colormap.cpp
+        ${SRC}/gui/paint.cpp
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/defrag_log.cpp
         ${SRC}/tech/defrag_struct.cpp

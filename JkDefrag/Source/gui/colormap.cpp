@@ -1,5 +1,5 @@
 #include "precompiled_header.h"
-#include "defrag_gui_colormap.h"
+#include "colormap.h"
 
 
 DiskColorMap::DiskColorMap()

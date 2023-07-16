@@ -16,7 +16,7 @@ public:
 
     void draw_cluster(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
 
-    void fill_squares(uint64_t clusterStartSquareNum, uint64_t clusterEndSquareNum);
+    void prepare_cells_for_cluster_range(uint64_t cluster_start_square_num, uint64_t cluster_end_square_num);
 
     void show_debug(DebugLevel level, const ItemStruct *item, std::wstring &&text);
 
@@ -36,18 +36,31 @@ public:
 
     void on_paint(HDC dc) const;
 
-    void paint_image(HDC dc);
+    void repaint_window(HDC dc);
 
     static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
 
-private:
+protected:
+    void
+    paint_background(Rect &window_size, Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const;
 
+    void paint_diskmap_outline(Graphics *graphics, const POINT &m_org, const POINT &m_end) const;
+
+    void paint_strings(Graphics *graphics) const;
+
+    void paint_diskmap(Graphics *graphics);
+
+    void paint_empty_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen,
+                          const Pen &pen_empty) const;
+
+    void paint_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen) const;
+
+    static void paint_set_gradient_colors(COLORREF col, Color &c1, Color &c2);
+
+private:
     HWND wnd_{};
     WNDCLASSEX wnd_class_{};
     MSG message_{};
-    // UINT_PTR size_timer_;
-
-    static constexpr size_t MESSAGES_BUF_SIZE = 32768;
 
     // The texts displayed on the screen
     std::wstring messages_[6];
@@ -65,7 +78,8 @@ private:
     // graphics data
     //
 
-    int top_height_{};
+    // Height of the top status area
+    int top_area_height_{};
     int square_size_;
 
     // Offsets of drawing area of disk
@@ -73,8 +87,7 @@ private:
     int offset_y_;
 
     // Calculated offset of drawing area of disk
-    int real_offset_x_{};
-    int real_offset_y_{};
+    POINT diskmap_pos_;
 
     // Size of drawing area of disk
     Rect disk_area_size_;

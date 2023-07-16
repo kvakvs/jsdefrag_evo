@@ -1,7 +1,5 @@
 #include "precompiled_header.h"
-#include "../tech/defrag_data_struct.h"
 
-#include <cstdarg>
 #include <memory>
 #include <format>
 
@@ -113,20 +111,23 @@ void DefragGui::set_display_data(HDC dc) {
     graphics.GetVisibleClipBounds(&client_window_size);
 
     client_size_ = client_window_size;
-    top_height_ = 33;
+    top_area_height_ = 33;
 
     if (debug_level_ > DebugLevel::Warning) {
-        top_height_ = 49;
+        top_area_height_ = 49;
     }
 
     disk_area_size_.Width = client_window_size.Width - offset_x_ * 2;
-    disk_area_size_.Height = client_window_size.Height - top_height_ - offset_y_ * 2;
+    disk_area_size_.Height = client_window_size.Height - top_area_height_ - offset_y_ * 2;
 
     color_map_.set_size((size_t) (disk_area_size_.Width / square_size_),
                         (size_t) (disk_area_size_.Height / square_size_));
 
-    real_offset_x_ = (int) ((client_size_.Width - (int) color_map_.get_width() * square_size_) * 0.5);
-    real_offset_y_ = (int) ((client_size_.Height - top_height_ - (int) color_map_.get_height() * square_size_) * 0.5);
+    // Find centered position for the disk map
+    diskmap_pos_ = {
+            .x = (client_size_.Width - (int) color_map_.get_width() * square_size_) / 2,
+            .y = (client_size_.Height - top_area_height_ - (int) color_map_.get_height() * square_size_) / 2
+    };
 
     bmp_ = std::make_unique<Bitmap>(client_size_.Width, client_size_.Height);
 }
@@ -146,27 +147,27 @@ void DefragGui::clear_screen(std::wstring &&text) {
         log_->log(messages_[0].c_str());
     }
 
-    paint_image(dc_);
+    repaint_window(dc_);
 }
 
-/* Callback: whenever an item (file, directory) is moved on disk. */
+// Callback: whenever an item (file, directory) is moved on disk.
 void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const uint64_t from_lcn,
                           const uint64_t to_lcn, const uint64_t from_vcn) {
-    /* Save the message in Messages 3. */
+    // Save the message in Messages 3
     if (clusters == 1) {
         messages_[3] = std::format(MOVING_1_CLUSTER_FMT, from_lcn, to_lcn);
     } else {
         messages_[3] = std::format(MOVING_CLUSTERS_FMT, clusters, from_lcn, to_lcn);
     }
 
-    /* Save the name of the file in Messages 4. */
+    // Save the name of the file in Messages 4
     if (item != nullptr && item->have_long_path()) {
         messages_[4] = item->get_long_path();
     } else {
         messages_[4].clear();
     }
 
-    /* If debug mode then write a message to the logfile. */
+    // If debug mode then write a message to the logfile.
     if (debug_level_ < DebugLevel::DetailedProgress) return;
 
     if (from_vcn > 0) {
@@ -184,7 +185,7 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
             log_->log(std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
         }
     }
-    paint_image(dc_);
+    repaint_window(dc_);
 }
 
 
@@ -204,7 +205,7 @@ void DefragGui::show_analyze(const DefragDataStruct *data, const ItemStruct *ite
     } else {
         messages_[4].clear();
     }
-    paint_image(dc_);
+    repaint_window(dc_);
 }
 
 /* Callback: show a debug message. */
@@ -220,7 +221,7 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
     messages_[5] = std::move(text);
     log_->log(messages_[5].c_str());
 
-    paint_image(dc_);
+    repaint_window(dc_);
 }
 
 // Callback: paint a cluster on the screen in a given palette color
@@ -275,13 +276,13 @@ void DefragGui::draw_cluster(const DefragDataStruct *data, const uint64_t cluste
     const int cluster_start_square_num = (int) ((uint64_t) cluster_start / (uint64_t) cluster_per_square);
     const int cluster_end_square_num = (int) ((uint64_t) cluster_end / (uint64_t) cluster_per_square);
 
-    fill_squares(cluster_start_square_num, cluster_end_square_num);
+    prepare_cells_for_cluster_range(cluster_start_square_num, cluster_end_square_num);
 
     ReleaseMutex(display_mutex_);
-    paint_image(dc_);
+    repaint_window(dc_);
 }
 
-/* Callback: just before the defragger starts a new Phase, and when it finishes. */
+// Callback: just before the defragger starts a new Phase, and when it finishes
 void DefragGui::show_status(const DefragDataStruct *data) {
     // Reset the progress counter
     __timeb64 now{};
@@ -598,226 +599,6 @@ void DefragGui::show_status(const DefragDataStruct *data) {
     }
 }
 
-
-void DefragGui::paint_image(HDC dc) {
-    std::unique_ptr<Graphics> graphics(Graphics::FromImage(bmp_.get()));
-    Rect window_size = client_size_;
-    Rect draw_area;
-
-    [[maybe_unused]] const auto square_size_unit = 1.f / (float) square_size_;
-
-    // Reset the display idle timer (screen saver) and system idle timer (power saver)
-    SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
-
-    if (progress_todo_ > 0) {
-        auto done = (double) ((double) progress_done_ / (double) progress_todo_);
-
-        if (done > 1.0) done = 1.0;
-
-        messages_[2] = std::format(FLT2_FMT L"%", 100.0 * done);
-    }
-
-    Color back_color1;
-    back_color1.SetFromCOLORREF(RGB(0, 0, 255));
-
-    Color back_color2;
-    back_color2.SetFromCOLORREF(RGB(255, 0, 0));
-
-    LinearGradientBrush bg_brush(window_size, Color::DarkBlue, Color::LightBlue, LinearGradientModeForwardDiagonal);
-
-    draw_area = window_size;
-
-    draw_area.Height = top_height_ + 1;
-
-    Color busy_color;
-    busy_color.SetFromCOLORREF(display_colors[(size_t) DrawColor::Busy]);
-
-    SolidBrush busy_brush(busy_color);
-
-    // graphics->FillRectangle(&busyBrush, drawArea);
-    graphics->FillRectangle(&bg_brush, draw_area);
-
-    SolidBrush brush(Color::White);
-
-    FontFamily font_family(L"Tahoma");
-    Font font(&font_family, 12, FontStyleRegular, UnitPixel);
-    const wchar_t *text;
-    PointF point_f(2.0f, 0.0f);
-
-    text = messages_[0].c_str();
-    graphics->DrawString(text, -1, &font, point_f, &brush);
-
-    point_f = PointF(40.0f, 0.0f);
-    text = messages_[1].c_str();
-    graphics->DrawString(text, -1, &font, point_f, &brush);
-
-    point_f = PointF(200.0f, 0.0f);
-    text = messages_[2].c_str();
-    graphics->DrawString(text, -1, &font, point_f, &brush);
-
-    point_f = PointF(280.0f, 0.0f);
-    text = messages_[3].c_str();
-    graphics->DrawString(text, -1, &font, point_f, &brush);
-
-    point_f = PointF(2.0f, 17.0f);
-    text = messages_[4].c_str();
-    graphics->DrawString(text, -1, &font, point_f, &brush);
-
-    if (debug_level_ > DebugLevel::Warning) {
-        point_f = PointF(2.0f, 33.0f);
-        text = messages_[5].c_str();
-        graphics->DrawString(text, -1, &font, point_f, &brush);
-    }
-
-
-    int xx1 = real_offset_x_ - 1;
-    int yy1 = real_offset_y_ + top_height_ - 1;
-
-    int xx2 = xx1 + (int) color_map_.get_width() * square_size_ + 1;
-    int yy2 = yy1 + (int) color_map_.get_height() * square_size_ + 1;
-
-    /*
-        Color bottomPartColor;
-        bottomPartColor.SetFromCOLORREF(Colors[JKDefragStruct::Busy]);
-    
-        SolidBrush bottomPartBrush(bottomPartColor);
-    */
-
-    draw_area = Rect(0, top_height_ + 1, client_size_.Width, yy1 - top_height_ - 2);
-    /*
-        graphics->FillRectangle(&bottomPartBrush, drawArea);
-    */
-    graphics->FillRectangle(&bg_brush, draw_area);
-
-    draw_area = Rect(0, yy2 + 2, client_size_.Width, client_size_.Height - yy2 - 2);
-    /*
-        graphics->FillRectangle(&bottomPartBrush, drawArea);
-    */
-    graphics->FillRectangle(&bg_brush, draw_area);
-
-    draw_area = Rect(0, yy1 - 1, xx1 - 1, yy2 - yy1 + 3);
-    /*
-        graphics->FillRectangle(&bottomPartBrush, drawArea);
-    */
-    graphics->FillRectangle(&bg_brush, draw_area);
-
-    draw_area = Rect(xx2, yy1 - 1, client_size_.Width - xx2, yy2 - yy1 + 3);
-    /*
-        graphics->FillRectangle(&bottomPartBrush, drawArea);
-    */
-    graphics->FillRectangle(&bg_brush, draw_area);
-
-    Pen pen1(Color(0, 0, 0));
-    Pen pen2(Color(255, 255, 255));
-
-    graphics->DrawLine(&pen1, xx1, yy2, xx1, yy1);
-    graphics->DrawLine(&pen1, xx1, yy1, xx2, yy1);
-    graphics->DrawLine(&pen1, xx2, yy1, xx2, yy2);
-    graphics->DrawLine(&pen1, xx2, yy2, xx1, yy2);
-
-    graphics->DrawLine(&pen2, xx1 - 1, yy2 + 1, xx1 - 1, yy1 - 1);
-    graphics->DrawLine(&pen2, xx1 - 1, yy1 - 1, xx2 + 1, yy1 - 1);
-    graphics->DrawLine(&pen2, xx2 + 1, yy1 - 1, xx2 + 1, yy2 + 1);
-    graphics->DrawLine(&pen2, xx2 + 1, yy2 + 1, xx1 - 1, yy2 + 1);
-
-    COLORREF color_empty_ref = display_colors[(size_t) DrawColor::Empty];
-    Color color_empty;
-    color_empty.SetFromCOLORREF(color_empty_ref);
-
-    Pen pen(Color(210, 210, 210));
-    Pen pen_empty(color_empty);
-    const auto map_width = color_map_.get_width();
-
-    for (auto cell_index = 0; cell_index < color_map_.get_total_count(); cell_index++) {
-        auto &cell = color_map_.get_cell(cell_index);
-
-        if (!cell.dirty_) {
-            continue;
-        }
-
-        cell.dirty_ = false;
-
-        auto x1 = cell_index % map_width;
-        auto y1 = cell_index / map_width;
-        auto xx3 = real_offset_x_ + x1 * square_size_;
-        auto yy3 = real_offset_y_ + y1 * square_size_ + top_height_;
-        auto &stored_color = cell.color_;
-        bool is_empty = true;
-        COLORREF col = display_colors[(size_t) DrawColor::Empty];
-
-        if (stored_color.busy) {
-            col = display_colors[(size_t) DrawColor::Busy];
-            is_empty = false;
-        } else if (stored_color.unmovable) {
-            col = display_colors[(size_t) DrawColor::Unmovable];
-            is_empty = false;
-        } else if (stored_color.fragmented) {
-            col = display_colors[(size_t) DrawColor::Fragmented];
-            is_empty = false;
-        } else if (stored_color.mft) {
-            col = display_colors[(size_t) DrawColor::Mft];
-            is_empty = false;
-        } else if (stored_color.unfragmented) {
-            col = display_colors[(size_t) DrawColor::Unfragmented];
-            is_empty = false;
-        } else if (stored_color.spacehog) {
-            col = display_colors[(size_t) DrawColor::SpaceHog];
-            is_empty = false;
-        }
-
-        Color c1;
-        Color c2;
-
-        c1.SetFromCOLORREF(col);
-
-        int rr = GetRValue(col) + 200;
-        rr = rr > 255 ? 255 : rr;
-
-        int gg = GetGValue(col) + 200;
-        gg = gg > 255 ? 255 : gg;
-
-        int bb = GetBValue(col) + 100;
-        bb = bb > 255 ? 255 : bb;
-
-        c2.SetFromCOLORREF(RGB((byte) rr, (byte) gg, (byte) bb));
-
-        if (is_empty) {
-            Rect draw_area2(xx3, yy3, square_size_ - 0, square_size_ - 0);
-
-            LinearGradientBrush bb2(draw_area2, c1, c2, LinearGradientModeVertical);
-            graphics->FillRectangle(&bb2, draw_area2);
-
-            int line_x1 = draw_area2.X;
-            int line_y1 = draw_area2.Y;
-            int line_x2 = draw_area2.X + square_size_ - 1;
-            int line_y2 = draw_area2.Y;
-            int line_x3 = draw_area2.X;
-            int line_y3 = draw_area2.Y + square_size_ - 1;
-            int line_x4 = draw_area2.X + square_size_ - 1;
-            int line_y4 = draw_area2.Y + square_size_ - 1;
-
-            graphics->DrawLine(&pen_empty, line_x1, line_y1, line_x2, line_y2);
-            graphics->DrawLine(&pen, line_x3, line_y3, line_x4, line_y4);
-        } else {
-            Rect draw_area2(xx3, yy3, square_size_ - 0, square_size_ - 0);
-
-            LinearGradientBrush bb1(draw_area2, c2, c1, LinearGradientModeForwardDiagonal);
-
-            graphics->FillRectangle(&bb1, draw_area2);
-
-            int line_x1 = draw_area2.X;
-            int line_y1 = draw_area2.Y + square_size_ - 1;
-            int line_x2 = draw_area2.X + square_size_ - 1;
-            int line_y2 = draw_area2.Y;
-            int line_x3 = draw_area2.X + square_size_ - 1;
-            int line_y3 = draw_area2.Y + square_size_ - 1;
-
-            graphics->DrawLine(&pen, line_x1, line_y1, line_x3, line_y3);
-            graphics->DrawLine(&pen, line_x2, line_y2, line_x3, line_y3);
-        }
-    }
-}
-
 void DefragGui::on_paint(HDC dc) const {
     Graphics graphics(dc);
     graphics.DrawImage(bmp_.get(), 0, 0);
@@ -866,8 +647,8 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             {
                 instance_->dc_ = BeginPaint(wnd, &ps);
                 instance_->set_display_data(instance_->dc_);
-                instance_->fill_squares(0, instance_->color_map_.get_total_count());
-                instance_->paint_image(instance_->dc_);
+                instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
+                instance_->repaint_window(instance_->dc_);
                 EndPaint(wnd, &ps);
             }
 
@@ -879,55 +660,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
     return DefWindowProc(wnd, message, w_param, l_param);
 }
 
-// Fill a sequence of squares with their current state bitflags
-void DefragGui::fill_squares(uint64_t clusterStartSquareNum, uint64_t clusterEndSquareNum) {
-    const auto cluster_per_square = (float) (num_clusters_ / color_map_.get_total_count());
-
-    for (uint64_t ii = clusterStartSquareNum; ii < clusterEndSquareNum; ii++) {
-        [[maybe_unused]] auto current_color = DrawColor::Empty;
-
-        ClusterSquareStruct::ColorBits cluster_group_colors{};
-        auto colors_map = cluster_info_.get();
-
-        for (uint64_t kk = ii * cluster_per_square;
-             kk < num_clusters_ && kk < (ii + 1) * cluster_per_square;
-             kk++) {
-            switch (colors_map[kk]) {
-                case DrawColor::Empty:
-                    cluster_group_colors.empty = true;
-                    break;
-                case DrawColor::Allocated:
-                    cluster_group_colors.allocated = true;
-                    break;
-                case DrawColor::Unfragmented:
-                    cluster_group_colors.unfragmented = true;
-                    break;
-                case DrawColor::Unmovable:
-                    cluster_group_colors.unmovable = true;
-                    break;
-                case DrawColor::Fragmented:
-                    cluster_group_colors.fragmented = true;
-                    break;
-                case DrawColor::Busy:
-                    cluster_group_colors.busy = true;
-                    break;
-                case DrawColor::Mft:
-                    cluster_group_colors.mft = true;
-                    break;
-                case DrawColor::SpaceHog:
-                    cluster_group_colors.spacehog = true;
-                    break;
-            }
-        }
-
-        auto &cell = color_map_.get_cell(ii);
-        cell.dirty_ = true;
-        cell.color_ = cluster_group_colors;
-    }
-}
-
 /*
-
 Show a map on the screen of all the clusters on disk. The map shows
 which clusters are free and which are in use.
 The data->RedrawScreen flag controls redrawing of the screen. It is set
@@ -935,7 +668,6 @@ to "2" (busy) when the subroutine starts. If another thread changes it to
 "1" (request) while the subroutine is busy then it will immediately exit
 without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no).
-
 */
 void DefragGui::show_diskmap(DefragDataStruct *data) {
     ItemStruct *item;
@@ -945,30 +677,20 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
         uint64_t BitmapSize;
 
         BYTE Buffer[65536]; /* Most efficient if binary multiple. */
-    } BitmapData{};
+    } bitmap_data{};
 
     uint64_t Lcn;
-    uint64_t ClusterStart;
-
-    uint32_t ErrorCode;
-
-    int Index;
-    int IndexMax;
-
-    BYTE Mask;
-
-    int InUse;
-    int PrevInUse;
-
+    uint64_t cluster_start;
+    uint32_t error_code;
+    int index;
+    int index_max;
+    BYTE mask;
+    int in_use;
+    int prev_in_use;
     DWORD w;
 
-    int i;
-
-    //	*data->RedrawScreen = 2;                       /* Set the flag to "busy". */
-
-    /* Exit if the library is not processing a disk yet. */
+    // Exit if the library is not processing a disk yet.
     if (data->disk_.volume_handle_ == nullptr) {
-        //		*data->RedrawScreen = 0;                       /* Set the flag to "no". */
         return;
     }
 
@@ -977,8 +699,8 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
 
     /* Show the map of all the clusters in use. */
     Lcn = 0;
-    ClusterStart = 0;
-    PrevInUse = 1;
+    cluster_start = 0;
+    prev_in_use = 1;
 
     do {
         if (*data->running_ != RunningState::RUNNING) break;
@@ -988,36 +710,36 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
         /* Fetch a block of cluster data. */
         bitmap_param.StartingLcn.QuadPart = Lcn;
 
-        ErrorCode = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                    &bitmap_param, sizeof bitmap_param, &BitmapData, sizeof BitmapData, &w,
-                                    nullptr);
+        error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w,
+                                     nullptr);
 
-        if (ErrorCode != 0) {
-            ErrorCode = NO_ERROR;
+        if (error_code != 0) {
+            error_code = NO_ERROR;
         } else {
-            ErrorCode = GetLastError();
+            error_code = GetLastError();
         }
 
-        if (ErrorCode != NO_ERROR && ErrorCode != ERROR_MORE_DATA) break;
+        if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
-        /* Sanity check. */
-        if (Lcn >= BitmapData.StartingLcn + BitmapData.BitmapSize) break;
+        // Sanity check
+        if (Lcn >= bitmap_data.StartingLcn + bitmap_data.BitmapSize) break;
 
-        /* Analyze the clusterdata. We resume where the previous block left off. */
-        Lcn = BitmapData.StartingLcn;
-        Index = 0;
-        Mask = 1;
+        // Analyze the clusterdata. We resume where the previous block left off
+        Lcn = bitmap_data.StartingLcn;
+        index = 0;
+        mask = 1;
 
-        IndexMax = sizeof BitmapData.Buffer;
+        index_max = sizeof bitmap_data.Buffer;
 
-        if (BitmapData.BitmapSize / 8 < IndexMax) IndexMax = (int) (BitmapData.BitmapSize / 8);
+        if (bitmap_data.BitmapSize / 8 < index_max) index_max = (int) (bitmap_data.BitmapSize / 8);
 
-        while (Index < IndexMax && *data->running_ == RunningState::RUNNING) {
-            InUse = BitmapData.Buffer[Index] & Mask;
+        while (index < index_max && *data->running_ == RunningState::RUNNING) {
+            in_use = bitmap_data.Buffer[index] & mask;
 
-            /* If at the beginning of the disk then copy the InUse value as our
+            /* If at the beginning of the disk then copy the in_use value as our
             starting value. */
-            if (Lcn == 0) PrevInUse = InUse;
+            if (Lcn == 0) prev_in_use = in_use;
 
             /* At the beginning and end of an Exclude draw the cluster. */
             if (Lcn == data->mft_excludes_[0].start_ || Lcn == data->mft_excludes_[0].end_ ||
@@ -1026,57 +748,55 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
                 if (Lcn == data->mft_excludes_[0].end_ ||
                     Lcn == data->mft_excludes_[1].end_ ||
                     Lcn == data->mft_excludes_[2].end_) {
-                    draw_cluster(data, ClusterStart, Lcn, DrawColor::Unmovable);
-                } else if (PrevInUse == 0) {
-                    draw_cluster(data, ClusterStart, Lcn, DrawColor::Empty);
+                    draw_cluster(data, cluster_start, Lcn, DrawColor::Unmovable);
+                } else if (prev_in_use == 0) {
+                    draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
                 } else {
-                    draw_cluster(data, ClusterStart, Lcn, DrawColor::Allocated);
+                    draw_cluster(data, cluster_start, Lcn, DrawColor::Allocated);
                 }
 
-                InUse = 1;
-                PrevInUse = 1;
-                ClusterStart = Lcn;
+                in_use = 1;
+                prev_in_use = 1;
+                cluster_start = Lcn;
             }
 
-            if (PrevInUse == 0 && InUse != 0) /* Free */
-            {
-                draw_cluster(data, ClusterStart, Lcn, DrawColor::Empty);
-
-                ClusterStart = Lcn;
+            // Free
+            if (prev_in_use == 0 && in_use != 0) {
+                draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
+                cluster_start = Lcn;
             }
 
-            if (PrevInUse != 0 && InUse == 0) /* In use */
-            {
-                draw_cluster(data, ClusterStart, Lcn, DrawColor::Allocated);
-
-                ClusterStart = Lcn;
+            // In use
+            if (prev_in_use != 0 && in_use == 0) {
+                draw_cluster(data, cluster_start, Lcn, DrawColor::Allocated);
+                cluster_start = Lcn;
             }
 
-            PrevInUse = InUse;
+            prev_in_use = in_use;
 
-            if (Mask == 128) {
-                Mask = 1;
-                Index = Index + 1;
+            if (mask == 128) {
+                mask = 1;
+                index = index + 1;
             } else {
-                Mask = Mask << 1;
+                mask = mask << 1;
             }
 
             Lcn = Lcn + 1;
         }
-    } while (ErrorCode == ERROR_MORE_DATA && Lcn < BitmapData.StartingLcn + BitmapData.BitmapSize);
+    } while (error_code == ERROR_MORE_DATA && Lcn < bitmap_data.StartingLcn + bitmap_data.BitmapSize);
 
-    if (Lcn > 0/* && (*data->RedrawScreen == 2)*/) {
-        if (PrevInUse == 0) {
+    if (Lcn > 0) {
+        if (prev_in_use == 0) {
             // Free
-            draw_cluster(data, ClusterStart, Lcn, DrawColor::Empty);
+            draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
         } else {
             // in use
-            draw_cluster(data, ClusterStart, Lcn, DrawColor::Allocated);
+            draw_cluster(data, cluster_start, Lcn, DrawColor::Allocated);
         }
     }
 
     // Show the MFT zones
-    for (i = 0; i < 3; i++) {
+    for (auto i = 0; i < 3; i++) {
         //		if (*data->RedrawScreen != 2) break;
         if (data->mft_excludes_[i].start_ <= 0) continue;
 
