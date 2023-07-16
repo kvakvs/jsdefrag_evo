@@ -114,12 +114,8 @@ ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_
     return p1;
 }
 
-/*
-
-Cleanup the Streams data in an inode_data struct. If CleanFragments is TRUE then
-also cleanup the fragments.
-
-*/
+// Cleanup the Streams data in an inode_data struct. If CleanFragments is TRUE then
+// also cleanup the fragments.
 void ScanNTFS::cleanup_streams(InodeDataStruct *inode_data, const bool cleanup_fragments) {
     const StreamStruct *stream = inode_data->streams_;
 

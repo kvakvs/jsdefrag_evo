@@ -124,7 +124,7 @@ public:
 private:
     static uint8_t calculate_short_name_check_sum(const UCHAR *name);
 
-    static micro64_t convert_time(const USHORT date, const USHORT time, const USHORT time10);
+    static filetime64_t convert_time(const USHORT date, const USHORT time, const USHORT time10);
 
     static void make_fragment_list(const DefragDataStruct *data, const FatDiskInfoStruct *disk_info, ItemStruct *item,
                                    uint64_t cluster);

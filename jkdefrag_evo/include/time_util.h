@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-// 10-millionths of a second, 100ns
+// 10-millionths of a second, 100ns resolution
 using filetime64_t = std::chrono::duration<uint64_t, std::ratio_multiply<std::ratio<100>, std::nano>>;
 
 // Millionths of a second

@@ -30,9 +30,9 @@ public:
 
     uint64_t bytes_;
     uint64_t clusters_count_;
-    micro64_t creation_time_;
-    micro64_t mft_change_time_;
-    micro64_t last_access_time_;
+    filetime64_t creation_time_;
+    filetime64_t mft_change_time_;
+    filetime64_t last_access_time_;
 
     // List of fragments
     // TODO: Owning pointer

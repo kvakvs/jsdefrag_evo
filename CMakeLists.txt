@@ -43,8 +43,10 @@ set(SOURCE_FILES
 
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/tech/defrag_struct.cpp
-        ${SRC}/tech/scan_fat.cpp
         ${SRC}/tech/itemstruct.cpp
+        ${SRC}/tech/fat/scan_fat.cpp
+        ${SRC}/tech/fat/analyze.cpp
+        ${SRC}/tech/fat/directory.cpp
         ${SRC}/tech/ntfs/scan_ntfs.cpp
         ${SRC}/tech/ntfs/analyze.cpp
         ${SRC}/tech/ntfs/attributes.cpp
