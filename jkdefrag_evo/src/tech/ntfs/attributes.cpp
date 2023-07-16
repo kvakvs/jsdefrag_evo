@@ -4,7 +4,7 @@
  * \brief Process a list of attributes and store the gathered information in the Item struct. Return FALSE if an error occurred.
  */
 void
-ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data,
+ScanNTFS::process_attribute_list(DefragState *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data,
                                  BYTE *buffer, const uint64_t buf_length, const int depth) {
     std::unique_ptr<BYTE[]> buffer_2;
     ATTRIBUTE_LIST *attribute;
@@ -167,7 +167,7 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
 
 // Process a list of attributes and store the gathered information in the Item
 // struct. Return FALSE if an error occurred
-bool ScanNTFS::process_attributes(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info,
+bool ScanNTFS::process_attributes(DefragState *data, NtfsDiskInfoStruct *disk_info,
                                   InodeDataStruct *inode_data, BYTE *buffer, const uint64_t buf_length,
                                   const USHORT instance, const int depth) {
     std::unique_ptr<BYTE[]> buffer_2;

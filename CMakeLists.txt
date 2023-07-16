@@ -25,7 +25,7 @@ set(HEADER_FILES
         ${INCL}/itemstruct.h
         ${INCL}/defrag_struct.h
         ${INCL}/defrag_lib.h
-        ${INCL}/defrag_data_struct.h
+        ${INCL}/defrag_state.h
         ${INCL}/defrag_gui.h
         ${INCL}/colormap.h
         ${INCL}/tree.h
@@ -45,6 +45,12 @@ set(SOURCE_FILES
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/tech/defrag_struct.cpp
         ${SRC}/tech/itemstruct.cpp
+        ${SRC}/tech/defrag_lib_moving.cpp
+        ${SRC}/tech/defrag/defrag_state.cpp
+        ${SRC}/tech/defrag/move_mft.cpp
+        ${SRC}/tech/defrag/finding.cpp
+        ${SRC}/tech/defrag/scan.cpp
+        ${SRC}/tech/defrag/analyze.cpp
         ${SRC}/tech/fat/scan_fat.cpp
         ${SRC}/tech/fat/analyze.cpp
         ${SRC}/tech/fat/directory.cpp
@@ -53,11 +59,6 @@ set(SOURCE_FILES
         ${SRC}/tech/ntfs/attributes.cpp
         ${SRC}/tech/ntfs/mft.cpp
         ${SRC}/tech/ntfs/stream.cpp
-        ${SRC}/tech/defrag_lib_finding.cpp
-        ${SRC}/tech/defrag_lib_moving.cpp
-        ${SRC}/tech/defrag_lib_scan.cpp
-        ${SRC}/tech/defrag_data_struct.cpp
-        ${SRC}/tech/defrag_lib_methods.cpp
         ${SRC}/tech/methods/fixup.cpp
         ${SRC}/tech/methods/defragment.cpp
         ${SRC}/tech/methods/forced_fill.cpp

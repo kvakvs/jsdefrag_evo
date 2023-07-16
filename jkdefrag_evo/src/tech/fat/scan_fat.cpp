@@ -1,5 +1,5 @@
 #include "precompiled_header.h"
-#include "defrag_data_struct.h"
+#include "defrag_state.h"
 
 #include <memory>
 
@@ -49,7 +49,7 @@ filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const U
 // - A zero-length file has a first cluster number of 0.
 // - The FAT contains either an EOC mark (End Of Clusterchain) or the cluster number of
 // the next cluster of the file.
-void ScanFAT::make_fragment_list(const DefragDataStruct *data, const FatDiskInfoStruct *disk_info,
+void ScanFAT::make_fragment_list(const DefragState *data, const FatDiskInfoStruct *disk_info,
                                  ItemStruct *item, uint64_t cluster) {
     FragmentListStruct *new_fragment;
     FragmentListStruct *last_fragment;

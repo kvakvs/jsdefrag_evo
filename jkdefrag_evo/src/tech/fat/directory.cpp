@@ -5,7 +5,7 @@
  * \return Return nullptr if error. Note: the caller owns the returned buffer.
  */
 BYTE *
-ScanFAT::load_directory(const DefragDataStruct *data, const FatDiskInfoStruct *disk_info, const uint64_t start_cluster,
+ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_info, const uint64_t start_cluster,
                         uint64_t *out_length) {
     std::unique_ptr<BYTE[]> buffer;
     uint64_t fragment_length;

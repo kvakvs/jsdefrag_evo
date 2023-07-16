@@ -1,7 +1,7 @@
 #include "precompiled_header.h"
 
 // Optimize the harddisk by filling gaps with files from above
-void DefragLib::optimize_volume(DefragDataStruct *data) {
+void DefragLib::optimize_volume(DefragState *data) {
     ItemStruct *item;
 
     uint64_t gap_begin;

@@ -119,21 +119,21 @@ public:
     // Get a non-owning pointer to instance of the class
     static ScanFAT *get_instance();
 
-    bool analyze_fat_volume(DefragDataStruct *data);
+    bool analyze_fat_volume(DefragState *data);
 
 private:
     static uint8_t calculate_short_name_check_sum(const UCHAR *name);
 
     static filetime64_t convert_time(const USHORT date, const USHORT time, const USHORT time10);
 
-    static void make_fragment_list(const DefragDataStruct *data, const FatDiskInfoStruct *disk_info, ItemStruct *item,
+    static void make_fragment_list(const DefragState *data, const FatDiskInfoStruct *disk_info, ItemStruct *item,
                                    uint64_t cluster);
 
     static BYTE *load_directory(
-            const DefragDataStruct *data, const FatDiskInfoStruct *disk_info, uint64_t start_cluster,
+            const DefragState *data, const FatDiskInfoStruct *disk_info, uint64_t start_cluster,
             uint64_t *out_length);
 
-    void analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *disk_info, BYTE *buffer, uint64_t length,
+    void analyze_fat_directory(DefragState *data, FatDiskInfoStruct *disk_info, BYTE *buffer, uint64_t length,
                                ItemStruct *parent_directory);
 
     // static member that is an instance of itself

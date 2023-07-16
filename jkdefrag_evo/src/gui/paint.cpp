@@ -283,7 +283,7 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
     }
 }
 
-void DefragGui::write_stats(const DefragDataStruct *data) {
+void DefragGui::write_stats(const DefragState *data) {
     ItemStruct *largest_items[25];
     uint64_t total_clusters;
     uint64_t total_bytes;

@@ -1,7 +1,7 @@
 #include "precompiled_header.h"
 
 // Optimize the harddisk by moving the selected items up
-void DefragLib::optimize_up(DefragDataStruct *data) {
+void DefragLib::optimize_up(DefragState *data) {
     ItemStruct *item;
 
     uint64_t gap_begin;

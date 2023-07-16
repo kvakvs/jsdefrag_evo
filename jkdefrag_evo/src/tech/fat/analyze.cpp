@@ -34,7 +34,7 @@
         case FAT32: if (FATContent == 0x0FFFFFF7) IsBadCluster = TRUE; break;
     }
 */
-bool ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
+bool ScanFAT::analyze_fat_volume(DefragState *data) {
     FatDiskInfoStruct disk_info{};
     OVERLAPPED g_overlapped;
     DWORD bytes_read;
@@ -316,7 +316,7 @@ bool ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
 }
 
 // Analyze a directory and add all the items to the item tree
-void ScanFAT::analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *disk_info, BYTE *buffer,
+void ScanFAT::analyze_fat_directory(DefragState *data, FatDiskInfoStruct *disk_info, BYTE *buffer,
                                     const uint64_t length, ItemStruct *parent_directory) {
     wchar_t short_name[13];
     wchar_t long_name[820];

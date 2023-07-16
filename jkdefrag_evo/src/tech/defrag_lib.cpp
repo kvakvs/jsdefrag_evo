@@ -26,7 +26,7 @@ http://www.kessels.com/
 #include <optional>
 #include <cwctype>
 
-#include "../../include/defrag_data_struct.h"
+#include "../../include/defrag_state.h"
 #include "../../include/defrag_lib.h"
 
 
@@ -156,7 +156,7 @@ wchar_t DefragLib::lower_case(const wchar_t c) {
 }
 
 // Dump a block of data to standard output, for debugging purposes
-void DefragLib::show_hex([[maybe_unused]] DefragDataStruct *data, const BYTE *buffer,
+void DefragLib::show_hex([[maybe_unused]] DefragState *data, const BYTE *buffer,
                          const uint64_t count) {
     DefragGui *gui = DefragGui::get_instance();
 
@@ -246,7 +246,7 @@ void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path)
 }
 
 // Return a string with the full path of an item, constructed from the short names.
-std::wstring DefragLib::get_short_path(const DefragDataStruct *data, const ItemStruct *item) {
+std::wstring DefragLib::get_short_path(const DefragState *data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
 
@@ -277,7 +277,7 @@ void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) 
 /*
 Return a string with the full path of an item, constructed from the long names.
 */
-std::wstring DefragLib::get_long_path(const DefragDataStruct *data, const ItemStruct *item) {
+std::wstring DefragLib::get_long_path(const DefragState *data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
 
@@ -296,7 +296,7 @@ std::wstring DefragLib::get_long_path(const DefragDataStruct *data, const ItemSt
 }
 
 // Slow the program down
-void DefragLib::slow_down(DefragDataStruct *data) {
+void DefragLib::slow_down(DefragState *data) {
     __timeb64 t{};
 
     // Sanity check
@@ -332,7 +332,7 @@ void DefragLib::slow_down(DefragDataStruct *data) {
 Open the item as a file or as a directory. If the item could not be
 opened then show an error message and return nullptr.
 */
-HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruct *item) {
+HANDLE DefragLib::open_item_handle(const DefragState *data, const ItemStruct *item) {
     HANDLE file_handle;
     const size_t length = wcslen(item->get_long_path()) + 5;
     auto path = std::make_unique<wchar_t[]>(length);
@@ -369,7 +369,7 @@ Note: Very small files are stored by Windows in the MFT and have no
 clusters (zero) and no fragments (nullptr).
 
 */
-bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HANDLE file_handle) {
+bool DefragLib::get_fragments(const DefragState *data, ItemStruct *item, HANDLE file_handle) {
     STARTING_VCN_INPUT_BUFFER RetrieveParam;
 
     struct {
@@ -606,7 +606,7 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
  * \param busy_size Number of clusters to be highlighted.
  * \param un_draw true to undraw the file from the screen.
  */
-void DefragLib::colorize_disk_item(DefragDataStruct *data, const ItemStruct *item, const uint64_t busy_offset,
+void DefragLib::colorize_disk_item(DefragState *data, const ItemStruct *item, const uint64_t busy_offset,
                                    const uint64_t busy_size, const int un_draw) const {
     DefragGui *gui = DefragGui::get_instance();
 
@@ -706,7 +706,7 @@ to "2" (busy) when the subroutine starts. If another thread changes it to
 without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no). */
 /*
-void ShowDiskmap2(struct DefragDataStruct *Data) {
+void ShowDiskmap2(struct DefragState *Data) {
 	struct ItemStruct *Item;
 	STARTING_LCN_INPUT_BUFFER BitmapParam;
 	struct {
@@ -843,7 +843,7 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 
 
 // Update some numbers in the DefragData
-void DefragLib::call_show_status(DefragDataStruct *data, const DefragPhase phase, const int zone) {
+void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, const int zone) {
     ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
 
@@ -1044,7 +1044,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const DefragPhase phase
 // Run the defragger/optimizer. See the .h file for a full explanation
 void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
                               const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
-    DefragDataStruct data{};
+    DefragState data{};
     uint32_t ntfs_disable_last_access_update;
     DWORD key_disposition;
     DWORD length;

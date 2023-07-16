@@ -14,7 +14,7 @@
  * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
  *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
  */
-bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
+bool DefragLib::find_gap(const DefragState *data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
                          const uint64_t minimum_size,
                          const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
                          const bool ignore_mft_excludes) {
@@ -185,7 +185,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
  * \param zone 0=only directories, 1=only regular files, 2=only space hogs, 3=all
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
-ItemStruct *DefragLib::find_highest_item(const DefragDataStruct *data, const uint64_t cluster_start,
+ItemStruct *DefragLib::find_highest_item(const DefragState *data, const uint64_t cluster_start,
                                          const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
     DefragGui *gui = DefragGui::get_instance();
 
@@ -246,7 +246,7 @@ Zone=2           Only search the SpaceHogs.
 Zone=3           Search all items.
 
 */
-ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64_t cluster_start,
+ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cluster_start,
                                       const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
@@ -385,7 +385,7 @@ Search the list for the item that occupies the cluster at the LCN. Return a
 pointer to the item. If not found then return nullptr.
 
 */
-[[maybe_unused]] ItemStruct *DefragLib::find_item_at_lcn(const DefragDataStruct *data, const uint64_t lcn) {
+[[maybe_unused]] ItemStruct *DefragLib::find_item_at_lcn(const DefragState *data, const uint64_t lcn) {
     /* Locate the item by descending the sorted tree in memory. If found then
     return the item. */
     ItemStruct *item = data->item_tree_;

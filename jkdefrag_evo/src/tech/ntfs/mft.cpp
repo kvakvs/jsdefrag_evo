@@ -1,6 +1,6 @@
 #include "precompiled_header.h"
 
-bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
+bool ScanNTFS::interpret_mft_record(DefragState *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
                                     const uint64_t inode_number, const uint64_t max_inode,
                                     FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
                                     FragmentListStruct **mft_bitmap_fragments, uint64_t *mft_bitmap_bytes,
@@ -217,7 +217,7 @@ array.
 
 */
 
-bool ScanNTFS::fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
+bool ScanNTFS::fixup_raw_mftdata(DefragState *data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
                                  const uint64_t buf_length) const {
     DefragGui *gui = DefragGui::get_instance();
 

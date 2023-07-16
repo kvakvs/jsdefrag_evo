@@ -354,20 +354,20 @@ public:
     // Get instance of the class
     static ScanNTFS *get_instance();
 
-    bool analyze_ntfs_volume(DefragDataStruct *data);
+    bool analyze_ntfs_volume(DefragState *data);
 
 private:
     static const wchar_t *stream_type_names(ATTRIBUTE_TYPE stream_type);
 
-    bool fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
+    bool fixup_raw_mftdata(DefragState *data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
                            uint64_t buf_length) const;
 
     static BYTE *read_non_resident_data(
-            const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info, const BYTE *run_data,
+            const DefragState *data, const NtfsDiskInfoStruct *disk_info, const BYTE *run_data,
             uint32_t run_data_length, uint64_t offset, uint64_t wanted_length);
 
     static bool translate_rundata_to_fragmentlist(
-            const DefragDataStruct *data, InodeDataStruct *inode_data,
+            const DefragState *data, InodeDataStruct *inode_data,
             const wchar_t *stream_name, ATTRIBUTE_TYPE stream_type,
             const BYTE *run_data, uint32_t run_data_length, uint64_t starting_vcn,
             uint64_t bytes);
@@ -378,15 +378,15 @@ private:
     construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, const StreamStruct *stream);
 
     bool process_attributes(
-            DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
+            DefragState *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
             uint64_t buf_length, USHORT instance, int depth);
 
     void process_attribute_list(
-            DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
+            DefragState *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
             uint64_t buf_length, int depth);
 
     bool interpret_mft_record(
-            DefragDataStruct *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array, uint64_t inode_number,
+            DefragState *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array, uint64_t inode_number,
             uint64_t max_inode, FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
             FragmentListStruct **mft_bitmap_fragments, uint64_t *mft_bitmap_bytes, BYTE *buffer, uint64_t buf_length);
 

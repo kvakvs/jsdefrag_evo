@@ -1,7 +1,7 @@
 #include "precompiled_header.h"
 
 // Load the MFT into a list of ItemStruct records in memory
-bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
+bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     NtfsDiskInfoStruct disk_info{};
     std::unique_ptr<BYTE[]> buffer;
     OVERLAPPED g_overlapped;

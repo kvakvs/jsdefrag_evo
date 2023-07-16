@@ -6,7 +6,7 @@
 //    chosen to wrap the MFT around that data. The fragments will be aligned, so
 //    the performance loss is minimal, and still faster than placing the MFT
 //    higher on the disk.
-[[maybe_unused]] void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct *data) {
+[[maybe_unused]] void DefragLib::move_mft_to_begin_of_disk(DefragState *data) {
     ItemStruct *item;
 
     uint64_t lcn;

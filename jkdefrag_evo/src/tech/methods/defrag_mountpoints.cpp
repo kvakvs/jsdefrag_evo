@@ -3,7 +3,7 @@
 // Subfunction for DefragAllDisks(). It will ignore removable disks, and
 // will iterate for disks that are mounted on a subdirectory of another
 // disk (instead of being mounted on a drive).
-void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_point, const OptimizeMode opt_mode) {
+void DefragLib::defrag_mountpoints(DefragState *data, const wchar_t *mount_point, const OptimizeMode opt_mode) {
     DefragGui *gui = DefragGui::get_instance();
 
     if (*data->running_ != RunningState::RUNNING) return;

@@ -6,7 +6,7 @@
 - Move SpaceHogs out of the directory- and regular zones.
 - Move items out of the MFT reserved zones
 */
-void DefragLib::fixup(DefragDataStruct *data) {
+void DefragLib::fixup(DefragState *data) {
     WIN32_FILE_ATTRIBUTE_DATA attributes;
     DefragGui *gui = DefragGui::get_instance();
 

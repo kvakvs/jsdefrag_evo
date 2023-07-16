@@ -6,9 +6,9 @@
 #include "defrag_lib.h"
 
 // The big data struct that holds all the defragger's variables for a single thread
-class DefragDataStruct {
+class DefragState {
 public:
-    DefragDataStruct();
+    DefragState();
 
 public:
     DefragPhase phase_; // The current Phase (1...3)

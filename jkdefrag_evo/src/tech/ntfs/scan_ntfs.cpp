@@ -1,5 +1,5 @@
 #include "precompiled_header.h"
-#include "defrag_data_struct.h"
+#include "defrag_state.h"
 
 #include <memory>
 
@@ -20,7 +20,7 @@ ScanNTFS *ScanNTFS::get_instance() {
  * \param offset Bytes to skip from begin of data
  * \return Return a malloc'ed buffer with the data, or nullptr if error. Note: The caller owns the returned buffer.
  */
-BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info,
+BYTE *ScanNTFS::read_non_resident_data(const DefragState *data, const NtfsDiskInfoStruct *disk_info,
                                        const BYTE *run_data, const uint32_t run_data_length,
                                        const uint64_t offset, uint64_t wanted_length) {
     union UlongBytes {
@@ -170,7 +170,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
 
 // Read the RunData list and translate into a list of fragments
 bool ScanNTFS::translate_rundata_to_fragmentlist(
-        const DefragDataStruct *data, InodeDataStruct *inode_data, const wchar_t *stream_name,
+        const DefragState *data, InodeDataStruct *inode_data, const wchar_t *stream_name,
         ATTRIBUTE_TYPE stream_type, const BYTE *run_data, const uint32_t run_data_length, const uint64_t starting_vcn,
         const uint64_t bytes) {
     StreamStruct *stream;

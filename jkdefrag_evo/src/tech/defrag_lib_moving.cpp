@@ -10,7 +10,7 @@
  * \param direction 0: move up, 1: move down
  * \return
  */
-bool DefragLib::move_item(DefragDataStruct *data, ItemStruct *item, const uint64_t new_lcn,
+bool DefragLib::move_item(DefragState *data, ItemStruct *item, const uint64_t new_lcn,
                           const uint64_t offset, const uint64_t size, const MoveDirection direction) const {
     // If the Item is Unmovable, Excluded, or has zero size then we cannot move it
     if (item->is_unmovable_) return false;
@@ -86,7 +86,7 @@ bool DefragLib::move_item(DefragDataStruct *data, ItemStruct *item, const uint64
  * \param size
  * \return NO_ERROR value or GetLastError() from DeviceIoControl()
  */
-DWORD DefragLib::move_item_whole(DefragDataStruct *data, HANDLE file_handle, const ItemStruct *item,
+DWORD DefragLib::move_item_whole(DefragState *data, HANDLE file_handle, const ItemStruct *item,
                                  const uint64_t new_lcn, const uint64_t offset,
                                  const uint64_t size) const {
     MOVE_FILE_DATA move_params;
@@ -160,7 +160,7 @@ DWORD DefragLib::move_item_whole(DefragDataStruct *data, HANDLE file_handle, con
  * \param size Number of clusters to be moved
  * \return NO_ERROR or GetLastError() from DeviceIoControl()
  */
-DWORD DefragLib::move_item_in_fragments(DefragDataStruct *data, HANDLE file_handle, const ItemStruct *item,
+DWORD DefragLib::move_item_in_fragments(DefragState *data, HANDLE file_handle, const ItemStruct *item,
                                         const uint64_t new_lcn, const uint64_t offset, const uint64_t size) const {
     MOVE_FILE_DATA move_params;
     uint64_t from_lcn;
@@ -268,7 +268,7 @@ DWORD DefragLib::move_item_in_fragments(DefragDataStruct *data, HANDLE file_hand
  * \return True if all good
  */
 bool
-DefragLib::move_item_with_strat(DefragDataStruct *data, ItemStruct *item, HANDLE file_handle, const uint64_t new_lcn,
+DefragLib::move_item_with_strat(DefragState *data, ItemStruct *item, HANDLE file_handle, const uint64_t new_lcn,
                                 const uint64_t offset, const uint64_t size, const MoveStrategy strategy) const {
     DWORD error_code;
     DefragGui *gui = DefragGui::get_instance();
@@ -322,7 +322,7 @@ DefragLib::move_item_with_strat(DefragDataStruct *data, ItemStruct *item, HANDLE
  * \return true if success, false if failed to move without fragmenting the
 item
  */
-int DefragLib::move_item_try_strategies(DefragDataStruct *data, ItemStruct *item, HANDLE file_handle,
+int DefragLib::move_item_try_strategies(DefragState *data, ItemStruct *item, HANDLE file_handle,
                                         const uint64_t new_lcn, const uint64_t offset, const uint64_t size,
                                         const MoveDirection direction) const {
     uint64_t cluster_start;

@@ -1,7 +1,7 @@
 #include "precompiled_header.h"
 
 // Fill all the gaps at the beginning of the disk with fragments from the files above
-void DefragLib::forced_fill(DefragDataStruct *data) {
+void DefragLib::forced_fill(DefragState *data) {
     call_show_status(data, DefragPhase::ForcedFill, -1); // "Phase 3: ForcedFill"
 
     // Walk through all the gaps

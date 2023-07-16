@@ -190,7 +190,7 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
 
 // Callback: for every file during analysis.
 // This subroutine is called one last time with Item=nullptr when analysis has finished
-void DefragGui::show_analyze(const DefragDataStruct *data, const ItemStruct *item) {
+void DefragGui::show_analyze(const DefragState *data, const ItemStruct *item) {
     // Make sure this function does not run more often than 100ms
     {
         static std::chrono::steady_clock::time_point last_time = std::chrono::steady_clock::now();
@@ -237,7 +237,7 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
 }
 
 // Callback: paint a cluster on the screen in a given palette color
-void DefragGui::draw_cluster(const DefragDataStruct *data, const uint64_t cluster_start, const uint64_t cluster_end,
+void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_start, const uint64_t cluster_end,
                              const DrawColor color) {
     __timeb64 now{};
     [[maybe_unused]] Rect window_size = client_size_;
@@ -295,7 +295,7 @@ void DefragGui::draw_cluster(const DefragDataStruct *data, const uint64_t cluste
 }
 
 // Callback: just before the defragger starts a new Phase, and when it finishes
-void DefragGui::show_status(const DefragDataStruct *data) {
+void DefragGui::show_status(const DefragState *data) {
     // Reset the progress counter
     __timeb64 now{};
     _ftime64_s(&now);
@@ -419,7 +419,7 @@ to "2" (busy) when the subroutine starts. If another thread changes it to
 without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no).
 */
-void DefragGui::show_diskmap(DefragDataStruct *data) {
+void DefragGui::show_diskmap(DefragState *data) {
     ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {

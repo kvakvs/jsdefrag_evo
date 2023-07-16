@@ -2,7 +2,7 @@
 
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
-void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, OptimizeMode opt_mode) {
+void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, OptimizeMode opt_mode) {
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
