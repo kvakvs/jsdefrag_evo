@@ -19,3 +19,11 @@ void ItemStruct::set_names(const wchar_t *long_path, const wchar_t *long_filenam
         this->short_filename_ = short_filename;
     }
 }
+
+ItemStruct::~ItemStruct() {
+    while (fragments_ != nullptr) {
+        FragmentListStruct *fragment = fragments_->next_;
+        delete fragments_;
+        fragments_ = fragment;
+    }
+}

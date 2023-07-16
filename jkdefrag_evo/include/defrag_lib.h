@@ -33,9 +33,6 @@ http://www.kessels.com/
 #include "constants.h"
 #include "types.h"
 
-#undef max
-constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
-
 // The three running states.
 enum class RunningState {
     RUNNING = 0,
@@ -213,26 +210,6 @@ public:
 
     static void slow_down(DefragDataStruct *data);
 
-    static uint64_t get_item_lcn(const ItemStruct *item);
-
-    static ItemStruct *tree_smallest(ItemStruct *top);
-
-    static ItemStruct *tree_biggest(ItemStruct *top);
-
-    static ItemStruct *tree_first(ItemStruct *top, int direction);
-
-    static ItemStruct *tree_prev(ItemStruct *here);
-
-    static ItemStruct *tree_next(ItemStruct *here);
-
-    static ItemStruct *tree_next_prev(ItemStruct *here, const bool reverse);
-
-    static void tree_insert(DefragDataStruct *data, ItemStruct *new_item);
-
-    static void tree_detach(DefragDataStruct *data, const ItemStruct *item);
-
-    static void delete_item_tree(ItemStruct *top);
-
     static int get_fragment_count(const ItemStruct *item);
 
     static bool is_fragmented(const ItemStruct *item, uint64_t offset, uint64_t size);
@@ -285,11 +262,12 @@ private:
                    const MoveDirection direction) const;
 
     static ItemStruct *
-    find_highest_item(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int direction,
-                      int zone);
+    find_highest_item(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end,
+                      Tree::Direction direction, int zone);
 
     static ItemStruct *
-    find_best_item(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int direction, int zone);
+    find_best_item(const DefragDataStruct *data, const uint64_t cluster_start, const uint64_t cluster_end,
+                   const Tree::Direction direction, const int zone);
 
     [[maybe_unused]] void compare_items(DefragDataStruct *data, const ItemStruct *item) const;
 

@@ -390,7 +390,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
 
     // Cleanup
-    delete_item_tree(data->item_tree_);
+    Tree::delete_tree(data->item_tree_);
 
     data->disk_.mount_point_.reset();
     data->disk_.mount_point_slash_.reset();

@@ -38,16 +38,17 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
             ItemStruct *item = nullptr;
             uint64_t phase_temp = 0;
 
-            for (auto temp_item = tree_smallest(data->item_tree_); temp_item != nullptr; temp_item =
-                                                                                                 tree_next(temp_item)) {
-                if (temp_item->is_unmovable_ == true) continue;
-                if (temp_item->is_excluded_ == true) continue;
+            for (auto temp_item = Tree::smallest(data->item_tree_);
+                 temp_item != nullptr;
+                 temp_item = Tree::next(temp_item)) {
+                if (temp_item->is_unmovable_) continue;
+                if (temp_item->is_excluded_) continue;
                 if (temp_item->clusters_count_ == 0) continue;
 
                 int file_zone = 1;
 
-                if (temp_item->is_hog_ == true) file_zone = 2;
-                if (temp_item->is_dir_ == true) file_zone = 0;
+                if (temp_item->is_hog_) file_zone = 2;
+                if (temp_item->is_dir_) file_zone = 0;
                 if (file_zone != data->zone_) continue;
 
                 if (previous_item != nullptr &&
@@ -73,7 +74,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
             data->phase_todo_ = data->phase_done_ + phase_temp;
 
             // If the item is already at the Lcn then skip
-            if (get_item_lcn(item) == lcn) {
+            if (item->get_item_lcn() == lcn) {
                 lcn = lcn + item->clusters_count_;
 
                 continue;

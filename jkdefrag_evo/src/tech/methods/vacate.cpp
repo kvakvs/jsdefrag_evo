@@ -60,8 +60,8 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
         bigger_item = nullptr;
         bigger_begin = 0;
 
-        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
-            if (item->is_unmovable_ == true || item->is_excluded_ == true || item->clusters_count_ == 0) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+            if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
                 continue;
             }
 

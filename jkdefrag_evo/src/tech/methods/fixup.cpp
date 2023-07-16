@@ -18,7 +18,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
 
     // Initialize the width of the progress bar: the total number of clusters of all the items
     ItemStruct *item;
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->clusters_count_ == 0) continue;
@@ -41,13 +41,13 @@ void DefragLib::fixup(DefragDataStruct *data) {
         gap_end[file_zone] = 0;
     }
 
-    auto next_item = tree_smallest(data->item_tree_);
+    auto next_item = Tree::smallest(data->item_tree_);
 
     while (next_item != nullptr && *data->running_ == RunningState::RUNNING) {
         // The loop will change the position of the item in the tree, so we have to determine the next item before executing the loop.
         item = next_item;
 
-        next_item = tree_next(item);
+        next_item = Tree::next(item);
 
         // Ignore items that are unmovable or excluded
         if (item->is_unmovable_) continue;
@@ -60,7 +60,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
         if (item->is_hog_) file_zone = 2;
         if (item->is_dir_) file_zone = 0;
 
-        const uint64_t item_lcn = get_item_lcn(item);
+        const uint64_t item_lcn = item->get_item_lcn();
 
         int move_me = false;
 
@@ -126,7 +126,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
                         DebugLevel::Progress, item,
                         std::format(
                                 L"Cannot move file away because no gap is big enough: lcn=" NUM_FMT "[" NUM_FMT " clusters]",
-                                get_item_lcn(item), item->clusters_count_));
+                                item->get_item_lcn(), item->clusters_count_));
 
                 gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
 

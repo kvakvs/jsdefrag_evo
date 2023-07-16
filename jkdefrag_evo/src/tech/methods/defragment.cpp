@@ -18,9 +18,8 @@ void DefragLib::defragment(DefragDataStruct *data) {
 
     call_show_status(data, 2, -1); /* "Phase 2: Defragment" */
 
-    /* Setup the width of the progress bar: the number of clusters in all
-    fragmented files. */
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    // Setup the width of the progress bar: the number of clusters in all fragmented files
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->clusters_count_ == 0) continue;
@@ -34,14 +33,14 @@ void DefragLib::defragment(DefragDataStruct *data) {
     if (data->phase_todo_ == 0) return;
 
     // Walk through all files and defrag
-    next_item = tree_smallest(data->item_tree_);
+    next_item = Tree::smallest(data->item_tree_);
 
     while (next_item != nullptr && *data->running_ == RunningState::RUNNING) {
         /* The loop may change the position of the item in the tree, so we have
         to determine and remember the next item now. */
         item = next_item;
 
-        next_item = tree_next(item);
+        next_item = Tree::next(item);
 
         // Ignore if the item cannot be moved, or is Excluded, or is not fragmented
         if (item->is_unmovable_) continue;

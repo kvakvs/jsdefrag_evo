@@ -186,7 +186,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
 ItemStruct *DefragLib::find_highest_item(const DefragDataStruct *data, const uint64_t cluster_start,
-                                         const uint64_t cluster_end, const int direction, const int zone) {
+                                         const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     /* "Looking for highest-fit %I64d[%I64d]" */
@@ -197,8 +197,13 @@ ItemStruct *DefragLib::find_highest_item(const DefragDataStruct *data, const uin
     /* Walk backwards through all the items on disk and select the first
     file that fits inside the free block. If we find an exact match then
     immediately return it. */
-    for (auto item = tree_first(data->item_tree_, direction); item != nullptr; item = tree_next_prev(item, direction)) {
-        const uint64_t item_lcn = get_item_lcn(item);
+    const auto step_direction =
+            direction == Tree::Direction::First ? Tree::StepDirection::StepForward : Tree::StepDirection::StepBack;
+
+    for (auto item = Tree::first(data->item_tree_, direction);
+         item != nullptr;
+         item = Tree::next_prev(item, step_direction)) {
+        const auto item_lcn = item->get_item_lcn();
 
         if (item_lcn == 0) continue;
 
@@ -242,7 +247,7 @@ Zone=3           Search all items.
 
 */
 ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64_t cluster_start,
-                                      const uint64_t cluster_end, const int direction, const int zone) {
+                                      const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
 
@@ -261,11 +266,14 @@ ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64
     uint64_t gap_size = cluster_end - cluster_start;
     uint64_t total_items_size = 0;
 
-    for (auto item = tree_first(data->item_tree_, direction);
+    const auto step_direction =
+            direction == Tree::Direction::First ? Tree::StepDirection::StepForward : Tree::StepDirection::StepBack;
+
+    for (auto item = Tree::first(data->item_tree_, direction);
          item != nullptr;
-         item = tree_next_prev(item, direction)) {
+         item = Tree::next_prev(item, step_direction)) {
         // If we have passed the top of the gap then...
-        const uint64_t item_lcn = get_item_lcn(item);
+        const auto item_lcn = item->get_item_lcn();
 
         if (item_lcn == 0) continue;
 
@@ -383,7 +391,7 @@ pointer to the item. If not found then return nullptr.
     ItemStruct *item = data->item_tree_;
 
     while (item != nullptr) {
-        const uint64_t item_lcn = get_item_lcn(item);
+        const auto item_lcn = item->get_item_lcn();
 
         if (item_lcn == lcn) return item;
 
@@ -396,7 +404,7 @@ pointer to the item. If not found then return nullptr.
 
     /* Walk through all the fragments of all the items in the sorted tree. If a
     fragment is found that occupies the LCN then return a pointer to the item. */
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (find_fragment_begin(item, lcn) != 0) return item;
     }
 

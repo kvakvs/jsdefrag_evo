@@ -1,5 +1,9 @@
 #pragma once
 
+#undef max
+// Used in the file ItemStruct tree for node locations
+constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
+
 enum class OptimizeMode {
     // Analyze only, do not defragment and do not optimize.
     AnalyzeOnly = 0,

@@ -12,7 +12,7 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
     call_show_status(data, 6, -1); /* "Phase 3: Move Up" */
 
     // Setup the progress counter: the total number of clusters in all files
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         data->phase_todo_ = data->phase_todo_ + item->clusters_count_;
     }
 
@@ -33,10 +33,10 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
         below the gap. */
         uint64_t phase_temp = 0;
 
-        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
-            if (get_item_lcn(item) >= gap_end) break;
+            if (item->get_item_lcn() >= gap_end) break;
 
             phase_temp = phase_temp + item->clusters_count_;
         }
@@ -54,14 +54,14 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
             /* Find the Item that is the best fit for the gap. If nothing found (no files
             fit the gap) then exit the loop. */
             if (perfect_fit) {
-                item = find_best_item(data, gap_begin, gap_end, 0, 3);
+                item = find_best_item(data, gap_begin, gap_end, Tree::Direction::First, 3);
 
                 if (item == nullptr) {
                     perfect_fit = false;
-                    item = find_highest_item(data, gap_begin, gap_end, 0, 3);
+                    item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::First, 3);
                 }
             } else {
-                item = find_highest_item(data, gap_begin, gap_end, 0, 3);
+                item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::First, 3);
             }
 
             if (item == nullptr) break;

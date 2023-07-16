@@ -450,7 +450,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
             log_->log(std::format(L"- Average end-begin distance: " FLT0_FMT " clusters", data->average_distance_));
         }
 
-        for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if (!item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
             if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
@@ -465,8 +465,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
             total_bytes = 0;
             total_clusters = 0;
 
-            for (item = DefragLib::tree_smallest(data->item_tree_);
-                 item != nullptr; item = DefragLib::tree_next(item)) {
+            for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
                 if (!item->is_unmovable_) continue;
                 if (item->is_excluded_) continue;
                 if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
@@ -480,7 +479,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 if (!item->have_long_path()) {
                     log_->log(std::format(L"  " SUMMARY_FMT " [at cluster " NUM_FMT "]",
                                           fragments, item->bytes_, item->clusters_count_,
-                                          DefragLib::get_item_lcn(item)));
+                                          item->get_item_lcn()));
                 } else {
                     log_->log(std::format(L"  " SUMMARY_FMT " {}", fragments, item->bytes_, item->clusters_count_,
                                           item->get_long_path()));
@@ -496,7 +495,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                                   total_fragments, total_bytes, total_clusters));
         }
 
-        for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_excluded_) continue;
             if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
 
@@ -515,8 +514,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
             total_bytes = 0;
             total_clusters = 0;
 
-            for (item = DefragLib::tree_smallest(data->item_tree_);
-                 item != nullptr; item = DefragLib::tree_next(item)) {
+            for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
                 if (item->is_excluded_) continue;
                 if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
 
@@ -527,7 +525,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 if (!item->have_long_path()) {
                     log_->log(std::format(L"  " SUMMARY_FMT " [at cluster " NUM_FMT "]",
                                           fragments, item->bytes_, item->clusters_count_,
-                                          DefragLib::get_item_lcn(item)));
+                                          item->get_item_lcn()));
                 } else {
                     log_->log(std::format(L"  " SUMMARY_FMT " {}",
                                           fragments, item->bytes_, item->clusters_count_, item->get_long_path()));
@@ -545,7 +543,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
 
         int last_largest = 0;
 
-        for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
                  _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;
@@ -587,7 +585,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                     log_->log(std::format(L"  " SUMMARY_FMT " [at cluster " NUM_FMT "]",
                                           DefragLib::get_fragment_count(largest_items[i]),
                                           largest_items[i]->bytes_, largest_items[i]->clusters_count_,
-                                          DefragLib::get_item_lcn(largest_items[i])));
+                                          largest_items[i]->get_item_lcn()));
                 } else {
                     log_->log(std::format(L"  " SUMMARY_FMT " {}",
                                           DefragLib::get_fragment_count(largest_items[i]),
@@ -806,7 +804,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
     /* Colorize all the files on the screen.
     Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
     ignore it. */
-    for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (*data->running_ != RunningState::RUNNING) break;
         //		if (*data->RedrawScreen != 2) break;
 

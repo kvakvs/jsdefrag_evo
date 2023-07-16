@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "time_util.h"
+#include "constants.h"
 
 #include <optional>
 
@@ -13,13 +14,32 @@ struct FragmentListStruct {
 };
 
 
-/**
- * \brief List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
- */
+// List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
 struct ItemStruct {
 public:
     void set_names(const wchar_t *long_path, const wchar_t *long_filename, const wchar_t *short_path,
                    const wchar_t *short_filename);
+
+    virtual ~ItemStruct();
+
+    // Tree node location type
+    using TreeLcn = uint64_t;
+//    using TreeLcn = struct {
+//        uint64_t lcn;
+//    };
+
+    // Return the location on disk (LCN, Logical Cluster Number) of an item
+    TreeLcn get_item_lcn() const {
+        // Sanity check
+        if (this == nullptr) return 0;
+
+        const FragmentListStruct *fragment = fragments_;
+
+        while (fragment != nullptr && fragment->lcn_ == VIRTUALFRAGMENT) {
+            fragment = fragment->next_;
+        }
+        return fragment == nullptr ? 0 : fragment->lcn_;
+    }
 
 public:
     ItemStruct *parent_;

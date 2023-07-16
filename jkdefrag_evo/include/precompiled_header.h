@@ -24,6 +24,7 @@ using namespace Gdiplus;
 
 #endif
 
+#include "tree.h"
 #include "defrag_struct.h"
 #include "itemstruct.h"
 #include "defrag_data_struct.h"

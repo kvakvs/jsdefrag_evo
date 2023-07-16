@@ -141,7 +141,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
         mft_data_fragments == nullptr || mft_data_bytes == 0 ||
         mft_bitmap_fragments == nullptr || mft_bitmap_bytes == 0) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"Fatal error, cannot process this disk.");
-        DefragLib::delete_item_tree(data->item_tree_);
+        Tree::delete_tree(data->item_tree_);
         data->item_tree_ = nullptr;
         return false;
     }
@@ -206,7 +206,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
                     sectors_per_cluster_) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
                                 std::format(L"  {}", DefragLib::system_error_str(GetLastError())));
-                DefragLib::delete_item_tree(data->item_tree_);
+                Tree::delete_tree(data->item_tree_);
                 data->item_tree_ = nullptr;
                 return false;
             }
@@ -321,7 +321,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
                                 std::format(L"Error while reading Inodes " NUM_FMT " to " NUM_FMT ": reason {}",
                                             inode_number, block_end - 1, DefragLib::system_error_str(GetLastError())));
 
-                DefragLib::delete_item_tree(data->item_tree_);
+                Tree::delete_tree(data->item_tree_);
                 data->item_tree_ = nullptr;
                 return FALSE;
             }
@@ -353,13 +353,13 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     }
 
     if (*data->running_ != RunningState::RUNNING) {
-        DefragLib::delete_item_tree(data->item_tree_);
+        Tree::delete_tree(data->item_tree_);
         data->item_tree_ = nullptr;
         return false;
     }
 
     // Setup the ParentDirectory in all the items with the info in the InodeArray
-    for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         item->parent_directory_ = inode_array[item->parent_inode_];
 
         if (item->parent_inode_ == 5) item->parent_directory_ = nullptr;

@@ -30,15 +30,15 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
             above the gap. Exit if there are no more files. */
             uint64_t phase_temp = 0;
 
-            for (item = tree_biggest(data->item_tree_); item != nullptr; item = tree_prev(item)) {
-                if (get_item_lcn(item) < gap_end) break;
-                if (item->is_unmovable_ == true) continue;
-                if (item->is_excluded_ == true) continue;
+            for (item = Tree::biggest(data->item_tree_); item != nullptr; item = Tree::prev(item)) {
+                if (item->get_item_lcn() < gap_end) break;
+                if (item->is_unmovable_) continue;
+                if (item->is_excluded_) continue;
 
                 int file_zone = 1;
 
-                if (item->is_hog_ == true) file_zone = 2;
-                if (item->is_dir_ == true) file_zone = 0;
+                if (item->is_hog_) file_zone = 2;
+                if (item->is_dir_) file_zone = 0;
                 if (file_zone != zone) continue;
 
                 phase_temp = phase_temp + item->clusters_count_;
@@ -56,16 +56,16 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
             while (gap_begin < gap_end && retry < 5 && *data->running_ == RunningState::RUNNING) {
                 /* Find the Item that is the best fit for the gap. If nothing found (no files
                 fit the gap) then exit the loop. */
-                if (perfect_fit == true) {
-                    item = find_best_item(data, gap_begin, gap_end, 1, zone);
+                if (perfect_fit) {
+                    item = find_best_item(data, gap_begin, gap_end, Tree::Direction::Last, zone);
 
                     if (item == nullptr) {
                         perfect_fit = false;
 
-                        item = find_highest_item(data, gap_begin, gap_end, 1, zone);
+                        item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::Last, zone);
                     }
                 } else {
-                    item = find_highest_item(data, gap_begin, gap_end, 1, zone);
+                    item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::Last, zone);
                 }
 
                 if (item == nullptr) break;

@@ -167,7 +167,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
         }
 
         // Add the item record to the sorted item tree in memory
-        DefragLib::tree_insert(data, item);
+        Tree::insert(data->item_tree_, data->balance_count_, item);
 
         /* Also add the item to the array that is used to construct the full pathnames.
         Note: if the array already contains an entry, and the new item has a shorter

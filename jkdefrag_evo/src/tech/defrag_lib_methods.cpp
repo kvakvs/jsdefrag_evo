@@ -15,8 +15,6 @@
     uint64_t clusters;
     uint64_t clusters_done;
 
-    bool result;
-
     OSVERSIONINFO os_version;
 
     DefragGui *gui = DefragGui::get_instance();
@@ -44,7 +42,7 @@
     }
 
     // Locate the Item for the MFT. If not found then exit
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (match_mask(item->get_long_path(), L"?:\\$MFT")) break;
     }
 
@@ -85,9 +83,9 @@
         if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
             vacate(data, lcn, item->clusters_count_ - clusters_done, TRUE);
 
-            result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
+            auto result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
 
-            if (result == false) return; // No gaps found, exit
+            if (!result) return; // No gaps found, exit
         }
 
         /* If the gap is not big enough to hold the entire MFT then calculate how much
@@ -108,12 +106,13 @@
         }
 
         // Move the MFT to the gap
-        result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
+        auto result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
 
         if (result) {
             gap_begin = gap_begin + clusters;
         } else {
-            result = find_gap(data, gap_begin, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
+            result = find_gap(data, gap_begin, 0, 0, true, false,
+                              &gap_begin, &gap_end, TRUE);
 
             if (!result) return; // No gaps found, exit
         }

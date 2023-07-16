@@ -517,7 +517,7 @@ void ScanFAT::analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *d
                                     item->bytes_));
 
         // Add the item record to the sorted item tree in memory
-        DefragLib::tree_insert(data, item);
+        Tree::insert(data->item_tree_, data->balance_count_, item);
 
         // Draw the item on the screen
         gui->show_analyze(data, item);

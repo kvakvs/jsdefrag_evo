@@ -26,7 +26,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
     // Calculate the number of clusters in movable items for every zone
     for (zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
 
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
@@ -89,7 +89,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
 
         /* Walk through all items and count the unmovable fragments. Ignore unmovable fragments
         in the MFT zones, we have already counted the zones. */
-        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if (!item->is_unmovable_ &&
                 !item->is_excluded_ &&
                 (!item->is_dir_ || data->cannot_move_dirs_ <= 20))
@@ -166,7 +166,7 @@ link. */
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::Fatal, nullptr,
-                    std::format(NUM_FMT L" {}", get_item_lcn(item), item->get_long_fn()));
+                    std::format(NUM_FMT L" {}", item->get_item_lcn(), item->get_long_fn()));
 
     if (!item->is_dir_) {
         file_handle = CreateFileW(item->get_long_path(), FILE_READ_ATTRIBUTES,
@@ -394,8 +394,11 @@ int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_fi
     if (item_1->creation_time_ > item_2->creation_time_) return 1;
 
     // As a last resort compare the location on harddisk
-    if (get_item_lcn(item_1) < get_item_lcn(item_2)) return -1;
-    if (get_item_lcn(item_1) > get_item_lcn(item_2)) return 1;
+    const auto item1_lcn = item_1->get_item_lcn();
+    const auto item2_lcn = item_2->get_item_lcn();
+
+    if (item1_lcn < item2_lcn) return -1;
+    if (item1_lcn > item2_lcn) return 1;
 
     return 0;
 }
@@ -579,7 +582,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         // Show debug message: "%I64d clusters at %I64d, %I64d bytes"
         gui->show_debug(DebugLevel::DetailedFileInfo, item,
                         std::format(L"%I64d clusters at " NUM_FMT ", " NUM_FMT " bytes",
-                                    item->clusters_count_, get_item_lcn(item), item->bytes_));
+                                    item->clusters_count_, item->get_item_lcn(), item->bytes_));
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
             // Show debug message: "Special file attribute: Compressed"
@@ -612,7 +615,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         }
 
         // Add the item to the ItemTree in memory
-        tree_insert(data, item);
+        Tree::insert(data->item_tree_, data->balance_count_, item);
         item = nullptr;
     } while (FindNextFileW(find_handle, &find_file_data) != 0);
 
@@ -690,14 +693,14 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
     data->phase_done_ = 0;
     data->phase_todo_ = 0;
 
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         data->phase_todo_ = data->phase_todo_ + 1;
     }
 
     gui->show_analyze(nullptr, nullptr);
 
     // Walk through all the items one by one
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (*data->running_ != RunningState::RUNNING) break;
 
         // If requested then redraw the diskmap

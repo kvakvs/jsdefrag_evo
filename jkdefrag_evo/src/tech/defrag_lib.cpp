@@ -328,20 +328,6 @@ void DefragLib::slow_down(DefragDataStruct *data) {
     data->last_checkpoint_ = t.time * 1000 + t.millitm;
 }
 
-// Return the location on disk (LCN, Logical Cluster Number) of an item
-uint64_t DefragLib::get_item_lcn(const ItemStruct *item) {
-    // Sanity check
-    if (item == nullptr) return 0;
-
-    const FragmentListStruct *fragment = item->fragments_;
-
-    while (fragment != nullptr && fragment->lcn_ == VIRTUALFRAGMENT) {
-        fragment = fragment->next_;
-    }
-    return fragment == nullptr ? 0 : fragment->lcn_;
-}
-
-
 /*
 Open the item as a file or as a directory. If the item could not be
 opened then show an error message and return nullptr.
@@ -971,7 +957,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     data->count_all_clusters_ = 0;
     data->count_fragmented_clusters_ = 0;
 
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
@@ -1026,7 +1012,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     */
     int64_t count = 0;
 
-    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
@@ -1041,7 +1027,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
         int64_t factor = 1 - count;
         int64_t sum = 0;
 
-        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
                  _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;
@@ -1049,9 +1035,8 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
 
             if (item->clusters_count_ == 0) continue;
 
-            sum = sum + factor * (get_item_lcn(item) * 2 + item->clusters_count_);
-
-            factor = factor + 2;
+            sum += factor * (item->get_item_lcn() * 2 + item->clusters_count_);
+            factor += 2;
         }
 
         data->average_distance_ = sum / (double) (count * (count - 1));

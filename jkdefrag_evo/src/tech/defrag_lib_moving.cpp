@@ -293,11 +293,11 @@ DefragLib::move_item_with_strat(DefragDataStruct *data, ItemStruct *item, HANDLE
 
     // Fetch the new fragment map of the item and refresh the screen
     colorize_disk_item(data, item, 0, 0, true);
-    tree_detach(data, item);
+    Tree::detach(data->item_tree_, item);
 
     const bool result = get_fragments(data, item, file_handle);
 
-    tree_insert(data, item);
+    Tree::insert(data->item_tree_, data->balance_count_, item);
     colorize_disk_item(data, item, 0, 0, false);
 
     // if windows reported an error while moving the item then show the error message and return false
@@ -331,7 +331,7 @@ int DefragLib::move_item_try_strategies(DefragDataStruct *data, ItemStruct *item
     DefragGui *gui = DefragGui::get_instance();
 
     // Remember the current position on disk of the item
-    const uint64_t old_lcn = get_item_lcn(item);
+    const auto old_lcn = item->get_item_lcn();
 
     // Move the Item to the requested LCN. If error then return false
     int result = move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::Whole);
