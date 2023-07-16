@@ -8,11 +8,11 @@ enum class Zone {
     // Used as no-value
     None = -1,
     // Beginning zone, suitable for storing directories
-    Zone0 = 0,
+    ZoneFirst = 0,
     // Everything else
-    Zone1 = 1,
+    ZoneCommon = 1,
     // Zone for space hogs, rare modified large files
-    Zone2 = 2,
+    ZoneLast = 2,
     // Used as stop-value in for-loops not a real value
     Zone3_MaxValue = 3,
 };

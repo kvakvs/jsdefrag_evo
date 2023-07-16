@@ -234,10 +234,10 @@ ItemStruct *DefragLib::find_highest_item(const DefragState *data, const uint64_t
         if (item->is_excluded_) continue;
 
         if (zone != Zone::Zone3_MaxValue) {
-            auto file_zone = Zone::Zone1;
+            auto file_zone = Zone::ZoneCommon;
 
-            if (item->is_hog_) file_zone = Zone::Zone2;
-            if (item->is_dir_) file_zone = Zone::Zone0;
+            if (item->is_hog_) file_zone = Zone::ZoneLast;
+            if (item->is_dir_) file_zone = Zone::ZoneFirst;
             if (zone != file_zone) continue;
         }
 
@@ -333,10 +333,10 @@ ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cl
         if (item->is_excluded_) continue;
 
         if (zone != Zone::Zone3_MaxValue) {
-            auto file_zone = Zone::Zone1;
+            auto file_zone = Zone::ZoneCommon;
 
-            if (item->is_hog_) file_zone = Zone::Zone2;
-            if (item->is_dir_) file_zone = Zone::Zone0;
+            if (item->is_hog_) file_zone = Zone::ZoneLast;
+            if (item->is_dir_) file_zone = Zone::ZoneFirst;
             if (zone != file_zone) continue;
         }
 

@@ -11,11 +11,11 @@ namespace Str {
 
 std::wstring zone_to_str(Zone zone) {
     switch (zone) {
-        case Zone::Zone0:
+        case Zone::ZoneFirst:
             return L"<Disk Beginning>";
-        case Zone::Zone1:
+        case Zone::ZoneCommon:
             return L"<All Files>";
-        case Zone::Zone2:
+        case Zone::ZoneLast:
             return L"<Disk End>";
         case Zone::Zone3_MaxValue:
             return L"<Zone 3>";

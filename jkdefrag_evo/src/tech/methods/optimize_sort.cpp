@@ -27,8 +27,6 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
     uint64_t gap_begin;
     uint64_t gap_end;
 
-    bool result;
-
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
@@ -38,7 +36,8 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
     [[maybe_unused]] uint64_t vacated_until = 0;
     const uint64_t minimum_vacate = data->total_clusters_ / 200;
 
-    for (data->zone_ = Zone::Zone0; data->zone_ < Zone::Zone3_MaxValue; data->zone_ = (Zone)((int) data->zone_ + 1)) {
+    for (data->zone_ = Zone::ZoneFirst;
+         data->zone_ < Zone::Zone3_MaxValue; data->zone_ = (Zone)((int) data->zone_ + 1)) {
         call_show_status(data, DefragPhase::ZoneSort, data->zone_); // "Zone N: Sort"
 
         /* Start at the begin of the zone and move all the items there, one by one
@@ -62,10 +61,10 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 if (temp_item->is_excluded_) continue;
                 if (temp_item->clusters_count_ == 0) continue;
 
-                auto file_zone = Zone::Zone1;
+                auto file_zone = Zone::ZoneCommon;
 
-                if (temp_item->is_hog_) file_zone = Zone::Zone2;
-                if (temp_item->is_dir_) file_zone = Zone::Zone0;
+                if (temp_item->is_hog_) file_zone = Zone::ZoneLast;
+                if (temp_item->is_dir_) file_zone = Zone::ZoneFirst;
                 if (file_zone != data->zone_) continue;
 
                 if (previous_item != nullptr &&
@@ -116,10 +115,10 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
                     vacate(data, lcn, item->clusters_count_ - clusters_done + minimum_vacate, FALSE);
 
-                    result = find_gap(data, lcn, 0, 0, true, false,
-                                      &gap_begin, &gap_end, FALSE);
+                    auto result = find_gap(data, lcn, 0, 0, true, false,
+                                           &gap_begin, &gap_end, FALSE);
 
-                    if (result == false) return; // No gaps found, exit
+                    if (!result) return; // No gaps found, exit
                 }
 
                 /* If the gap is not big enough to hold the entire item then calculate how much
@@ -140,12 +139,13 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 }
 
                 // Move the item to the gap
-                result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
+                auto result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
 
                 if (result) {
                     gap_begin = gap_begin + clusters;
                 } else {
-                    result = find_gap(data, gap_begin, 0, 0, true, false, &gap_begin, &gap_end, FALSE);
+                    result = find_gap(data, gap_begin, 0, 0, true,
+                                      false, &gap_begin, &gap_end, FALSE);
                     if (!result) return; // No gaps found, exit.
                 }
 
