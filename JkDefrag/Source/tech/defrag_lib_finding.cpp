@@ -1,4 +1,4 @@
-#include "std_afx.h"
+#include "precompiled_header.h"
 
 /**
  * \brief Look for a gap, a block of empty clusters on the volume.

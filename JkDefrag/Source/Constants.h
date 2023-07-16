@@ -99,3 +99,7 @@ enum class DrawColor : uint8_t {
 #define VEXTENT_FMT             L"Extent (virtual): Vcn=" NUM_FMT ", NextVcn=" NUM_FMT
 #define SKIPPING_GAP_FMT        L"Skipping gap, cannot fill: " NUM_FMT " [" NUM_FMT " clusters]"
 #define MFT_EXCL_FMT            L"MftExcludes[{}].Start=" NUM_FMT ", MftExcludes[{}].End=" NUM_FMT
+
+// Formats the summary for:       Fragments Bytes            Clusters     Path or location
+#define SUMMARY_DASH_LINE       L"--------- ---------------- ------------ -----"
+#define SUMMARY_FMT             L"{:9L} {:16L} {:12L}"

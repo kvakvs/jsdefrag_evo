@@ -1,5 +1,5 @@
-#include "std_afx.h"
-#include "defrag_data_struct.h"
+#include "precompiled_header.h"
+#include "../tech/defrag_data_struct.h"
 
 #include <cstdarg>
 #include <memory>
@@ -477,10 +477,11 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 fragments = DefragLib::get_fragment_count(item);
 
                 if (!item->have_long_path()) {
-                    log_->log(std::format(L"  {:9} {:11} {:9} [at cluster " NUM_FMT "]", fragments, item->bytes_,
-                                          item->clusters_count_, DefragLib::get_item_lcn(item)));
+                    log_->log(std::format(L"  " SUMMARY_FMT " [at cluster " NUM_FMT "]",
+                                          fragments, item->bytes_, item->clusters_count_,
+                                          DefragLib::get_item_lcn(item)));
                 } else {
-                    log_->log(std::format(L"  {:9} {:11} {:9} {}", fragments, item->bytes_, item->clusters_count_,
+                    log_->log(std::format(L"  " SUMMARY_FMT " {}", fragments, item->bytes_, item->clusters_count_,
                                           item->get_long_path()));
                 }
 
@@ -489,8 +490,9 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 total_clusters = total_clusters + item->clusters_count_;
             }
 
-            log_->log(L"  --------- ----------- --------- -----");
-            log_->log(std::format(L"  {:9} {:11} {:9} Total", total_fragments, total_bytes, total_clusters));
+            log_->log(L"  " SUMMARY_DASH_LINE);
+            log_->log(std::format(L"  " SUMMARY_FMT " Total",
+                                  total_fragments, total_bytes, total_clusters));
         }
 
         for (item = DefragLib::tree_smallest(data->item_tree_); item != nullptr; item = DefragLib::tree_next(item)) {
@@ -522,11 +524,12 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 if (fragments <= 1) continue;
 
                 if (!item->have_long_path()) {
-                    log_->log(std::format(L"  {:9} {:11} {:9} [at cluster " NUM_FMT "]", fragments, item->bytes_,
-                                          item->clusters_count_, DefragLib::get_item_lcn(item)));
+                    log_->log(std::format(L"  " SUMMARY_FMT " [at cluster " NUM_FMT "]",
+                                          fragments, item->bytes_, item->clusters_count_,
+                                          DefragLib::get_item_lcn(item)));
                 } else {
-                    log_->log(std::format(L"  {:9} {:11} {:9} {}", fragments, item->bytes_, item->clusters_count_,
-                                          item->get_long_path()));
+                    log_->log(std::format(L"  " SUMMARY_FMT " {}",
+                                          fragments, item->bytes_, item->clusters_count_, item->get_long_path()));
                 }
 
                 total_fragments = total_fragments + fragments;
@@ -534,8 +537,9 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 total_clusters = total_clusters + item->clusters_count_;
             }
 
-            log_->log(L"  --------- ----------- --------- -----");
-            log_->log(std::format(L"  {:9} {:11} {:9} Total", total_fragments, total_bytes, total_clusters));
+            log_->log(L"  " SUMMARY_DASH_LINE);
+            log_->log(std::format(L"  " SUMMARY_FMT " Total",
+                                  total_fragments, total_bytes, total_clusters));
         }
 
         int last_largest = 0;
@@ -546,17 +550,20 @@ void DefragGui::show_status(const DefragDataStruct *data) {
                 continue;
             }
 
+            int i;
             for (i = last_largest - 1; i >= 0; i--) {
                 if (item->clusters_count_ < largest_items[i]->clusters_count_) break;
 
                 if (item->clusters_count_ == largest_items[i]->clusters_count_ &&
-                    item->bytes_ < largest_items[i]->bytes_)
+                    item->bytes_ < largest_items[i]->bytes_) {
                     break;
+                }
 
                 if (item->clusters_count_ == largest_items[i]->clusters_count_ &&
                     item->bytes_ == largest_items[i]->bytes_ &&
-                    _wcsicmp(item->get_long_fn(), largest_items[i]->get_long_fn()) > 0)
+                    _wcsicmp(item->get_long_fn(), largest_items[i]->get_long_fn()) > 0) {
                     break;
+                }
             }
 
             if (i < 24) {
@@ -574,14 +581,15 @@ void DefragGui::show_status(const DefragDataStruct *data) {
             log_->log(L"The 25 largest items on disk:");
             log_->log(L"  Fragments       Bytes  Clusters Name");
 
-            for (i = 0; i < last_largest; i++) {
+            for (auto i = 0; i < last_largest; i++) {
                 if (!largest_items[i]->have_long_path()) {
-                    log_->log(std::format(L"  {:9} {:11} {:9} [at cluster " NUM_FMT "]",
+                    log_->log(std::format(L"  " SUMMARY_FMT " [at cluster " NUM_FMT "]",
                                           DefragLib::get_fragment_count(largest_items[i]),
                                           largest_items[i]->bytes_, largest_items[i]->clusters_count_,
                                           DefragLib::get_item_lcn(largest_items[i])));
                 } else {
-                    log_->log(std::format(L"  {:9} {:11} {:9L} {}", DefragLib::get_fragment_count(largest_items[i]),
+                    log_->log(std::format(L"  " SUMMARY_FMT " {}",
+                                          DefragLib::get_fragment_count(largest_items[i]),
                                           largest_items[i]->bytes_, largest_items[i]->clusters_count_,
                                           largest_items[i]->get_long_path()));
                 }

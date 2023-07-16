@@ -1,7 +1,8 @@
-#include "std_afx.h"
+#include "precompiled_header.h"
+
+#include <time_util.h>
 
 /*
-
 Calculate the begin of the 3 zones.
 Unmovable files pose an interesting problem. Suppose an unmovable file is in
 zone 1, then the calculation for the beginning of zone 2 must count that file.
@@ -11,7 +12,6 @@ change, and again, and again....
 Note: the program only knows if a file is unmovable after it has tried to move a
 file. So we have to recalculate the beginning of the zones every time we encounter
 an unmovable file.
-
 */
 void DefragLib::calculate_zones(DefragDataStruct *data) {
     ItemStruct *item;
@@ -45,7 +45,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
     for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
 
     for (int iterate = 1; iterate <= 10; iterate++) {
-        /* Calculate the end of the zones. */
+        // Calculate the end of the zones
         zone_end[0] = size_of_movable_files[0] + size_of_unmovable_fragments[0] +
                       (uint64_t) (data->total_clusters_ * data->free_space_ / 100.0);
 
@@ -191,21 +191,23 @@ link. */
         u.LowPart = file_information.ftCreationTime.dwLowDateTime;
         u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
-        if (item->creation_time_ != u.QuadPart) {
+        if (item->creation_time_ != std::chrono::microseconds(u.QuadPart)) {
+            auto diff = item->creation_time_.count() - u.QuadPart;
             gui->show_debug(
                     DebugLevel::Fatal, nullptr,
                     std::format(L"  Different CreationTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
-                                item->creation_time_, u.QuadPart, item->creation_time_ - u.QuadPart));
+                                item->creation_time_.count(), u.QuadPart, diff));
         }
 
         u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
         u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
-        if (item->last_access_time_ != u.QuadPart) {
+        if (item->last_access_time_ != std::chrono::microseconds(u.QuadPart)) {
+            auto diff = item->last_access_time_.count() - u.QuadPart;
             gui->show_debug(
                     DebugLevel::Fatal, nullptr,
                     std::format(L"  Different LastAccessTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
-                                item->last_access_time_, u.QuadPart, item->last_access_time_ - u.QuadPart));
+                                item->last_access_time_.count(), u.QuadPart, diff));
         }
     }
 
@@ -512,9 +514,9 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
                        find_file_data.nFileSizeLow;
 
         item->clusters_count_ = 0;
-        item->creation_time_ = 0;
-        item->last_access_time_ = 0;
-        item->mft_change_time_ = 0;
+        item->creation_time_ = {};
+        item->last_access_time_ = {};
+        item->mft_change_time_ = {};
         item->parent_directory_ = parent_directory;
         item->is_dir_ = false;
 
@@ -639,7 +641,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 memory for later use by the optimizer. */
 void DefragLib::analyze_volume(DefragDataStruct *data) {
     ItemStruct *item;
-    uint64_t system_time;
+    micro64_t system_time;
     SYSTEMTIME time1;
     FILETIME time2;
     int i;
@@ -654,13 +656,12 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
     GetSystemTime(&time1);
 
     if (SystemTimeToFileTime(&time1, &time2) == FALSE) {
-        system_time = 0;
+        system_time = {};
     } else {
         ULARGE_INTEGER time3;
         time3.LowPart = time2.dwLowDateTime;
         time3.HighPart = time2.dwHighDateTime;
-
-        system_time = time3.QuadPart;
+        system_time = std::chrono::microseconds(time3.QuadPart);
     }
 
     /* Scan NTFS disks. */
@@ -750,7 +751,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
                 item->is_hog_ = true;
             } else if (data->use_default_space_hogs_ &&
                        data->use_last_access_time_ == TRUE &&
-                       item->last_access_time_ + (uint64_t) (30 * 24 * 60 * 60) * 10000000 < system_time) {
+                       item->last_access_time_ + std::chrono::microseconds(30UL * 24UL * 3600UL) < system_time) {
                 item->is_hog_ = true;
             } else {
                 for (const auto &s: data->space_hogs_) {

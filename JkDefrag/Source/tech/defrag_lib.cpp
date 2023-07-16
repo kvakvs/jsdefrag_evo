@@ -20,7 +20,7 @@ http://www.kessels.com/
 
 */
 
-#include "std_afx.h"
+#include "precompiled_header.h"
 
 #include <memory>
 #include <optional>
@@ -417,26 +417,26 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
         item->fragments_ = last_fragment;
     }
 
-    /* Fetch the date/times of the file. */
-    if (item->creation_time_ == 0 &&
-        item->last_access_time_ == 0 &&
-        item->mft_change_time_ == 0 &&
+    // Fetch the date/times of the file
+    if (item->creation_time_.count() == 0 &&
+        item->last_access_time_.count() == 0 &&
+        item->mft_change_time_.count() == 0 &&
         GetFileInformationByHandle(file_handle, &file_information) != 0) {
         ULARGE_INTEGER u;
         u.LowPart = file_information.ftCreationTime.dwLowDateTime;
         u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
-        item->creation_time_ = u.QuadPart;
+        item->creation_time_ = std::chrono::microseconds(u.QuadPart);
 
         u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
         u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
-        item->last_access_time_ = u.QuadPart;
+        item->last_access_time_ = std::chrono::microseconds(u.QuadPart);
 
         u.LowPart = file_information.ftLastWriteTime.dwLowDateTime;
         u.HighPart = file_information.ftLastWriteTime.dwHighDateTime;
 
-        item->mft_change_time_ = u.QuadPart;
+        item->mft_change_time_ = std::chrono::microseconds(u.QuadPart);
     }
 
     /* Show debug message: "Getting cluster bitmap: %s" */

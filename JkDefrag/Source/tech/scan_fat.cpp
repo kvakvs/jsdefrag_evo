@@ -1,4 +1,4 @@
-#include "std_afx.h"
+#include "precompiled_header.h"
 #include "defrag_data_struct.h"
 
 #include <memory>
@@ -35,19 +35,19 @@ Note: the FAT stores times in local time, not in GMT time. This subroutine conve
 that into GMT time, to be compatible with the NTFS date/times.
 
 */
-uint64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const USHORT time10) {
+micro64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const USHORT time10) {
     FILETIME time1;
     FILETIME time2;
     ULARGE_INTEGER time3;
 
-    if (DosDateTimeToFileTime(date, time, &time1) == 0) return 0;
-    if (LocalFileTimeToFileTime(&time1, &time2) == 0) return 0;
+    if (DosDateTimeToFileTime(date, time, &time1) == 0) return {};
+    if (LocalFileTimeToFileTime(&time1, &time2) == 0) return {};
 
     time3.LowPart = time2.dwLowDateTime;
     time3.HighPart = time2.dwHighDateTime;
     time3.QuadPart = time3.QuadPart + time10 * 100000;
 
-    return time3.QuadPart;
+    return std::chrono::microseconds(time3.QuadPart);
 }
 
 /*
@@ -716,21 +716,21 @@ bool ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
 
     gui->show_debug(DebugLevel::Progress, nullptr, std::format(
             L"  OEMName: {}\n"
-            L"  BytesPerSector: " NUM_FMT "\n"
-            L"  TotalSectors: " NUM_FMT "\n"
-            L"  SectorsPerCluster: " NUM_FMT "\n"
-            L"  RootDirSectors: " NUM_FMT "\n"
-            L"  FATSz: " NUM_FMT "\n"
-            L"  FirstDataSector: " NUM_FMT "\n"
-            L"  DataSec: " NUM_FMT "\n"
-            L"  CountofClusters: " NUM_FMT "\n"
-            L"  ReservedSectors: " NUM_FMT "\n"
-            L"  NumberFATs: " NUM_FMT "\n"
-            L"  RootEntriesCount: " NUM_FMT "\n"
-            L"  MediaType: {}"
-            L"  SectorsPerTrack: " NUM_FMT "\n"
-            L"  NumberOfHeads: " NUM_FMT "\n"
-            L"  HiddenSectors: " NUM_FMT "\n",
+            L"\n  BytesPerSector: " NUM_FMT
+            L"\n  TotalSectors: " NUM_FMT
+            L"\n  SectorsPerCluster: " NUM_FMT
+            L"\n  RootDirSectors: " NUM_FMT
+            L"\n  FATSz: " NUM_FMT
+            L"\n  FirstDataSector: " NUM_FMT
+            L"\n  DataSec: " NUM_FMT
+            L"\n  CountofClusters: " NUM_FMT
+            L"\n  ReservedSectors: " NUM_FMT
+            L"\n  NumberFATs: " NUM_FMT
+            L"\n  RootEntriesCount: " NUM_FMT
+            L"\n  MediaType: {}"
+            L"\n  SectorsPerTrack: " NUM_FMT
+            L"\n  NumberOfHeads: " NUM_FMT
+            L"\n  HiddenSectors: " NUM_FMT,
             Str::from_char(s2), disk_info.bytes_per_sector_, disk_info.total_sectors_,
             disk_info.sectors_per_cluster_, disk_info.root_dir_sectors_, disk_info.fat_sz_,
             disk_info.first_data_sector_, disk_info.data_sec_, disk_info.countof_clusters_,

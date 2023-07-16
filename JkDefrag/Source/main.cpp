@@ -1,4 +1,4 @@
-#include "std_afx.h"
+#include "precompiled_header.h"
 #include "defrag.h"
 
 void set_locale();

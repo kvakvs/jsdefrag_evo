@@ -12,11 +12,11 @@
 using namespace Gdiplus;
 
 #include <tlhelp32.h>                  /* CreateToolhelp32Snapshot() */
-#include <format>
 #include <string>
 #include <memory>
 #include <optional>
 #include <cwctype>
+#include <chrono>
 
 #ifdef _DEBUG
 
@@ -24,14 +24,14 @@ using namespace Gdiplus;
 
 #endif
 
-#include "defrag_struct.h"
-#include "itemstruct.h"
-#include "defrag_data_struct.h"
+#include "tech/defrag_struct.h"
+#include "tech/itemstruct.h"
+#include "tech/defrag_data_struct.h"
 
 #include "printing.h"
-#include "defrag_lib.h"
+#include "tech/defrag_lib.h"
 #include "defrag_log.h"
-#include "scan_fat.h"
-#include "scan_ntfs.h"
-#include "defrag_gui_colormap.h"
-#include "defrag_gui.h"
+#include "tech/scan_fat.h"
+#include "tech/scan_ntfs.h"
+#include "gui/defrag_gui_colormap.h"
+#include "gui/defrag_gui.h"

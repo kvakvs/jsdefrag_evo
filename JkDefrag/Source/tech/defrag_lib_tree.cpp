@@ -1,4 +1,4 @@
-#include "std_afx.h"
+#include "precompiled_header.h"
 
 /* Return pointer to the first item in the tree (the first file on the volume). */
 ItemStruct *DefragLib::tree_smallest(ItemStruct *top) {

@@ -1,4 +1,4 @@
-#include "std_afx.h"
+#include "precompiled_header.h"
 #include "defrag_data_struct.h"
 
 #include <memory>
@@ -860,9 +860,9 @@ bool ScanNTFS::process_attributes(DefragDataStruct *data, NtfsDiskInfoStruct *di
                 auto standard_information = (STANDARD_INFORMATION *) &buffer[attribute_offset + resident_attribute->
                         value_offset_];
 
-                inode_data->creation_time_ = standard_information->creation_time_;
-                inode_data->mft_change_time_ = standard_information->mft_change_time_;
-                inode_data->last_access_time_ = standard_information->last_access_time_;
+                inode_data->creation_time_ = std::chrono::microseconds(standard_information->creation_time_);
+                inode_data->mft_change_time_ = std::chrono::microseconds(standard_information->mft_change_time_);
+                inode_data->last_access_time_ = std::chrono::microseconds(standard_information->last_access_time_);
             }
 
             /* The value of the AttributeData (0x80) is the actual data of the file. */
@@ -1037,9 +1037,9 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
 
     inode_data.long_filename_ = nullptr; /* Long filename. */
     inode_data.short_filename_ = nullptr; /* Short filename (8.3 DOS). */
-    inode_data.creation_time_ = 0; /* 1 second = 10000000 */
-    inode_data.mft_change_time_ = 0;
-    inode_data.last_access_time_ = 0;
+    inode_data.creation_time_ = {};
+    inode_data.mft_change_time_ = {};
+    inode_data.last_access_time_ = {};
     inode_data.bytes_ = 0; /* Size of the $DATA stream. */
     inode_data.streams_ = nullptr; /* List of StreamStruct. */
     inode_data.mft_data_fragments_ = *mft_data_fragments;
@@ -1054,7 +1054,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
                                           0, 0);
     }
 
-    /* Interpret the attributes. */
+    // Interpret the attributes
     [[maybe_unused]] int result = process_attributes(data, disk_info, &inode_data,
                                                      &buffer[file_record_header->attribute_offset_],
                                                      buf_length - file_record_header->attribute_offset_, 65535, 0);
@@ -1182,13 +1182,13 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     bool result;
     ULONG clusters_per_mft_record;
     __timeb64 time{};
-    int64_t start_time;
-    int64_t end_time;
+    milli64_t start_time;
+    milli64_t end_time;
     wchar_t s1[BUFSIZ];
     uint64_t u1;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Read the boot block from the disk. */
+    // Read the boot block from the disk
     buffer = std::make_unique<BYTE[]>(mftbuffersize);
 
     g_overlapped.Offset = 0;
@@ -1237,19 +1237,19 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     }
 
     gui->show_debug(DebugLevel::Fatal, nullptr, std::format(
-            L"This is an NTFS disk.\n"
-            L"  Disk cookie: " NUM_FMT
-            L"  BytesPerSector: " NUM_FMT
-            L"  TotalSectors: " NUM_FMT
-            L"  SectorsPerCluster: " NUM_FMT
-            L"  SectorsPerTrack: " NUM_FMT
-            L"  NumberOfHeads: " NUM_FMT
-            L"  MftStartLcn: " NUM_FMT
-            L"  Mft2StartLcn: " NUM_FMT
-            L"  BytesPerMftRecord: " NUM_FMT
-            L"  ClustersPerIndexRecord: " NUM_FMT
-            L"  MediaType: {:x}"
-            L"  VolumeSerialNumber: " NUM_FMT,
+            L"This is an NTFS disk."
+            L"\n  Disk cookie: " NUM_FMT
+            L"\n  BytesPerSector: " NUM_FMT
+            L"\n  TotalSectors: " NUM_FMT
+            L"\n  SectorsPerCluster: " NUM_FMT
+            L"\n  SectorsPerTrack: " NUM_FMT
+            L"\n  NumberOfHeads: " NUM_FMT
+            L"\n  MftStartLcn: " NUM_FMT
+            L"\n  Mft2StartLcn: " NUM_FMT
+            L"\n  BytesPerMftRecord: " NUM_FMT
+            L"\n  ClustersPerIndexRecord: " NUM_FMT
+            L"\n  MediaType: {:x}"
+            L"\n  VolumeSerialNumber: " NUM_FMT,
             *(ULONGLONG *) &buffer[3], disk_info.bytes_per_sector_, disk_info.total_sectors_,
             disk_info.sectors_per_cluster_, *(USHORT *) &buffer[24], *(USHORT *) &buffer[26], disk_info.mft_start_lcn_,
             disk_info.mft2_start_lcn_, disk_info.bytes_per_mft_record_, disk_info.clusters_per_index_record_,
@@ -1397,7 +1397,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
 
     _ftime64_s(&time);
 
-    start_time = time.time * 1000 + time.millitm;
+    start_time = std::chrono::milliseconds(time.time * 1000 + time.millitm);
 
     for (inode_number = 1; inode_number < max_inode; inode_number++) {
         if ((mft_bitmap[inode_number >> 3] & bitmap_masks[inode_number % 8]) == 0) continue;
@@ -1502,12 +1502,11 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     }
 
     _ftime64_s(&time);
-
-    end_time = time.time * 1000 + time.millitm;
+    end_time = std::chrono::milliseconds(time.time * 1000 + time.millitm);
 
     if (end_time > start_time) {
         gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"  Analysis speed: " NUM_FMT " items per second",
-                                                                   max_inode * 1000 / (end_time - start_time)));
+                                                                   max_inode * 1000 / (end_time - start_time).count()));
     }
 
     if (*data->running_ != RunningState::RUNNING) {

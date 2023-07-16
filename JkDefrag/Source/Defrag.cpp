@@ -18,7 +18,7 @@ Internet Engineer
 http://www.kessels.com/
 */
 
-#include "std_afx.h"
+#include "precompiled_header.h"
 #include "defrag.h"
 
 #include <ctime>

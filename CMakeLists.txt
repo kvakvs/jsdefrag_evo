@@ -9,44 +9,49 @@ add_compile_options("/std:c++20")
 
 set(APP_NAME jkdefrag)
 set(SRC ${PROJECT_SOURCE_DIR}/JkDefrag/Source)
+include_directories(${SRC})
+
 set(HEADER_FILES
         ${SRC}/constants.h
         ${SRC}/types.h
-        ${SRC}/std_afx.h
-        ${SRC}/scan_ntfs.h
-        ${SRC}/scan_fat.h
-        ${SRC}/itemstruct.h
+        ${SRC}/precompiled_header.h
         ${SRC}/printing.h
-        ${SRC}/defrag_struct.h
         ${SRC}/defrag_log.h
-        ${SRC}/defrag_lib.h
-        ${SRC}/defrag_gui.h
-        ${SRC}/defrag_gui_colormap.h
-        ${SRC}/defrag_data_struct.h
-        ${SRC}/defrag.h)
+        ${SRC}/defrag.h
+        ${SRC}/time_util.h
+        ${SRC}/tech/scan_ntfs.h
+        ${SRC}/tech/scan_fat.h
+        ${SRC}/tech/itemstruct.h
+        ${SRC}/tech/defrag_struct.h
+        ${SRC}/tech/defrag_lib.h
+        ${SRC}/tech/defrag_data_struct.h
+        ${SRC}/gui/defrag_gui.h
+        ${SRC}/gui/defrag_gui_colormap.h
+        )
 set(SOURCE_FILES
+        ${SRC}/precompiled_header.cpp
         ${SRC}/main.cpp
         ${SRC}/defrag.cpp
-        ${SRC}/defrag_gui.cpp
-        ${SRC}/defrag_gui_colormap.cpp
-        ${SRC}/defrag_lib.cpp
+        ${SRC}/gui/defrag_gui.cpp
+        ${SRC}/gui/defrag_gui_colormap.cpp
+        ${SRC}/tech/defrag_lib.cpp
         ${SRC}/defrag_log.cpp
-        ${SRC}/defrag_struct.cpp
-        ${SRC}/scan_fat.cpp
-        ${SRC}/scan_ntfs.cpp
-        ${SRC}/std_afx.cpp
-        ${SRC}/itemstruct.cpp
+        ${SRC}/tech/defrag_struct.cpp
+        ${SRC}/tech/scan_fat.cpp
+        ${SRC}/tech/scan_ntfs.cpp
+        ${SRC}/tech/itemstruct.cpp
         ${SRC}/printing.cpp
-        ${SRC}/defrag_lib_finding.cpp
-        ${SRC}/defrag_lib_methods.cpp
-        ${SRC}/defrag_lib_moving.cpp
-        ${SRC}/defrag_lib_tree.cpp
-        ${SRC}/defrag_lib_scan.cpp)
+        ${SRC}/tech/defrag_lib_finding.cpp
+        ${SRC}/tech/defrag_lib_methods.cpp
+        ${SRC}/tech/defrag_lib_moving.cpp
+        ${SRC}/tech/defrag_lib_tree.cpp
+        ${SRC}/tech/defrag_lib_scan.cpp)
 
 add_executable(${APP_NAME} ${OPTIONS}
         ${HEADER_FILES}
         ${SOURCE_FILES}
         )
+
 target_link_libraries(${APP_NAME} DbgHelp GdiPlus)
 target_precompile_headers(${APP_NAME} PRIVATE
-        "$<$<COMPILE_LANGUAGE:CXX>:${SRC}/std_afx.h>")
+        "$<$<COMPILE_LANGUAGE:CXX>:${SRC}/precompiled_header.h>")

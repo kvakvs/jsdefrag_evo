@@ -1,5 +1,8 @@
 #pragma once
 
+#include "types.h"
+#include "time_util.h"
+
 #include <optional>
 
 /* List in memory of the fragments of a file. */
@@ -27,10 +30,9 @@ public:
 
     uint64_t bytes_;
     uint64_t clusters_count_;
-    // Unit: Microseconds
-    uint64_t creation_time_;
-    uint64_t mft_change_time_;
-    uint64_t last_access_time_;
+    micro64_t creation_time_;
+    micro64_t mft_change_time_;
+    micro64_t last_access_time_;
 
     // List of fragments
     // TODO: Owning pointer

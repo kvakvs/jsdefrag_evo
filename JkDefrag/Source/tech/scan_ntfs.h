@@ -314,10 +314,10 @@ struct InodeDataStruct {
     // Short filename (8.3 DOS); TODO: use std::wstring
     std::unique_ptr<wchar_t[]> short_filename_;
 
-    uint64_t bytes_; /* Total number of bytes. */
-    uint64_t creation_time_; /* 1 second = 10000000 */
-    uint64_t mft_change_time_;
-    uint64_t last_access_time_;
+    uint64_t bytes_; // Total number of bytes
+    micro64_t creation_time_;
+    micro64_t mft_change_time_;
+    micro64_t last_access_time_;
 
     StreamStruct *streams_; /* List of StreamStruct. */
     FragmentListStruct *mft_data_fragments_; /* The Fragments of the $MFT::$DATA stream. */
