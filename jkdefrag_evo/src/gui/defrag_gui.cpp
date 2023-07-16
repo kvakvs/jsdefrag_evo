@@ -5,14 +5,13 @@
 
 DefragGui *DefragGui::instance_ = nullptr;
 
-DefragGui::DefragGui() : debug_level_(), color_map_() {
+DefragGui::DefragGui() : debug_level_(), color_map_(), diskmap_pos_() {
     defrag_lib_ = DefragLib::get_instance();
     defrag_struct_ = std::make_unique<DefragStruct>();
 
     square_size_ = 6;
 
-    offset_x_ = 26;
-    offset_y_ = 16;
+    drawing_area_offset_ = {.x=8, .y=8};
 
     num_clusters_ = 1;
 
@@ -117,8 +116,8 @@ void DefragGui::set_display_data(HDC dc) {
         top_area_height_ = 49;
     }
 
-    disk_area_size_.Width = client_window_size.Width - offset_x_ * 2;
-    disk_area_size_.Height = client_window_size.Height - top_area_height_ - offset_y_ * 2;
+    disk_area_size_.Width = client_window_size.Width - drawing_area_offset_.x * 2;
+    disk_area_size_.Height = client_window_size.Height - top_area_height_ - drawing_area_offset_.y * 2;
 
     color_map_.set_size((size_t) (disk_area_size_.Width / square_size_),
                         (size_t) (disk_area_size_.Height / square_size_));
@@ -794,11 +793,10 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
     }
 
     // Show the MFT zones
-    for (auto i = 0; i < 3; i++) {
-        //		if (*data->RedrawScreen != 2) break;
-        if (data->mft_excludes_[i].start_ <= 0) continue;
+    for (auto &mft_exclude: data->mft_excludes_) {
+        if (mft_exclude.start_ <= 0) continue;
 
-        draw_cluster(data, data->mft_excludes_[i].start_, data->mft_excludes_[i].end_, DrawColor::Mft);
+        draw_cluster(data, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
     }
 
     /* Colorize all the files on the screen.

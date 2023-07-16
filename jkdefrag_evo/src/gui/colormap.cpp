@@ -11,11 +11,7 @@ void DiskColorMap::set_size(size_t width, size_t height) {
     height_ = height;
 
     total_count_ = width_ * height_;
-    if (total_count_) {
-        cells_.resize(total_count_);
-    } else {
-        cells_.clear();
-    }
+    cells_.resize(total_count_ + 1);
 
     for (int ii = 0; ii < total_count_; ii++) {
         cells_[ii].color_ = {};

@@ -83,8 +83,7 @@ private:
     int square_size_;
 
     // Offsets of drawing area of disk
-    int offset_x_;
-    int offset_y_;
+    POINT drawing_area_offset_;
 
     // Calculated offset of drawing area of disk
     POINT diskmap_pos_;
