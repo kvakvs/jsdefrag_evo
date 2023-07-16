@@ -14,7 +14,7 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
 
     // Process all the zones
     for (int zone = 0; zone < 3; zone++) {
-        call_show_status(data, 5, zone); /* "Zone N: Fast Optimize" */
+        call_show_status(data, DefragPhase::ZoneFastOpt, zone); /* "Zone N: Fast Optimize" */
 
         // Walk through all the gaps
         gap_begin = data->zones_[zone];

@@ -56,6 +56,7 @@ set(SOURCE_FILES
         ${SRC}/tech/defrag_lib_finding.cpp
         ${SRC}/tech/defrag_lib_moving.cpp
         ${SRC}/tech/defrag_lib_scan.cpp
+        ${SRC}/tech/defrag_data_struct.cpp
         ${SRC}/tech/defrag_lib_methods.cpp
         ${SRC}/tech/methods/fixup.cpp
         ${SRC}/tech/methods/defragment.cpp

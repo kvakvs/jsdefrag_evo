@@ -330,6 +330,6 @@ namespace Tree {
     template<class NODE>
     void delete_tree(NODE *&root) {
         delete_node_rec(root);
-        root == nullptr;
+        root = nullptr;
     }
 }

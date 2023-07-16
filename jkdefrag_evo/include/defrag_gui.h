@@ -41,6 +41,8 @@ public:
     static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
 
 protected:
+    void write_stats(const DefragDataStruct *data);
+
     void
     paint_background(Rect &window_size, Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const;
 

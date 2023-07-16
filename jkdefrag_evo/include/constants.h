@@ -4,6 +4,17 @@
 // Used in the file ItemStruct tree for node locations
 constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
 
+enum class DefragPhase {
+    Analyze,
+    Defragment,
+    ForcedFill,
+    ZoneSort,
+    ZoneFastOpt,
+    MoveUp,
+    Fixup,
+    Done,
+};
+
 enum class OptimizeMode {
     // Analyze only, do not defragment and do not optimize.
     AnalyzeOnly = 0,
@@ -114,7 +125,7 @@ enum class MoveDirection {
 #define SKIPPING_GAP_FMT        L"Skipping gap, cannot fill: " NUM_FMT " [" NUM_FMT " clusters]"
 #define MFT_EXCL_FMT            L"MftExcludes[{}].Start=" NUM_FMT ", MftExcludes[{}].End=" NUM_FMT
 
-// Formats the summary for:       Fragments Bytes            Clusters     Path or location
+#define SUMMARY_HEADER          L"Fragments Bytes            Clusters     Name"
 #define SUMMARY_DASH_LINE       L"--------- ---------------- ------------ -----"
 #define SUMMARY_FMT             L"{:9L} {:16L} {:12L}"
 

@@ -11,7 +11,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
     ULARGE_INTEGER u;
     DefragGui *gui = DefragGui::get_instance();
 
-    call_show_status(data, 8, -1); /* "Phase 3: Fixup" */
+    call_show_status(data, DefragPhase::Fixup, -1); /* "Phase 3: Fixup" */
 
     // Initialize: fetch the current time
     filetime64_t system_time = from_system_time();

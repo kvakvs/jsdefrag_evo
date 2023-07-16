@@ -32,6 +32,7 @@ http://www.kessels.com/
 
 #include "constants.h"
 #include "types.h"
+#include "defrag_data_struct.h"
 
 // The three running states.
 enum class RunningState {
@@ -215,9 +216,9 @@ public:
     static bool is_fragmented(const ItemStruct *item, uint64_t offset, uint64_t size);
 
     void colorize_disk_item(DefragDataStruct *data, const ItemStruct *item,
-                            const uint64_t busy_offset, const uint64_t busy_size, const int un_draw) const;
+                            uint64_t busy_offset, uint64_t busy_size, int un_draw) const;
 
-    static void call_show_status(DefragDataStruct *data, int phase, int zone);
+    static void call_show_status(DefragDataStruct *data, DefragPhase phase, int zone);
 
 private:
     static wchar_t lower_case(wchar_t c);

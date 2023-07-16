@@ -26,70 +26,24 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     FILE *fin;
     wchar_t *p1;
     DWORD w;
-    int i;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Initialize the data. Some items are inherited from the caller and are not
-    initialized. */
-    data->phase_ = 0;
-    data->disk_.volume_handle_ = nullptr;
-    data->disk_.mount_point_ = nullptr;
-    data->disk_.mount_point_slash_ = nullptr;
-    data->disk_.volume_name_[0] = 0;
-    data->disk_.volume_name_slash_[0] = 0;
-    data->disk_.type_ = DiskType::UnknownType;
-    data->item_tree_ = nullptr;
-    data->balance_count_ = 0;
-    data->mft_excludes_[0].start_ = 0;
-    data->mft_excludes_[0].end_ = 0;
-    data->mft_excludes_[1].start_ = 0;
-    data->mft_excludes_[1].end_ = 0;
-    data->mft_excludes_[2].start_ = 0;
-    data->mft_excludes_[2].end_ = 0;
-    data->total_clusters_ = 0;
-    data->bytes_per_cluster_ = 0;
 
-    for (i = 0; i < 3; i++) data->zones_[i] = 0;
-
-    data->cannot_move_dirs_ = 0;
-    data->count_directories_ = 0;
-    data->count_all_files_ = 0;
-    data->count_fragmented_items_ = 0;
-    data->count_all_bytes_ = 0;
-    data->count_fragmented_bytes_ = 0;
-    data->count_all_clusters_ = 0;
-    data->count_fragmented_clusters_ = 0;
-    data->count_free_clusters_ = 0;
-    data->count_gaps_ = 0;
-    data->biggest_gap_ = 0;
-    data->count_gaps_less16_ = 0;
-    data->count_clusters_less16_ = 0;
-    data->phase_todo_ = 0;
-    data->phase_done_ = 0;
-
-    _ftime64_s(&time);
-
-    data->start_time_ = time.time * 1000 + time.millitm;
-    data->last_checkpoint_ = data->start_time_;
-    data->running_time_ = 0;
-
-    /* Compare the item with the Exclude masks. If a mask matches then return,
-    ignoring the item. */
+    /* Compare the item with the Exclude masks. If a mask matches then return, ignoring the item. */
 
     for (const auto &s: data->excludes_) {
         if (DefragLib::match_mask(path, s.c_str())) break;
-        if (wcschr(s.c_str(), L'*') == nullptr &&
-            s.length() <= 3 &&
-            lower_case(path[0]) == lower_case(data->excludes_[i][0]))
+        if (wcschr(s.c_str(), L'*') == nullptr && s.length() <= 3 && lower_case(path[0]) == lower_case(s[0])) {
             break;
+        }
     }
 
-    if (data->excludes_.size() >= i) {
-        // Show debug message: "Ignoring volume '%s' because of exclude mask '%s'."
-        gui->show_debug(DebugLevel::Fatal, nullptr,
-                        std::format(L"Ignoring volume '{}' because of exclude mask '{}'.", path, data->excludes_[i]));
-        return;
-    }
+//    if (data->excludes_.size() >= i) {
+//        // Show debug message: "Ignoring volume '%s' because of exclude mask '%s'."
+//        gui->show_debug(DebugLevel::Fatal, nullptr,
+//                        std::format(L"Ignoring volume '{}' because of exclude mask '{}'.", path, data->excludes_[i]));
+//        return;
+//    }
 
 
     // Clear the screen and show "Processing '%s'" message
@@ -381,7 +335,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
     */
 
-    call_show_status(data, 7, -1); /* "Finished." */
+    call_show_status(data, DefragPhase::Done, -1); /* "Finished." */
 
     // Close the volume handles
     if (data->disk_.volume_handle_ != nullptr &&

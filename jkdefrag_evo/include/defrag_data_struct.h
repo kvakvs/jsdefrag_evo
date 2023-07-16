@@ -6,9 +6,12 @@
 #include "defrag_lib.h"
 
 // The big data struct that holds all the defragger's variables for a single thread
+class DefragDataStruct {
+public:
+    DefragDataStruct();
 
-struct DefragDataStruct {
-    int phase_; // The current Phase (1...3)
+public:
+    DefragPhase phase_; // The current Phase (1...3)
     int zone_; // The current Zone (0..2) for Phase 3
     RunningState *running_; // If not RUNNING then stop defragging
     //	int *RedrawScreen;                     // 0:no, 1:request, 2: busy

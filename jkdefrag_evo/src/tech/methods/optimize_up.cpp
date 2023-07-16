@@ -9,7 +9,7 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
 
     DefragGui *gui = DefragGui::get_instance();
 
-    call_show_status(data, 6, -1); /* "Phase 3: Move Up" */
+    call_show_status(data, DefragPhase::MoveUp, -1); /* "Phase 3: Move Up" */
 
     // Setup the progress counter: the total number of clusters in all files
     for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {

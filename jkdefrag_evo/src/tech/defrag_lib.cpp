@@ -854,7 +854,7 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 
 
 // Update some numbers in the DefragData
-void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const int zone) {
+void DefragLib::call_show_status(DefragDataStruct *data, const DefragPhase phase, const int zone) {
     ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
 

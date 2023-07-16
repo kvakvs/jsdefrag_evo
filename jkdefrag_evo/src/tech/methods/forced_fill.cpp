@@ -2,7 +2,7 @@
 
 // Fill all the gaps at the beginning of the disk with fragments from the files above
 void DefragLib::forced_fill(DefragDataStruct *data) {
-    call_show_status(data, 3, -1); /* "Phase 3: ForcedFill" */
+    call_show_status(data, DefragPhase::ForcedFill, -1); /* "Phase 3: ForcedFill" */
 
     // Walk through all the gaps
     uint64_t gap_begin = 0;
