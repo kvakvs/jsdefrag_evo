@@ -283,11 +283,8 @@ void DefragGui::draw_cluster(const DefragDataStruct *data, const uint64_t cluste
 
 /* Callback: just before the defragger starts a new Phase, and when it finishes. */
 void DefragGui::show_status(const DefragDataStruct *data) {
+    // Reset the progress counter
     __timeb64 now{};
-
-    int i;
-
-    /* Reset the progress counter. */
     _ftime64_s(&now);
 
     progress_start_time_ = now.time * 1000 + now.millitm;
@@ -296,7 +293,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
     progress_todo_ = 0;
 
     // Reset all the messages.
-    for (i = 0; i < 6; i++) messages_[i].clear();
+    for (auto &message: messages_) message.clear();
 
     /* Update Message 0 and 1. */
     if (data != nullptr) {
