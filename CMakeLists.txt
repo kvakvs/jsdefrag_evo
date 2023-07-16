@@ -45,7 +45,7 @@ set(SOURCE_FILES
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/tech/defrag_struct.cpp
         ${SRC}/tech/itemstruct.cpp
-        ${SRC}/tech/defrag_lib_moving.cpp
+        ${SRC}/tech/defrag/moving.cpp
         ${SRC}/tech/defrag/defrag_state.cpp
         ${SRC}/tech/defrag/move_mft.cpp
         ${SRC}/tech/defrag/finding.cpp

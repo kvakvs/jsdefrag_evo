@@ -1,24 +1,19 @@
 /*
+ JkDefrag  --  Defragment and optimize all harddisks.
 
-The JkDefrag library.
+ This program is free software; you can redistribute it and/or modify it under the terms of the GNU General
+ Public License as published by the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+ the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
+ For the full text of the license see the "License gpl.txt" file.
 
-For the full text of the license see the "License lgpl.txt" file.
-
-Jeroen C. Kessels
-Internet Engineer
-http://www.kessels.com/
-
-*/
+ Jeroen C. Kessels, Internet Engineer
+ http://www.kessels.com/
+ */
 
 #include "precompiled_header.h"
 
@@ -274,9 +269,7 @@ void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) 
     path += item->get_short_fn(); // will append long if not empty otherwise will append short
 }
 
-/*
-Return a string with the full path of an item, constructed from the long names.
-*/
+// Return a string with the full path of an item, constructed from the long names
 std::wstring DefragLib::get_long_path(const DefragState *data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
@@ -328,10 +321,7 @@ void DefragLib::slow_down(DefragState *data) {
     data->last_checkpoint_ = t.time * 1000 + t.millitm;
 }
 
-/*
-Open the item as a file or as a directory. If the item could not be
-opened then show an error message and return nullptr.
-*/
+// Open the item as a file or as a directory. If the item could not be opened then show an error message and return nullptr.
 HANDLE DefragLib::open_item_handle(const DefragState *data, const ItemStruct *item) {
     HANDLE file_handle;
     const size_t length = wcslen(item->get_long_path()) + 5;
