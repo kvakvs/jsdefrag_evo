@@ -203,7 +203,7 @@ bool DefragLib::find_gap(const DefragState *data, const uint64_t minimum_lcn, ui
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
 ItemStruct *DefragLib::find_highest_item(const DefragState *data, const uint64_t cluster_start,
-                                         const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
+                                         const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     // "Looking for highest-fit %I64d[%I64d]"
@@ -233,11 +233,11 @@ ItemStruct *DefragLib::find_highest_item(const DefragState *data, const uint64_t
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
-        if (zone != 3) {
-            int file_zone = 1;
+        if (zone != Zone::Zone3_MaxValue) {
+            auto file_zone = Zone::Zone1;
 
-            if (item->is_hog_) file_zone = 2;
-            if (item->is_dir_) file_zone = 0;
+            if (item->is_hog_) file_zone = Zone::Zone2;
+            if (item->is_dir_) file_zone = Zone::Zone0;
             if (zone != file_zone) continue;
         }
 
@@ -264,7 +264,7 @@ Zone=3           Search all items.
 
 */
 ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cluster_start,
-                                      const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
+                                      const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
 
@@ -332,11 +332,11 @@ ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cl
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
-        if (zone != 3) {
-            int file_zone = 1;
+        if (zone != Zone::Zone3_MaxValue) {
+            auto file_zone = Zone::Zone1;
 
-            if (item->is_hog_) file_zone = 2;
-            if (item->is_dir_) file_zone = 0;
+            if (item->is_hog_) file_zone = Zone::Zone2;
+            if (item->is_dir_) file_zone = Zone::Zone0;
             if (zone != file_zone) continue;
         }
 

@@ -38,14 +38,14 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
     [[maybe_unused]] uint64_t vacated_until = 0;
     const uint64_t minimum_vacate = data->total_clusters_ / 200;
 
-    for (data->zone_ = 0; data->zone_ < 3; data->zone_++) {
+    for (data->zone_ = Zone::Zone0; data->zone_ < Zone::Zone3_MaxValue; data->zone_ = (Zone)((int) data->zone_ + 1)) {
         call_show_status(data, DefragPhase::ZoneSort, data->zone_); // "Zone N: Sort"
 
         /* Start at the begin of the zone and move all the items there, one by one
         in the requested sorting order, making room as we go. */
         ItemStruct *previous_item = nullptr;
 
-        uint64_t lcn = data->zones_[data->zone_];
+        uint64_t lcn = data->zones_[(size_t) data->zone_];
 
         gap_begin = 0;
         gap_end = 0;
@@ -62,10 +62,10 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 if (temp_item->is_excluded_) continue;
                 if (temp_item->clusters_count_ == 0) continue;
 
-                int file_zone = 1;
+                auto file_zone = Zone::Zone1;
 
-                if (temp_item->is_hog_) file_zone = 2;
-                if (temp_item->is_dir_) file_zone = 0;
+                if (temp_item->is_hog_) file_zone = Zone::Zone2;
+                if (temp_item->is_dir_) file_zone = Zone::Zone0;
                 if (file_zone != data->zone_) continue;
 
                 if (previous_item != nullptr &&
@@ -82,7 +82,7 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
 
             if (item == nullptr) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
-                                std::format(L"Finished sorting zone {}.", data->zone_ + 1));
+                                std::format(L"Finished sorting zone {}.", zone_to_str(data->zone_)));
 
                 break;
             }
@@ -116,7 +116,8 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
                     vacate(data, lcn, item->clusters_count_ - clusters_done + minimum_vacate, FALSE);
 
-                    result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, FALSE);
+                    result = find_gap(data, lcn, 0, 0, true, false,
+                                      &gap_begin, &gap_end, FALSE);
 
                     if (result == false) return; // No gaps found, exit
                 }

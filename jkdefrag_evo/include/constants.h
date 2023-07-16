@@ -4,6 +4,21 @@
 // Used in the file ItemStruct tree for node locations
 constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
 
+enum class Zone {
+    // Used as no-value
+    None = -1,
+    // Beginning zone, suitable for storing directories
+    Zone0 = 0,
+    // Everything else
+    Zone1 = 1,
+    // Zone for space hogs, rare modified large files
+    Zone2 = 2,
+    // Used as stop-value in for-loops not a real value
+    Zone3_MaxValue = 3,
+};
+
+std::wstring zone_to_str(Zone zone);
+
 enum class DefragPhase {
     Analyze,
     Defragment,
@@ -65,14 +80,14 @@ enum class DebugLevel {
 #define DISPLAY_MUTEX APP_NAME "DisplayMutex"
 
 constexpr COLORREF display_colors[9] = {
-        RGB(150, 150, 150),     // 0 Empty         - Empty diskspace
-        RGB(200, 200, 200),     // 1 Allocated     - Used diskspace / system files
-        RGB(0, 150, 0),         // 2 Unfragmented  - Unfragmented files
+        RGB(240, 240, 240),     // 0 Empty         - Empty diskspace
+        RGB(160, 160, 160),     // 1 Allocated     - Used diskspace / system files
+        RGB(128, 128, 128),     // 2 Unfragmented  - Unfragmented files
         RGB(128, 0, 0),         // 3 Unmovable     - Unmovable files
-        RGB(200, 100, 60),      // 4 Fragmented    - Fragmented files
-        RGB(0, 0, 255),         // 5 Busy          - Busy color
-        RGB(255, 0, 255),       // 6 Mft           - MFT reserved zones
-        RGB(0, 150, 150),       // 7 SpaceHog      - Large files, rarely changed
+        RGB(200, 60, 60),       // 4 Fragmented    - Fragmented files
+        RGB(0, 0, 160),         // 5 Busy          - Busy color
+        RGB(140, 0, 140),       // 6 Mft           - MFT reserved zones
+        RGB(40, 40, 160),       // 7 SpaceHog      - Large files, rarely changed
         // RGB(255, 255, 255)      // 8 background
 };
 

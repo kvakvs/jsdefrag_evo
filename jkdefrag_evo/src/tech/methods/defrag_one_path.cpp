@@ -331,7 +331,7 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     }
     */
 
-    call_show_status(data, DefragPhase::Done, -1); // "Finished."
+    call_show_status(data, DefragPhase::Done, Zone::None); // "Finished."
 
     // Close the volume handles
     if (data->disk_.volume_handle_ != nullptr &&

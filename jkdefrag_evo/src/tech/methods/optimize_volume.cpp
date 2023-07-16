@@ -30,11 +30,13 @@ void DefragLib::optimize_volume(DefragState *data) {
     if (data->item_tree_ == nullptr) return;
 
     // Process all the zones
-    for (int zone = 0; zone < 3; zone++) {
+    for (int zone_i = 0; zone_i < (int) Zone::Zone3_MaxValue; zone_i++) {
+        auto zone = (Zone) zone_i;
+
         call_show_status(data, DefragPhase::ZoneFastOpt, zone); // "Zone N: Fast Optimize"
 
         // Walk through all the gaps
-        gap_begin = data->zones_[zone];
+        gap_begin = data->zones_[(size_t) zone];
         int retry = 0;
 
         while (*data->running_ == RunningState::RUNNING) {
@@ -52,10 +54,10 @@ void DefragLib::optimize_volume(DefragState *data) {
                 if (item->is_unmovable_) continue;
                 if (item->is_excluded_) continue;
 
-                int file_zone = 1;
+                auto file_zone = Zone::Zone1;
 
-                if (item->is_hog_) file_zone = 2;
-                if (item->is_dir_) file_zone = 0;
+                if (item->is_hog_) file_zone = Zone::Zone2;
+                if (item->is_dir_) file_zone = Zone::Zone0;
                 if (file_zone != zone) continue;
 
                 phase_temp = phase_temp + item->clusters_count_;

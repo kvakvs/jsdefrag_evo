@@ -218,7 +218,7 @@ public:
     void colorize_disk_item(DefragState *data, const ItemStruct *item,
                             uint64_t busy_offset, uint64_t busy_size, int un_draw) const;
 
-    static void call_show_status(DefragState *data, DefragPhase phase, int zone);
+    static void call_show_status(DefragState *data, DefragPhase phase, Zone zone);
 
 private:
     static wchar_t lower_case(wchar_t c);
@@ -263,11 +263,11 @@ private:
 
     static ItemStruct *
     find_highest_item(const DefragState *data, uint64_t cluster_start, uint64_t cluster_end,
-                      Tree::Direction direction, int zone);
+                      Tree::Direction direction, Zone zone);
 
     static ItemStruct *
     find_best_item(const DefragState *data, uint64_t cluster_start, uint64_t cluster_end,
-                   Tree::Direction direction, int zone);
+                   Tree::Direction direction, Zone zone);
 
     [[maybe_unused]] void compare_items(DefragState *data, const ItemStruct *item) const;
 

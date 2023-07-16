@@ -53,13 +53,20 @@ void DefragLib::vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL 
     again and again. */
     move_to = lcn + clusters;
 
-    if (data->zone_ == 0) move_to = data->zones_[1];
-    if (data->zone_ == 1) move_to = data->zones_[2];
-
-    if (data->zone_ == 2) {
-        // Zone 2: end of disk minus all the free space
-        move_to = data->total_clusters_ - data->count_free_clusters_ +
-                  (uint64_t) (data->total_clusters_ * 2.0 * data->free_space_ / 100.0);
+    switch (data->zone_) {
+        case Zone::Zone0:
+            move_to = data->zones_[1];
+            break;
+        case Zone::Zone1:
+            move_to = data->zones_[2];
+            break;
+        case Zone::Zone2:
+            // Zone 2: end of disk minus all the free space
+            move_to = data->total_clusters_ - data->count_free_clusters_ +
+                      (uint64_t) (data->total_clusters_ * 2.0 * data->free_space_ / 100.0);
+            break;
+        default:
+            break;
     }
 
     if (move_to < lcn + clusters) move_to = lcn + clusters;

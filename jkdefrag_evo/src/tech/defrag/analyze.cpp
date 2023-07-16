@@ -24,7 +24,7 @@ void DefragLib::analyze_volume(DefragState *data) {
     ScanFAT *scan_fat = ScanFAT::get_instance();
     ScanNTFS *scan_ntfs = ScanNTFS::get_instance();
 
-    call_show_status(data, DefragPhase::Analyze, -1); // "Phase 1: Analyze"
+    call_show_status(data, DefragPhase::Analyze, Zone::None); // "Phase 1: Analyze"
 
     // Fetch the current time in the uint64_t format (1 second = 10000000)
     filetime64_t system_time;

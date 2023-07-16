@@ -340,10 +340,10 @@ void DefragGui::show_status(const DefragState *data) {
                 messages_[1] = L"Phase 3: Forced Fill";
                 break;
             case DefragPhase::ZoneSort:
-                messages_[1] = std::format(L"Zone {}: Sort", data->zone_ + 1);
+                messages_[1] = std::format(L"Zone {}: Sort", zone_to_str(data->zone_));
                 break;
             case DefragPhase::ZoneFastOpt:
-                messages_[1] = std::format(L"Zone {}: Fast Optimize", data->zone_ + 1);
+                messages_[1] = std::format(L"Zone {}: Fast Optimize", zone_to_str(data->zone_));
                 break;
             case DefragPhase::MoveUp:
                 messages_[1] = L"Phase 3: Move Up";

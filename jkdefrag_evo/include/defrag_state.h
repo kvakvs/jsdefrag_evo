@@ -14,7 +14,7 @@ public:
     // The current Phase (1...3)
     DefragPhase phase_ = DefragPhase::Analyze;
     // The current Zone (0..2) for Phase 3
-    int zone_;
+    Zone zone_;
     // If not RUNNING then stop defragging
     RunningState *running_;
     // If TRUE then use LastAccessTime for SpaceHogs
@@ -40,13 +40,18 @@ public:
 
     // Array with exclude masks
     Wstrings excludes_;
+
     // use the built-in SpaceHogs
     bool use_default_space_hogs_;
+
     // Array with SpaceHog masks
     std::vector<std::wstring> space_hogs_;
-    uint64_t zones_[4] = {}; // Begin (LCN) of the zones
 
-    ExcludesStruct mft_excludes_[3] = {}; // List of clusters reserved for the MFT
+    // Begin (LCN) of the zones
+    uint64_t zones_[4] = {};
+
+    // List of clusters reserved for the MFT
+    ExcludesStruct mft_excludes_[3] = {};
 
     /*
      * Counters filled before Phase 1.
