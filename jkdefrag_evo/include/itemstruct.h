@@ -20,6 +20,8 @@ public:
     void set_names(const wchar_t *long_path, const wchar_t *long_filename, const wchar_t *short_path,
                    const wchar_t *short_filename);
 
+    ItemStruct() = default;
+
     virtual ~ItemStruct();
 
     // Tree node location type

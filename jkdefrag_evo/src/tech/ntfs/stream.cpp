@@ -31,7 +31,7 @@ const wchar_t *ScanNTFS::stream_type_names(const ATTRIBUTE_TYPE stream_type) {
         case ATTRIBUTE_TYPE::AttributeEA:
             return L"$EA";
         case ATTRIBUTE_TYPE::AttributePropertySet:
-            return L"$PROPERTY_SET"; /* guess, not documented */
+            return L"$PROPERTY_SET"; // guess, not documented
         case ATTRIBUTE_TYPE::AttributeLoggedUtilityStream:
             return L"$LOGGED_UTILITY_STREAM";
         case ATTRIBUTE_TYPE::AttributeInvalid:

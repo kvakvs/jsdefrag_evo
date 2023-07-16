@@ -22,7 +22,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
     const uint64_t minimum_vacate = data->total_clusters_ / 200;
 
     for (data->zone_ = 0; data->zone_ < 3; data->zone_++) {
-        call_show_status(data, DefragPhase::ZoneSort, data->zone_); /* "Zone N: Sort" */
+        call_show_status(data, DefragPhase::ZoneSort, data->zone_); // "Zone N: Sort"
 
         /* Start at the begin of the zone and move all the items there, one by one
         in the requested sorting order, making room as we go. */

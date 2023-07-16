@@ -9,7 +9,7 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
 
     DefragGui *gui = DefragGui::get_instance();
 
-    call_show_status(data, DefragPhase::MoveUp, -1); /* "Phase 3: Move Up" */
+    call_show_status(data, DefragPhase::MoveUp, -1); // "Phase 3: Move Up"
 
     // Setup the progress counter: the total number of clusters in all files
     for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
@@ -81,7 +81,7 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
 
         // If the gap could not be filled then skip
         if (gap_begin < gap_end) {
-            /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
+            // Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]"
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                             std::format(SKIPPING_GAP_FMT, gap_begin, gap_end - gap_begin));
 

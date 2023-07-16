@@ -21,7 +21,7 @@ http://www.kessels.com/
 */
 
 
-/* Include guard */
+// Include guard
 
 #pragma once
 
@@ -58,8 +58,8 @@ struct DiskStruct {
     std::unique_ptr<wchar_t[]> mount_point_;
     // Example: "c:\"; TODO: use std::wstring
     std::unique_ptr<wchar_t[]> mount_point_slash_;
-    wchar_t volume_name_[52]; /* Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}" */
-    wchar_t volume_name_slash_[52]; /* Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\" */
+    wchar_t volume_name_[52]; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}"
+    wchar_t volume_name_slash_[52]; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\"
 
     DiskType type_;
 

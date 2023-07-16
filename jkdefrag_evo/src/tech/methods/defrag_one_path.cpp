@@ -3,34 +3,15 @@
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
 void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, OptimizeMode opt_mode) {
-    HANDLE process_token_handle;
-    LUID take_ownership_value;
-    TOKEN_PRIVILEGES token_privileges;
-    STARTING_LCN_INPUT_BUFFER bitmap_param;
-
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
         BYTE buffer_[8];
     } bitmap_data{};
 
-    NTFS_VOLUME_DATA_BUFFER ntfs_data;
-
-    uint64_t free_bytes_to_caller;
-    uint64_t total_bytes;
-    uint64_t free_bytes;
-    int result;
-    uint32_t error_code;
-    size_t length;
-    __timeb64 time{};
-    FILE *fin;
-    wchar_t *p1;
-    DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-
-    /* Compare the item with the Exclude masks. If a mask matches then return, ignoring the item. */
-
+    // Compare the item with the Exclude masks. If a mask matches then return, ignoring the item.
     for (const auto &s: data->excludes_) {
         if (DefragLib::match_mask(path, s.c_str())) break;
         if (wcschr(s.c_str(), L'*') == nullptr && s.length() <= 3 && lower_case(path[0]) == lower_case(s[0])) {
@@ -38,6 +19,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         }
     }
 
+    // TODO: fix this?
 //    if (data->excludes_.size() >= i) {
 //        // Show debug message: "Ignoring volume '%s' because of exclude mask '%s'."
 //        gui->show_debug(DebugLevel::Fatal, nullptr,
@@ -45,15 +27,18 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 //        return;
 //    }
 
-
     // Clear the screen and show "Processing '%s'" message
     gui->clear_screen(std::format(L"Processing {}", path));
 
-    /* Try to change our permissions so we can access special files and directories
-    such as "C:\System Volume Information". If this does not succeed then quietly
-    continue, we'll just have to do with whatever permissions we have.
-    SE_BACKUP_NAME = Backup and Restore Privileges.
-    */
+    // Try to change our permissions so we can access special files and directories
+    // such as "C:\System Volume Information". If this does not succeed then quietly
+    // continue, we'll just have to do with whatever permissions we have.
+    // SE_BACKUP_NAME = Backup and Restore Privileges.
+
+    HANDLE process_token_handle;
+    LUID take_ownership_value;
+    TOKEN_PRIVILEGES token_privileges;
+
     if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
                          &process_token_handle) != 0 &&
         LookupPrivilegeValue(nullptr, SE_BACKUP_NAME, &take_ownership_value) != 0) {
@@ -62,7 +47,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         token_privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
         if (AdjustTokenPrivileges(process_token_handle, FALSE, &token_privileges,
-                                  sizeof(TOKEN_PRIVILEGES), nullptr, 0) == FALSE) {
+                                  sizeof(TOKEN_PRIVILEGES), nullptr, nullptr) == FALSE) {
             gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
         }
     } else {
@@ -74,20 +59,22 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     a literal MountPoint name. */
     data->disk_.mount_point_.reset(_wcsdup(path));
 
-    result = GetVolumePathNameW(path, data->disk_.mount_point_.get(),
-                                (uint32_t) wcslen(data->disk_.mount_point_.get()) + 1);
+    auto result = GetVolumePathNameW(path, data->disk_.mount_point_.get(),
+                                     (uint32_t) wcslen(data->disk_.mount_point_.get()) + 1);
 
-    if (result == FALSE) wcscpy_s(data->disk_.mount_point_.get(), wcslen(path) + 1, path);
+    if (result == FALSE) {
+        wcscpy_s(data->disk_.mount_point_.get(), wcslen(path) + 1, path);
+    }
 
     // Make two versions of the MountPoint, one with a trailing backslash and one without
-    p1 = wcschr(data->disk_.mount_point_.get(), 0);
+    wchar_t *p1 = wcschr(data->disk_.mount_point_.get(), 0);
 
     if (p1 != data->disk_.mount_point_.get()) {
         p1--;
         if (*p1 == '\\') *p1 = 0;
     }
 
-    length = wcslen(data->disk_.mount_point_.get()) + 2;
+    size_t length = wcslen(data->disk_.mount_point_.get()) + 2;
     data->disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
 
     swprintf_s(data->disk_.mount_point_slash_.get(), length, L"%s\\", data->disk_.mount_point_.get());
@@ -123,38 +110,26 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
 
     // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
-    length = wcslen(data->disk_.mount_point_slash_.get()) + 14;
+    // length = wcslen(data->disk_.mount_point_slash_.get()) + 14;
+    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data->disk_.mount_point_slash_.get());
 
-    p1 = new wchar_t[length];
-
-    if (p1 == nullptr) {
-        data->disk_.mount_point_slash_.reset();
-        data->disk_.mount_point_.reset();
-
-        return;
-    }
-
-    swprintf_s(p1, length, L"%s\\hiberfil.sys", data->disk_.mount_point_slash_.get());
-
-    result = _wfopen_s(&fin, p1, L"rb");
+    FILE *fin;
+    result = _wfopen_s(&fin, hibernation_path.c_str(), L"rb");
 
     if (result == 0 && fin != nullptr) {
-        w = 0;
+        DWORD w = 0;
 
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
             gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
 
             data->disk_.mount_point_.reset();
             data->disk_.mount_point_slash_.reset();
-            delete p1;
 
             return;
         }
     }
 
-    delete p1;
-
-    /* Show debug message: "Opening volume '%s' at mountpoint '%s'" */
+    // Show debug message: "Opening volume '%s' at mountpoint '%s'"
     gui->show_debug(DebugLevel::Fatal, nullptr,
                     std::format(L"Opening volume '{}' at mountpoint '{}'", data->disk_.volume_name_,
                                 data->disk_.mount_point_.get()));
@@ -176,22 +151,19 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         return;
     }
 
-    /* Determine the maximum LCN (maximum cluster number). A single call to
-    FSCTL_GET_VOLUME_BITMAP is enough, we don't have to walk through the
-    entire bitmap.
-    It's a pity we have to do it in this roundabout manner, because
-    there is no system call that reports the total number of clusters
-    in a volume. GetDiskFreeSpace() does, but is limited to 2Gb volumes,
-    GetDiskFreeSpaceEx() reports in bytes, not clusters, _getdiskfree()
-    requires a drive letter so cannot be used on unmounted volumes or
-    volumes that are mounted on a directory, and FSCTL_GET_NTFS_VOLUME_DATA
-    only works for NTFS volumes. */
+    // Determine the maximum LCN (maximum cluster number). A single call to FSCTL_GET_VOLUME_BITMAP is enough, we don't
+    // have to walk through the entire bitmap. It's a pity we have to do it in this roundabout manner, because
+    // there is no system call that reports the total number of clusters in a volume. GetDiskFreeSpace() does,
+    // but is limited to 2Gb volumes, GetDiskFreeSpaceEx() reports in bytes, not clusters, _getdiskfree()
+    // requires a drive letter so cannot be used on unmounted volumes or volumes that are mounted on a directory,
+    // and FSCTL_GET_NTFS_VOLUME_DATA only works for NTFS volumes.
+    STARTING_LCN_INPUT_BUFFER bitmap_param;
     bitmap_param.StartingLcn.QuadPart = 0;
 
-    //	long koko = FSCTL_GET_VOLUME_BITMAP;
-
-    error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                 &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
+    DWORD w;
+    DWORD error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+                                       &bitmap_param, sizeof bitmap_param, &bitmap_data,
+                                       sizeof bitmap_data, &w, nullptr);
 
     if (error_code != 0) {
         error_code = NO_ERROR;
@@ -200,7 +172,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
 
     if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
-        /* Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'" */
+        // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
         gui->show_debug(DebugLevel::Fatal, nullptr,
                         std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data->disk_.volume_name_,
                                     data->disk_.mount_point_.get()));
@@ -220,16 +192,23 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     no system call that returns the number of bytes per cluster, so first I have
     to get the total size of the disk and then divide by the number of clusters.
     */
+    uint64_t free_bytes_to_caller;
+    uint64_t total_bytes;
+    uint64_t free_bytes;
     error_code = GetDiskFreeSpaceExW(path, (PULARGE_INTEGER) &free_bytes_to_caller,
-                                     (PULARGE_INTEGER) &total_bytes, (PULARGE_INTEGER) &free_bytes);
+                                     (PULARGE_INTEGER) &total_bytes,
+                                     (PULARGE_INTEGER) &free_bytes);
 
     if (error_code != 0) data->bytes_per_cluster_ = total_bytes / data->total_clusters_;
 
-    /* Setup the list of clusters that cannot be used. The Master File
-    Table cannot be moved and cannot be used by files. All this is
-    only necessary for NTFS volumes. */
+    // Setup the list of clusters that cannot be used. The Master File Table cannot be moved and cannot be used by
+    // files. All this is only necessary for NTFS volumes.
+    NTFS_VOLUME_DATA_BUFFER ntfs_data;
+
+    DWORD w2;
     error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_NTFS_VOLUME_DATA,
-                                 nullptr, 0, &ntfs_data, sizeof ntfs_data, &w, nullptr);
+                                 nullptr, 0, &ntfs_data, sizeof ntfs_data,
+                                 &w2, nullptr);
 
     if (error_code != 0) {
         /* Note: NtfsData.TotalClusters.QuadPart should be exactly the same
@@ -246,7 +225,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         data->mft_excludes_[2].end_ = ntfs_data.Mft2StartLcn.QuadPart +
                                       ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
 
-        /* Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d" */
+        // Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d"
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
                         std::format(
                                 L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT ", MftValidDataLength=" NUM_FMT,
@@ -254,7 +233,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
                                 ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
                                 ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster));
 
-        /* Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d" */
+        // Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d"
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
                         std::format(MFT_EXCL_FMT, 0, data->mft_excludes_[0].start_, 0, data->mft_excludes_[0].end_));
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
@@ -311,23 +290,23 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByName) {
-        optimize_sort(data, 0); /* Filename */
+        optimize_sort(data, 0); // Filename
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortBySize) {
-        optimize_sort(data, 1); /* Filesize */
+        optimize_sort(data, 1); // Filesize
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
-        optimize_sort(data, 2); /* Last access */
+        optimize_sort(data, 2); // Last access
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
-        optimize_sort(data, 3); /* Last change */
+        optimize_sort(data, 3); // Last change
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
-        optimize_sort(data, 4); /* Creation */
+        optimize_sort(data, 4); // Creation
     }
     /*
     if ((*Data->Running == RUNNING) && (Mode == 11)) {
@@ -335,7 +314,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
     */
 
-    call_show_status(data, DefragPhase::Done, -1); /* "Finished." */
+    call_show_status(data, DefragPhase::Done, -1); // "Finished."
 
     // Close the volume handles
     if (data->disk_.volume_handle_ != nullptr &&

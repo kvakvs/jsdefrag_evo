@@ -114,8 +114,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
     StreamStruct *stream = inode_data.streams_;
     do {
         // Create and fill a new item record in memory
-        auto item = new ItemStruct();
-
+        auto item = std::make_unique<ItemStruct>();
         auto long_fn_constructed = construct_stream_name(inode_data.long_filename_.get(),
                                                          inode_data.short_filename_.get(), stream);
         auto short_fn_constructed = construct_stream_name(inode_data.short_filename_.get(),
@@ -157,7 +156,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
 
         if (stream != nullptr) data->count_all_clusters_ = data->count_all_clusters_ + stream->clusters_;
 
-        if (DefragLib::get_fragment_count(item) > 1) {
+        if (DefragLib::get_fragment_count(item.get()) > 1) {
             data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
             data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + inode_data.bytes_;
 
@@ -167,25 +166,26 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
         }
 
         // Add the item record to the sorted item tree in memory
-        Tree::insert(data->item_tree_, data->balance_count_, item);
+        auto last_created_item = item.release();
+        Tree::insert(data->item_tree_, data->balance_count_, last_created_item);
 
-        /* Also add the item to the array that is used to construct the full pathnames.
-        Note: if the array already contains an entry, and the new item has a shorter
-        filename, then the entry is replaced. This is needed to make sure that
-        the shortest form of the name of directories is used. */
+        // Also add the item to the array that is used to construct the full pathnames.
+        // Note: if the array already contains an entry, and the new item has a shorter
+        // filename, then the entry is replaced. This is needed to make sure that
+        // the shortest form of the name of directories is used.
 
-        if (inode_array != nullptr &&
-            inode_number < max_inode &&
-            (inode_array[inode_number] == nullptr ||
-             (inode_array[inode_number]->have_long_fn()
-              && item->have_long_fn()
-              && wcscmp(inode_array[inode_number]->get_long_fn(), item->get_long_fn()) > 0))) {
-            inode_array[inode_number] = item;
+        if (inode_array != nullptr
+            && inode_number < max_inode
+            && (inode_array[inode_number] == nullptr
+                || (inode_array[inode_number]->have_long_fn()
+                    && last_created_item->have_long_fn()
+                    && wcscmp(inode_array[inode_number]->get_long_fn(), last_created_item->get_long_fn()) > 0))) {
+            inode_array[inode_number] = last_created_item;
         }
 
         // Draw the item on the screen.
-        gui->show_analyze(data, item);
-        defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
+        gui->show_analyze(data, last_created_item);
+        defrag_lib_->colorize_disk_item(data, last_created_item, 0, 0, false);
 
         if (stream != nullptr) stream = stream->next_;
     } while (stream != nullptr);

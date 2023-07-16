@@ -11,7 +11,7 @@
 
 using namespace Gdiplus;
 
-#include <TlHelp32.h>                  /* CreateToolhelp32Snapshot() */
+#include <TlHelp32.h>                  // CreateToolhelp32Snapshot()
 #include <string>
 #include <memory>
 #include <optional>
@@ -20,7 +20,7 @@ using namespace Gdiplus;
 
 #ifdef _DEBUG
 
-#   include <DbgHelp.h>                   /* SetUnhandledExceptionFilter() */
+#   include <DbgHelp.h>                   // SetUnhandledExceptionFilter()
 
 #endif
 

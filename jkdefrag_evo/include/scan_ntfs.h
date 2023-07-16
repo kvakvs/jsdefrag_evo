@@ -11,12 +11,12 @@ struct INODE_REFERENCE {
 };
 
 struct NTFS_RECORD_HEADER {
-    ULONG type_; /* File type, for example 'FILE' */
+    ULONG type_; // File type, for example 'FILE'
 
-    USHORT usa_offset_; /* Offset to the Update Sequence Array */
-    USHORT usa_count_; /* Size in words of Update Sequence Array */
+    USHORT usa_offset_; // Offset to the Update Sequence Array
+    USHORT usa_count_; // Size in words of Update Sequence Array
 
-    USN lsn_; /* $LogFile Sequence Number (LSN) */
+    USN lsn_; // $LogFile Sequence Number (LSN)
 };
 
 struct FILE_RECORD_HEADER {
@@ -30,22 +30,22 @@ struct FILE_RECORD_HEADER {
     // Flags. bit 1 = in use, bit 2 = directory, bit 4 & 8 = unknown. 
     USHORT flags_;
 
-    ULONG bytes_in_use_; /* Real size of the FILE record */
-    ULONG bytes_allocated_; /* Allocated size of the FILE record */
+    ULONG bytes_in_use_; // Real size of the FILE record
+    ULONG bytes_allocated_; // Allocated size of the FILE record
 
-    INODE_REFERENCE base_file_record_; /* File reference to the base FILE record */
+    INODE_REFERENCE base_file_record_; // File reference to the base FILE record
 
-    USHORT next_attribute_number_; /* Next Attribute Id */
-    USHORT padding_; /* Align to 4 UCHAR boundary (XP) */
+    USHORT next_attribute_number_; // Next Attribute Id
+    USHORT padding_; // Align to 4 UCHAR boundary (XP)
 
-    ULONG mft_record_number_; /* Number of this MFT Record (XP) */
+    ULONG mft_record_number_; // Number of this MFT Record (XP)
 
     USHORT update_seq_num_;
 };
 
 enum class ATTRIBUTE_TYPE {
     AttributeInvalid = 0x00,
-    /* Not defined by Windows */
+    // Not defined by Windows
     AttributeStandardInformation = 0x10,
     AttributeAttributeList = 0x20,
     AttributeFileName = 0x30,
@@ -58,7 +58,7 @@ enum class ATTRIBUTE_TYPE {
     AttributeIndexAllocation = 0xA0,
     AttributeBitmap = 0xB0,
     AttributeReparsePoint = 0xC0,
-    /* Reparse Point = Symbolic link */
+    // Reparse Point = Symbolic link
     AttributeEAInformation = 0xD0,
     AttributeEA = 0xE0,
     AttributePropertySet = 0xF0,
@@ -179,7 +179,7 @@ struct VOLUME_INFORMATION {
     UCHAR major_version_;
     UCHAR minor_version_;
 
-    USHORT flags_; /* DIRTY=0x01, RESIZE_LOG_FILE=0x02 */
+    USHORT flags_; // DIRTY=0x01, RESIZE_LOG_FILE=0x02
 };
 
 struct DIRECTORY_INDEX {

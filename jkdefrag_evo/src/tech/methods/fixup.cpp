@@ -10,7 +10,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
     WIN32_FILE_ATTRIBUTE_DATA attributes;
     DefragGui *gui = DefragGui::get_instance();
 
-    call_show_status(data, DefragPhase::Fixup, -1); /* "Phase 3: Fixup" */
+    call_show_status(data, DefragPhase::Fixup, -1); // "Phase 3: Fixup"
 
     // Initialize: fetch the current time
     filetime64_t system_time = from_system_time();
@@ -64,7 +64,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
         int move_me = false;
 
         if (is_fragmented(item, 0, item->clusters_count_)) {
-            /* "I am fragmented." */
+            // "I am fragmented."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am fragmented.");
 
             move_me = true;
@@ -87,7 +87,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
         }
 
         if (file_zone == 2 && item_lcn < data->zones_[2] && move_me == false) {
-            /* "I am a spacehog in zone 1 or 2." */
+            // "I am a spacehog in zone 1 or 2."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a spacehog in zone 1 or 2.");
             move_me = true;
         }
@@ -120,7 +120,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
                               &gap_end[file_zone], FALSE);
 
             if (!result) {
-                /* Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]" */
+                // Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]"
                 gui->show_debug(
                         DebugLevel::Progress, item,
                         std::format(

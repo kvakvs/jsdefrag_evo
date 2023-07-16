@@ -86,7 +86,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
                 }
 
                 if (prev_in_use == 0 && in_use != 0) {
-                    /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
+                    // Show debug message: "Gap found: LCN=%I64d, Size=%I64d"
                     gui->show_debug(
                             DebugLevel::DetailedGapFinding, nullptr,
                             std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
@@ -135,7 +135,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
 
     // Process the last gap
     if (prev_in_use == 0) {
-        /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
+        // Show debug message: "Gap found: LCN=%I64d, Size=%I64d"
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
 
@@ -189,7 +189,7 @@ ItemStruct *DefragLib::find_highest_item(const DefragDataStruct *data, const uin
                                          const uint64_t cluster_end, const Tree::Direction direction, const int zone) {
     DefragGui *gui = DefragGui::get_instance();
 
-    /* "Looking for highest-fit %I64d[%I64d]" */
+    // "Looking for highest-fit %I64d[%I64d]"
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                     std::format(L"Looking for highest-fit start=" NUM_FMT " [" NUM_FMT " clusters]",
                                 cluster_start, cluster_end - cluster_start));

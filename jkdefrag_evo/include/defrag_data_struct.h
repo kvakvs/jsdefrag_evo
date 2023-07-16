@@ -18,7 +18,7 @@ public:
     bool use_last_access_time_; // If TRUE then use LastAccessTime for SpaceHogs
     int cannot_move_dirs_; // If bigger than 20 then do not move dirs
 
-    wchar_t *include_mask_; /* Example: "c:\t1\*" */
+    wchar_t *include_mask_; // Example: "c:\t1\*"
     DiskStruct disk_;
 
     double free_space_; // Percentage of total disk size 0..100

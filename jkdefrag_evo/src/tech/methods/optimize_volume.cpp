@@ -14,7 +14,7 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
 
     // Process all the zones
     for (int zone = 0; zone < 3; zone++) {
-        call_show_status(data, DefragPhase::ZoneFastOpt, zone); /* "Zone N: Fast Optimize" */
+        call_show_status(data, DefragPhase::ZoneFastOpt, zone); // "Zone N: Fast Optimize"
 
         // Walk through all the gaps
         gap_begin = data->zones_[zone];
@@ -84,7 +84,7 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
 
             // If the gap could not be filled then skip
             if (gap_begin < gap_end) {
-                /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
+                // Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]"
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                                 std::format(SKIPPING_GAP_FMT, gap_begin,
                                             gap_end - gap_begin));

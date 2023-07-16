@@ -16,7 +16,7 @@ void DefragLib::defragment(DefragDataStruct *data) {
     int result;
     DefragGui *gui = DefragGui::get_instance();
 
-    call_show_status(data, DefragPhase::Defragment, -1); /* "Phase 2: Defragment" */
+    call_show_status(data, DefragPhase::Defragment, -1); // "Phase 2: Defragment"
 
     // Setup the width of the progress bar: the number of clusters in all fragmented files
     for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {

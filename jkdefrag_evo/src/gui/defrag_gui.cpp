@@ -188,9 +188,22 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
 }
 
 
-/* Callback: for every file during analysis.
-This subroutine is called one last time with Item=nullptr when analysis has finished. */
+// Callback: for every file during analysis.
+// This subroutine is called one last time with Item=nullptr when analysis has finished
 void DefragGui::show_analyze(const DefragDataStruct *data, const ItemStruct *item) {
+    // Make sure this function does not run more often than 100ms
+    {
+        static std::chrono::steady_clock::time_point last_time = std::chrono::steady_clock::now();
+        auto currentTime = std::chrono::steady_clock::now();
+        auto duration = currentTime - last_time;
+
+        if (duration < std::chrono::milliseconds(100)) {
+            return;
+        }
+
+        last_time = currentTime;
+    }
+
     if (data != nullptr && data->count_all_files_ != 0) {
         messages_[3] = std::format(L"Files " NUM_FMT ", Directories " NUM_FMT ", Clusters " NUM_FMT,
                                    data->count_all_files_, data->count_directories_, data->count_all_clusters_);

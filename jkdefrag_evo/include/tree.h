@@ -258,9 +258,9 @@ namespace Tree {
 
             if (item->smaller_ != nullptr) item->smaller_->parent_ = item->parent_;
         } else if (item->bigger_->smaller_ == nullptr) {
-            /* The Bigger child has no Smaller child. In this case, we move Bigger
-            into the node's place, attaching the node's Smaller subtree as the
-            new Smaller. */
+            // The Bigger child has no Smaller child. In this case, we move Bigger
+            // into the node's place, attaching the node's Smaller subtree as the
+            // new Smaller.
             if (item->parent_ != nullptr) {
                 if (item->parent_->smaller_ == item) {
                     item->parent_->smaller_ = item->bigger_;

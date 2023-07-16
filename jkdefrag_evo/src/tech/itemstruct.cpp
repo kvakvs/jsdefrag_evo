@@ -27,3 +27,4 @@ ItemStruct::~ItemStruct() {
         fragments_ = fragment;
     }
 }
+

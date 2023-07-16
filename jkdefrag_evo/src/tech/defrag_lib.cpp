@@ -408,7 +408,7 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
         item->mft_change_time_ = from_FILETIME(file_information.ftLastWriteTime);
     }
 
-    /* Show debug message: "Getting cluster bitmap: %s" */
+    // Show debug message: "Getting cluster bitmap: %s"
     gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
                     std::format(L"Getting cluster bitmap: {}", item->get_long_path()));
 
@@ -455,12 +455,12 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
         for (uint32_t i = 0; i < extent_data.extent_count_; i++) {
             // Show debug message
             if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
-                /* "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u" */
+                // "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u"
                 gui->show_debug(
                         DebugLevel::DetailedFileInfo, nullptr,
                         std::format(EXTENT_FMT, extent_data.extents_[i].lcn_, vcn, extent_data.extents_[i].next_vcn_));
             } else {
-                /* "Extent (virtual): Vcn=%I64u, NextVcn=%I64u" */
+                // "Extent (virtual): Vcn=%I64u, NextVcn=%I64u"
                 gui->show_debug(
                         DebugLevel::DetailedFileInfo, nullptr,
                         std::format(VEXTENT_FMT, vcn, extent_data.extents_[i].next_vcn_));
@@ -1077,9 +1077,9 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
     }
 
     if (data.use_default_space_hogs_) {
-        data.space_hogs_.emplace_back(L"?:\\$RECYCLE.BIN\\*"); /* Vista */
-        data.space_hogs_.emplace_back(L"?:\\RECYCLED\\*"); /* FAT on 2K/XP */
-        data.space_hogs_.emplace_back(L"?:\\RECYCLER\\*"); /* NTFS on 2K/XP */
+        data.space_hogs_.emplace_back(L"?:\\$RECYCLE.BIN\\*"); // Vista
+        data.space_hogs_.emplace_back(L"?:\\RECYCLED\\*"); // FAT on 2K/XP
+        data.space_hogs_.emplace_back(L"?:\\RECYCLER\\*"); // NTFS on 2K/XP
         data.space_hogs_.emplace_back(L"?:\\WINDOWS\\$*");
         data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Downloaded Installations\\*");
         data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Ehome\\*");
@@ -1114,11 +1114,11 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
         data.space_hogs_.emplace_back(L"*.zip");
 
         data.space_hogs_.emplace_back(L"*.bak");
-        data.space_hogs_.emplace_back(L"*.bup"); /* DVD */
+        data.space_hogs_.emplace_back(L"*.bup"); // DVD
         data.space_hogs_.emplace_back(L"*.cab");
-        data.space_hogs_.emplace_back(L"*.chm"); /* Help files */
+        data.space_hogs_.emplace_back(L"*.chm"); // Help files
         data.space_hogs_.emplace_back(L"*.dvr-ms");
-        data.space_hogs_.emplace_back(L"*.ifo"); /* DVD */
+        data.space_hogs_.emplace_back(L"*.ifo"); // DVD
         data.space_hogs_.emplace_back(L"*.log");
         data.space_hogs_.emplace_back(L"*.lzh");
         data.space_hogs_.emplace_back(L"*.msi");

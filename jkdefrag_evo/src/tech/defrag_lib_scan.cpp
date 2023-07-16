@@ -401,24 +401,9 @@ int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_fi
     return 0;
 }
 
-/* Scan all files in a directory and all it's subdirectories (recursive)
-and store the information in a tree in memory for later use by the
-optimizer. */
+// Scan all files in a directory and all it's subdirectories (recursive)
+// and store the information in a tree in memory for later use by the optimizer
 void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct *parent_directory) {
-    ItemStruct *item;
-    FragmentListStruct *fragment;
-    HANDLE find_handle;
-    WIN32_FIND_DATAW find_file_data;
-    std::unique_ptr<wchar_t[]> root_path;
-    wchar_t *temp_path;
-    HANDLE file_handle;
-    uint64_t SystemTime;
-    SYSTEMTIME time_1;
-    FILETIME time_2;
-    ULARGE_INTEGER time_3;
-    int result;
-    size_t length;
-    wchar_t *p1;
     DefragGui *gui = DefragGui::get_instance();
 
     /* Slow the program down to the percentage that was specified on the
@@ -429,11 +414,9 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     everything after the last backslash in the mask. The FindFirstFile()
     system call only processes wildcards in the last section (i.e. after
     the last backslash). */
-    root_path.reset(_wcsdup(mask));
+    std::unique_ptr<wchar_t[]> root_path(_wcsdup(mask));
 
-    if (root_path == nullptr) return;
-
-    p1 = wcsrchr(root_path.get(), L'\\');
+    wchar_t *p1 = wcsrchr(root_path.get(), L'\\');
 
     if (p1 != nullptr) *p1 = 0;
 
@@ -441,29 +424,29 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(L"Analyzing: %s", mask));
 
     // Fetch the current time in the uint64_t format (1 second = 10000000)
+    SYSTEMTIME time_1;
+    FILETIME time_2;
     GetSystemTime(&time_1);
 
-    if (SystemTimeToFileTime(&time_1, &time_2) == FALSE) {
-        SystemTime = 0;
-    } else {
-        time_3.LowPart = time_2.dwLowDateTime;
-        time_3.HighPart = time_2.dwHighDateTime;
-
-        SystemTime = time_3.QuadPart;
+    filetime64_t system_time{};
+    if (SystemTimeToFileTime(&time_1, &time_2) == TRUE) {
+        system_time = from_FILETIME(time_2);
     }
 
     /* Walk through all the files. If nothing found then exit.
     Note: I am using FindFirstFileW() instead of _findfirst() because the latter
     will crash (exit program) on files with badly formed dates. */
-    find_handle = FindFirstFileW(mask, &find_file_data);
+    WIN32_FIND_DATAW find_file_data;
+    HANDLE find_handle = FindFirstFileW(mask, &find_file_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
         return;
     }
 
-    item = nullptr;
+    std::unique_ptr<ItemStruct> item;
 
     wchar_t path_buf2[MAX_PATH];
+    FragmentListStruct *fragment;
 
     do {
         if (*data->running_ != RunningState::RUNNING) break;
@@ -477,22 +460,10 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
             continue;
         }
 
-        // Cleanup old item
-        if (item != nullptr) {
-            while (item->fragments_ != nullptr) {
-                fragment = item->fragments_->next_;
-                delete item->fragments_;
-                item->fragments_ = fragment;
-            }
-
-            delete item;
-        }
-
         // Create new item
-        item = new ItemStruct();
-        item->fragments_ = nullptr;
+        item = std::make_unique<ItemStruct>();
 
-        length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 2;
+        size_t length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 2;
         _ASSERT(MAX_PATH > length);
         auto path_buf1 = std::format(L"{}\\{}", root_path.get(), find_file_data.cFileName);
 
@@ -505,38 +476,30 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         item->bytes_ = find_file_data.nFileSizeHigh * ((uint64_t) MAXDWORD + 1) +
                        find_file_data.nFileSizeLow;
 
-        item->clusters_count_ = 0;
-        item->creation_time_ = {};
-        item->last_access_time_ = {};
-        item->mft_change_time_ = {};
         item->parent_directory_ = parent_directory;
-        item->is_dir_ = false;
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             item->is_dir_ = true;
         }
-        item->is_unmovable_ = false;
-        item->is_excluded_ = false;
-        item->is_hog_ = false;
 
-        /* Analyze the item: Clusters and Fragments, and the CreationTime, LastAccessTime,
-        and MftChangeTime. If the item could not be opened then ignore the item. */
-        file_handle = open_item_handle(data, item);
+        // Analyze the item: Clusters and Fragments, and the CreationTime, LastAccessTime,
+        // and MftChangeTime. If the item could not be opened then ignore the item. */
+        HANDLE file_handle = open_item_handle(data, item.get());
 
         if (file_handle == nullptr) continue;
 
-        result = get_fragments(data, item, file_handle);
+        auto result = get_fragments(data, item.get(), file_handle);
 
         CloseHandle(file_handle);
 
-        if (result == false) continue;
+        if (!result) continue;
 
         // Increment counters
         data->count_all_files_ = data->count_all_files_ + 1;
         data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
         data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
 
-        if (is_fragmented(item, 0, item->clusters_count_)) {
+        if (is_fragmented(item.get(), 0, item->clusters_count_)) {
             data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
             data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + item->bytes_;
             data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + item->clusters_count_;
@@ -545,21 +508,14 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         data->phase_done_ = data->phase_done_ + item->clusters_count_;
 
         // Show progress message
-        gui->show_analyze(data, item);
+        gui->show_analyze(data, item.get());
 
         // If it's a directory then iterate subdirectories
         if (item->is_dir_) {
             data->count_directories_ = data->count_directories_ + 1;
-
-            length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 4;
-
-            temp_path = new wchar_t[length];
-
-            if (temp_path != nullptr) {
-                swprintf_s(temp_path, length, L"%s\\%s\\*", root_path.get(), find_file_data.cFileName);
-                scan_dir(data, temp_path, item);
-                delete temp_path;
-            }
+            // length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 4;
+            auto temp_path = std::format(L"{}\\{}\\*", root_path.get(), find_file_data.cFileName);
+            scan_dir(data, temp_path.c_str(), item.get());
         }
 
         /* Ignore the item if it has no clusters or no LCN. Very small
@@ -568,63 +524,49 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         if (item->clusters_count_ == 0 || item->fragments_ == nullptr) continue;
 
         // Draw the item on the screen
-        colorize_disk_item(data, item, 0, 0, false);
+        colorize_disk_item(data, item.get(), 0, 0, false);
 
         // Show debug info about the file.
         // Show debug message: "%I64d clusters at %I64d, %I64d bytes"
-        gui->show_debug(DebugLevel::DetailedFileInfo, item,
+        gui->show_debug(DebugLevel::DetailedFileInfo, item.get(),
                         std::format(L"%I64d clusters at " NUM_FMT ", " NUM_FMT " bytes",
                                     item->clusters_count_, item->get_item_lcn(), item->bytes_));
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) != 0) {
             // Show debug message: "Special file attribute: Compressed"
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Compressed");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item.get(), L"Special file attribute: Compressed");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) != 0) {
             // Show debug message: "Special file attribute: Encrypted"
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Encrypted");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item.get(), L"Special file attribute: Encrypted");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) != 0) {
             // Show debug message: "Special file attribute: Offline"
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Offline");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item.get(), L"Special file attribute: Offline");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
             // Show debug message: "Special file attribute: Read-only"
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Read-only");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item.get(), L"Special file attribute: Read-only");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE) != 0) {
             // Show debug message: "Special file attribute: Sparse-file"
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Sparse-file");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item.get(), L"Special file attribute: Sparse-file");
         }
 
         if ((find_file_data.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) != 0) {
             // Show debug message: "Special file attribute: Temporary"
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Temporary");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item.get(), L"Special file attribute: Temporary");
         }
 
         // Add the item to the ItemTree in memory
-        Tree::insert(data->item_tree_, data->balance_count_, item);
-        item = nullptr;
+        Tree::insert(data->item_tree_, data->balance_count_, item.release());
     } while (FindNextFileW(find_handle, &find_file_data) != 0);
 
     FindClose(find_handle);
-
-    // Cleanup
-    if (item != nullptr) {
-        while (item->fragments_ != nullptr) {
-            fragment = item->fragments_->next_;
-
-            delete item->fragments_;
-
-            item->fragments_ = fragment;
-        }
-
-        delete item;
-    }
 }
 
 /* Scan all files in a volume and store the information in a tree in
@@ -640,7 +582,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
     ScanFAT *scan_fat = ScanFAT::get_instance();
     ScanNTFS *scan_ntfs = ScanNTFS::get_instance();
 
-    call_show_status(data, DefragPhase::Analyze, -1); /* "Phase 1: Analyze" */
+    call_show_status(data, DefragPhase::Analyze, -1); // "Phase 1: Analyze"
 
     // Fetch the current time in the uint64_t format (1 second = 10000000)
     GetSystemTime(&time1);

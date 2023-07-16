@@ -281,7 +281,7 @@ parameters and call the defragger library.
 
 */
 DWORD WINAPI Defrag::defrag_thread(LPVOID) {
-    OptimizeMode optimize_mode = {}; /* 1...11 */
+    OptimizeMode optimize_mode = {}; // 1...11
     LPWSTR *argv;
     int argc;
     std::time_t now;
