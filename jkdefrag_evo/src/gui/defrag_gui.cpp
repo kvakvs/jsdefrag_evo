@@ -437,7 +437,6 @@ without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no).
 */
 void DefragGui::show_diskmap(DefragState *data) {
-    ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
         uint64_t StartingLcn;
@@ -572,7 +571,7 @@ void DefragGui::show_diskmap(DefragState *data) {
     /* Colorize all the files on the screen.
     Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
     ignore it. */
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (*data->running_ != RunningState::RUNNING) break;
         //		if (*data->RedrawScreen != 2) break;
 

@@ -101,13 +101,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "ProductName", "JkDefrag"
+            VALUE "ProductName", "JkDefrag Evo"
             VALUE "ProductVersion", "3.36"
             VALUE "LegalCopyright", "GNU General Public License"
             VALUE "CompanyName", "J.C. Kessels"
             VALUE "FileDescription", "JkDefrag - disk defragmentation and optimization tool"
             VALUE "FileVersion", "3.36"
-            VALUE "InternalName", "JkDefrag"
+            VALUE "InternalName", "JkDefragEvo"
             VALUE "OriginalFilename", "JkDefrag.exe"
         END
     END

@@ -10,6 +10,7 @@ add_compile_options("/std:c++20")
 set(APP_NAME jkdefrag)
 set(SRC ${PROJECT_SOURCE_DIR}/jkdefrag_evo/src)
 set(INCL ${PROJECT_SOURCE_DIR}/jkdefrag_evo/include)
+set(RSRC ${PROJECT_SOURCE_DIR}/jkdefrag_evo/resource)
 include_directories(${INCL})
 
 set(HEADER_FILES
@@ -70,11 +71,9 @@ set(SOURCE_FILES
         ${SRC}/tech/methods/defrag_mountpoints.cpp
         )
 
-add_executable(${APP_NAME} ${OPTIONS}
-        ${HEADER_FILES}
-        ${SOURCE_FILES}
-        )
+add_executable(${APP_NAME} ${OPTIONS} ${HEADER_FILES} ${SOURCE_FILES})
 
+target_sources(${APP_NAME} PRIVATE ${RSRC}/jkdefrag.rc)
 target_link_libraries(${APP_NAME} DbgHelp GdiPlus)
 target_precompile_headers(${APP_NAME} PRIVATE
         "$<$<COMPILE_LANGUAGE:CXX>:${INCL}/precompiled_header.h>")
