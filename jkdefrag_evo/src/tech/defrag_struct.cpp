@@ -1,5 +1,5 @@
 #include "precompiled_header.h"
-#include "defrag_struct.h"
+#include "../../include/defrag_struct.h"
 
 
 DefragStruct::DefragStruct() {

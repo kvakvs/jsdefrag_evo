@@ -1,5 +1,5 @@
-#include "precompiled_header.h"
-#include "defrag.h"
+#include "../include/precompiled_header.h"
+#include "../include/defrag.h"
 
 void set_locale();
 

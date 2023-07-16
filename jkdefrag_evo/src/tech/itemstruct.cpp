@@ -1,5 +1,5 @@
 #include "precompiled_header.h"
-#include "itemstruct.h"
+#include "../../include/itemstruct.h"
 
 /// short_path can be null
 void ItemStruct::set_names(const wchar_t *long_path, const wchar_t *long_filename,

@@ -30,8 +30,8 @@ http://www.kessels.com/
 #include <optional>
 #include <tchar.h>
 
-#include "../constants.h"
-#include "../types.h"
+#include "constants.h"
+#include "types.h"
 
 #undef max
 constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();

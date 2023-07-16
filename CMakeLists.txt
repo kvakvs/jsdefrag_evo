@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(JkDefrag)
+project(JkDefragEvo)
 
 if (MSVC)
     set(OPTIONS WIN32)
@@ -8,25 +8,26 @@ endif (MSVC)
 add_compile_options("/std:c++20")
 
 set(APP_NAME jkdefrag)
-set(SRC ${PROJECT_SOURCE_DIR}/JkDefrag/Source)
-include_directories(${SRC})
+set(SRC ${PROJECT_SOURCE_DIR}/jkdefrag_evo/src)
+set(INCL ${PROJECT_SOURCE_DIR}/jkdefrag_evo/include)
+include_directories(${INCL})
 
 set(HEADER_FILES
-        ${SRC}/constants.h
-        ${SRC}/types.h
-        ${SRC}/precompiled_header.h
-        ${SRC}/printing.h
-        ${SRC}/defrag_log.h
-        ${SRC}/defrag.h
-        ${SRC}/time_util.h
-        ${SRC}/tech/scan_ntfs.h
-        ${SRC}/tech/scan_fat.h
-        ${SRC}/tech/itemstruct.h
-        ${SRC}/tech/defrag_struct.h
-        ${SRC}/tech/defrag_lib.h
-        ${SRC}/tech/defrag_data_struct.h
-        ${SRC}/gui/defrag_gui.h
-        ${SRC}/gui/colormap.h
+        ${INCL}/constants.h
+        ${INCL}/types.h
+        ${INCL}/precompiled_header.h
+        ${INCL}/printing.h
+        ${INCL}/defrag_log.h
+        ${INCL}/defrag.h
+        ${INCL}/time_util.h
+        ${INCL}/scan_ntfs.h
+        ${INCL}/scan_fat.h
+        ${INCL}/itemstruct.h
+        ${INCL}/defrag_struct.h
+        ${INCL}/defrag_lib.h
+        ${INCL}/defrag_data_struct.h
+        ${INCL}/defrag_gui.h
+        ${INCL}/colormap.h
         )
 set(SOURCE_FILES
         ${SRC}/precompiled_header.cpp
@@ -68,4 +69,4 @@ add_executable(${APP_NAME} ${OPTIONS}
 
 target_link_libraries(${APP_NAME} DbgHelp GdiPlus)
 target_precompile_headers(${APP_NAME} PRIVATE
-        "$<$<COMPILE_LANGUAGE:CXX>:${SRC}/precompiled_header.h>")
+        "$<$<COMPILE_LANGUAGE:CXX>:${INCL}/precompiled_header.h>")

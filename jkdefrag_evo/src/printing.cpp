@@ -1,4 +1,4 @@
-#include "precompiled_header.h"
+#include "../include/precompiled_header.h"
 
 namespace Str {
     std::wstring from_char(const char *input) {

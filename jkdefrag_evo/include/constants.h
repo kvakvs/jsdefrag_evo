@@ -113,3 +113,7 @@ enum class MoveDirection {
 // Formats the summary for:       Fragments Bytes            Clusters     Path or location
 #define SUMMARY_DASH_LINE       L"--------- ---------------- ------------ -----"
 #define SUMMARY_FMT             L"{:9L} {:16L} {:12L}"
+
+#define EXECUTABLE_NAME         "jkdefrag.exe"
+#define CMD_EXECUTABLE_NAME     "jkdefragcmd.exe"
+#define SCREENSAVER_NAME        "jkdefragscreensaver.exe"

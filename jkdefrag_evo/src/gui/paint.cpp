@@ -1,5 +1,5 @@
 #include "precompiled_header.h"
-#include "defrag_gui.h"
+#include "../../include/defrag_gui.h"
 
 void DefragGui::paint_background(Rect &window_size, Graphics *graphics,
                                  const POINT &diskmap_org, const POINT &diskmap_end) const {

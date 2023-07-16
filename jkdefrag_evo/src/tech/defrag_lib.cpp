@@ -26,8 +26,8 @@ http://www.kessels.com/
 #include <optional>
 #include <cwctype>
 
-#include "defrag_data_struct.h"
-#include "defrag_lib.h"
+#include "../../include/defrag_data_struct.h"
+#include "../../include/defrag_lib.h"
 
 
 DefragLib::DefragLib() = default;
