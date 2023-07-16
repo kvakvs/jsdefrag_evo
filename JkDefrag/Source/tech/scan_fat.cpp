@@ -548,7 +548,7 @@ void ScanFAT::analyze_fat_directory(DefragDataStruct *data, FatDiskInfoStruct *d
         /* Draw the item on the screen. */
         gui->show_analyze(data, item);
         //		if (*data->RedrawScreen == false) {
-        defrag_lib_->colorize_item(data, item, 0, 0, false);
+        defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
         //		} else {
         //			show_diskmap(data);
         //		}

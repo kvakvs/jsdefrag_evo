@@ -814,7 +814,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0))
             continue;
 
-        defrag_lib_->colorize_item(data, item, 0, 0, false);
+        defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
     }
 
     /* Set the flag to "no". */

@@ -1142,7 +1142,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
 
         // Draw the item on the screen.
         gui->show_analyze(data, item);
-        defrag_lib_->colorize_item(data, item, 0, 0, false);
+        defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
 
         if (stream != nullptr) stream = stream->next_;
     } while (stream != nullptr);

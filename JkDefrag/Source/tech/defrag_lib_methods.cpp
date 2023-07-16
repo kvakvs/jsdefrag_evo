@@ -152,7 +152,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
         }
 
         /* Move the item. */
-        result = move_item(data, item, gap_begin[file_zone], 0, item->clusters_count_, 0);
+        result = move_item(data, item, gap_begin[file_zone], 0, item->clusters_count_, MoveDirection::Up);
 
         if (result) {
             gap_begin[file_zone] = gap_begin[file_zone] + item->clusters_count_;
@@ -243,7 +243,7 @@ void DefragLib::defragment(DefragDataStruct *data) {
         /* If the gap is big enough to hold the entire item then move the file
         in a single go, and loop. */
         if (gap_end - gap_begin >= item->clusters_count_) {
-            move_item(data, item, gap_begin, 0, item->clusters_count_, 0);
+            move_item(data, item, gap_begin, 0, item->clusters_count_, MoveDirection::Up);
 
             continue;
         }
@@ -255,7 +255,7 @@ void DefragLib::defragment(DefragDataStruct *data) {
         if (file_handle == nullptr) {
             item->is_unmovable_ = true;
 
-            colorize_item(data, item, 0, 0, false);
+            colorize_disk_item(data, item, 0, 0, false);
 
             continue;
         }
@@ -296,7 +296,8 @@ void DefragLib::defragment(DefragDataStruct *data) {
             if (clusters_done >= item->clusters_count_) break;
 
             /* Move the segment. */
-            result = move_item4(data, item, file_handle, gap_begin, clusters_done, clusters, 0);
+            result = move_item_try_strategies(data, item, file_handle, gap_begin, clusters_done, clusters,
+                                              MoveDirection::Up);
 
             /* Next segment. */
             clusters_done = clusters_done + clusters;
@@ -387,7 +388,8 @@ void DefragLib::forced_fill(DefragDataStruct *data) {
 
         if (clusters > highest_size) clusters = highest_size;
 
-        result = move_item(data, highest_item, gap_begin, highest_vcn + highest_size - clusters, clusters, 0);
+        result = move_item(data, highest_item, gap_begin, highest_vcn + highest_size - clusters, clusters,
+                           MoveDirection::Up);
 
         gap_begin = gap_begin + clusters;
         max_lcn = highest_lcn + highest_size - clusters;
@@ -563,7 +565,8 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
         }
 
         // Move the fragment to the gap.
-        result = move_item(data, bigger_item, move_gap_begin, bigger_real_vcn, bigger_end - bigger_begin, 0);
+        result = move_item(data, bigger_item, move_gap_begin, bigger_real_vcn, bigger_end - bigger_begin,
+                           MoveDirection::Up);
 
         if (result) {
             if (move_gap_begin < move_to) move_to = move_gap_begin;
@@ -700,7 +703,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
                 }
 
                 /* Move the item to the gap. */
-                result = move_item(data, item, gap_begin, clusters_done, clusters, 0);
+                result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
 
                 if (result == true) {
                     gap_begin = gap_begin + clusters;
@@ -827,8 +830,8 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct *data) {
             }
         }
 
-        /* Move the MFT to the gap. */
-        result = move_item(data, item, gap_begin, clusters_done, clusters, 0);
+        // Move the MFT to the gap
+        result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
 
         if (result == true) {
             gap_begin = gap_begin + clusters;
@@ -845,7 +848,7 @@ void DefragLib::move_mft_to_begin_of_disk(DefragDataStruct *data) {
     /* Make the MFT unmovable. We don't want it moved again by any other subroutine. */
     item->is_unmovable_ = true;
 
-    colorize_item(data, item, 0, 0, false);
+    colorize_disk_item(data, item, 0, 0, false);
     calculate_zones(data);
 
     /* Note: The MftExcludes do not change by moving the MFT. */
@@ -921,8 +924,8 @@ void DefragLib::optimize_volume(DefragDataStruct *data) {
 
                 if (item == nullptr) break;
 
-                /* Move the item. */
-                result = move_item(data, item, gap_begin, 0, item->clusters_count_, 0);
+                // Move the item
+                result = move_item(data, item, gap_begin, 0, item->clusters_count_, MoveDirection::Up);
 
                 if (result == true) {
                     gap_begin = gap_begin + item->clusters_count_;
@@ -1013,8 +1016,9 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
 
             if (item == nullptr) break;
 
-            /* Move the item. */
-            result = move_item(data, item, gap_end - item->clusters_count_, 0, item->clusters_count_, 1);
+            // Move the item
+            result = move_item(data, item, gap_end - item->clusters_count_, 0, item->clusters_count_,
+                               MoveDirection::Down);
 
             if (result == true) {
                 gap_end = gap_end - item->clusters_count_;

@@ -576,7 +576,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         if (item->clusters_count_ == 0 || item->fragments_ == nullptr) continue;
 
         // Draw the item on the screen
-        colorize_item(data, item, 0, 0, false);
+        colorize_disk_item(data, item, 0, 0, false);
 
         // Show debug info about the file.
         // Show debug message: "%I64d clusters at %I64d, %I64d bytes"
@@ -716,7 +716,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         if (!match_mask(item->get_long_path(), data->include_mask_) &&
             !match_mask(item->get_short_path(), data->include_mask_)) {
             item->is_excluded_ = true;
-            colorize_item(data, item, 0, 0, false);
+            colorize_disk_item(data, item, 0, 0, false);
         }
 
         /* Determine if the item is to be excluded by comparing it's name with the
@@ -727,7 +727,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
                     match_mask(item->get_short_path(), s.c_str())) {
                     item->is_excluded_ = true;
 
-                    colorize_item(data, item, 0, 0, false);
+                    colorize_disk_item(data, item, 0, 0, false);
 
                     break;
                 }
@@ -741,7 +741,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
              _wcsicmp(item->get_long_fn(), L"jkdefragscreensaver.log") == 0)) {
             item->is_excluded_ = true;
 
-            colorize_item(data, item, 0, 0, false);
+            colorize_disk_item(data, item, 0, 0, false);
         }
 
         /* The item is a SpaceHog if it's larger than 50 megabytes, or last access time
@@ -763,7 +763,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
                 }
             }
 
-            if (item->is_hog_) colorize_item(data, item, 0, 0, false);
+            if (item->is_hog_) colorize_disk_item(data, item, 0, 0, false);
         }
 
         // Special exception for "http://www.safeboot.com/"

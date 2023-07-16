@@ -389,7 +389,7 @@ Note: Very small files are stored by Windows in the MFT and have no
 clusters (zero) and no fragments (nullptr).
 
 */
-int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HANDLE file_handle) {
+bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HANDLE file_handle) {
     STARTING_VCN_INPUT_BUFFER RetrieveParam;
 
     struct {
@@ -530,7 +530,7 @@ int DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HAN
     /* If there was an error while reading the clustermap then return false. */
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
         wchar_t error_string[BUFSIZ];
-        /* Show debug message: "Cannot process clustermap of '%s': %s" */
+        // Show debug message: "Cannot process clustermap of '%s': %s"
         system_error_str(error_code, error_string, BUFSIZ);
 
         gui->show_debug(
@@ -639,23 +639,21 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
  * \param busy_size Number of clusters to be highlighted.
  * \param un_draw true to undraw the file from the screen.
  */
-void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, const uint64_t busy_offset,
-                              const uint64_t busy_size, const int un_draw) const {
+void DefragLib::colorize_disk_item(DefragDataStruct *data, const ItemStruct *item, const uint64_t busy_offset,
+                                   const uint64_t busy_size, const int un_draw) const {
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Determine if the item is fragmented. */
+    // Determine if the item is fragmented.
     const bool is_fragmented = this->is_fragmented(item, 0, item->clusters_count_);
 
-    /* Walk through all the fragments of the file. */
+    // Walk through all the fragments of the file.
     uint64_t vcn = 0;
     uint64_t real_vcn = 0;
 
     const FragmentListStruct *fragment = item->fragments_;
 
     while (fragment != nullptr) {
-        /*
-        Ignore virtual fragments. They do not occupy space on disk and do not require colorization.
-        */
+        // Ignore virtual fragments. They do not occupy space on disk and do not require colorization.
         if (fragment->lcn_ == VIRTUALFRAGMENT) {
             vcn = fragment->next_vcn_;
             fragment = fragment->next_;
@@ -663,13 +661,9 @@ void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, co
             continue;
         }
 
-        /*
-        Walk through all the segments of the file. A segment is usually
-        the same as a fragment, but if a fragment spans across a boundary
-        then we must determine the color of the left and right parts
-        individually. So we pretend the fragment is divided into segments
-        at the various possible boundaries.
-        */
+        // Walk through all the segments of the file. A segment is usually the same as a fragment, but if a fragment spans across a boundary
+        // then we must determine the color of the left and right parts individually. So we pretend the fragment is divided into segments
+        // at the various possible boundaries.
         uint64_t segment_begin = real_vcn;
 
         while (segment_begin < real_vcn + fragment->next_vcn_ - vcn) {
@@ -717,15 +711,17 @@ void DefragLib::colorize_item(DefragDataStruct *data, const ItemStruct *item, co
                 }
             }
 
-            /* Colorize the segment. */
-            gui->draw_cluster(data, fragment->lcn_ + segment_begin - real_vcn, fragment->lcn_ + segment_end - real_vcn,
+            // Colorize the segment
+            gui->draw_cluster(data,
+                              fragment->lcn_ + segment_begin - real_vcn,
+                              fragment->lcn_ + segment_end - real_vcn,
                               color);
 
-            /* Next segment. */
+            // Next segment
             segment_begin = segment_end;
         }
 
-        /* Next fragment. */
+        // Next fragment
         real_vcn = real_vcn + fragment->next_vcn_ - vcn;
 
         vcn = fragment->next_vcn_;

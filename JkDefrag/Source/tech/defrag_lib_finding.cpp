@@ -17,7 +17,7 @@
 bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
                          const uint64_t minimum_size,
                          const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
-                         const BOOL ignore_mft_excludes) {
+                         const bool ignore_mft_excludes) {
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
         uint64_t starting_lcn_;
@@ -83,7 +83,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
                 if ((lcn >= data->mft_excludes_[0].start_ && lcn < data->mft_excludes_[0].end_) ||
                     (lcn >= data->mft_excludes_[1].start_ && lcn < data->mft_excludes_[1].end_) ||
                     (lcn >= data->mft_excludes_[2].start_ && lcn < data->mft_excludes_[2].end_)) {
-                    if (ignore_mft_excludes == FALSE) in_use = 1;
+                    if (!ignore_mft_excludes) in_use = 1;
                 }
 
                 if (prev_in_use == 0 && in_use != 0) {
