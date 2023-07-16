@@ -44,8 +44,12 @@ set(SOURCE_FILES
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/tech/defrag_struct.cpp
         ${SRC}/tech/scan_fat.cpp
-        ${SRC}/tech/scan_ntfs.cpp
         ${SRC}/tech/itemstruct.cpp
+        ${SRC}/tech/ntfs/scan_ntfs.cpp
+        ${SRC}/tech/ntfs/analyze.cpp
+        ${SRC}/tech/ntfs/attributes.cpp
+        ${SRC}/tech/ntfs/mft.cpp
+        ${SRC}/tech/ntfs/stream.cpp
         ${SRC}/tech/defrag_lib_finding.cpp
         ${SRC}/tech/defrag_lib_moving.cpp
         ${SRC}/tech/defrag_lib_tree.cpp
