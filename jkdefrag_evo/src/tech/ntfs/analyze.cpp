@@ -5,7 +5,6 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     NtfsDiskInfoStruct disk_info{};
     std::unique_ptr<BYTE[]> buffer;
     OVERLAPPED g_overlapped;
-    ULARGE_INTEGER trans;
     DWORD bytes_read;
     FragmentListStruct *mft_data_fragments;
     uint64_t mft_data_bytes;
@@ -84,7 +83,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
 
     gui->show_debug(DebugLevel::Fatal, nullptr, std::format(
             L"This is an NTFS disk."
-            L"\n  Disk cookie: " NUM_FMT
+            L"\n  Disk cookie: {:x}"
             L"\n  BytesPerSector: " NUM_FMT
             L"\n  TotalSectors: " NUM_FMT
             L"\n  SectorsPerCluster: " NUM_FMT
@@ -95,7 +94,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
             L"\n  BytesPerMftRecord: " NUM_FMT
             L"\n  ClustersPerIndexRecord: " NUM_FMT
             L"\n  MediaType: {:x}"
-            L"\n  VolumeSerialNumber: " NUM_FMT,
+            L"\n  VolumeSerialNumber: {:x}",
             *(ULONGLONG *) &buffer[3], disk_info.bytes_per_sector_, disk_info.total_sectors_,
             disk_info.sectors_per_cluster_, *(USHORT *) &buffer[24], *(USHORT *) &buffer[26], disk_info.mft_start_lcn_,
             disk_info.mft2_start_lcn_, disk_info.bytes_per_mft_record_, disk_info.clusters_per_index_record_,
@@ -106,8 +105,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     data->disk_.mft_locked_clusters_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_ / disk_info.
             bytes_per_mft_record_;
 
-    /* Read the $MFT record from disk into memory, which is always the first record in
-    the MFT. */
+    // Read the $MFT record from disk into memory, which is always the first record in the MFT
+    ULARGE_INTEGER trans;
     trans.QuadPart = disk_info.mft_start_lcn_ * disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
     g_overlapped.Offset = trans.LowPart;
     g_overlapped.OffsetHigh = trans.HighPart;

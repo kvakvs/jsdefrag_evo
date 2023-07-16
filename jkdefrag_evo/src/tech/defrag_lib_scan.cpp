@@ -160,7 +160,6 @@ link. */
     uint32_t error_code;
     wchar_t error_string[BUFSIZ];
     int max_loop;
-    ULARGE_INTEGER u;
     uint32_t i;
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
@@ -186,26 +185,25 @@ link. */
 
     // Fetch the date/times of the file
     if (GetFileInformationByHandle(file_handle, &file_information) != 0) {
-        u.LowPart = file_information.ftCreationTime.dwLowDateTime;
-        u.HighPart = file_information.ftCreationTime.dwHighDateTime;
+        const auto fi_creation = from_FILETIME(file_information.ftCreationTime);
 
-        if (item->creation_time_ != std::chrono::microseconds(u.QuadPart)) {
-            auto diff = item->creation_time_.count() - u.QuadPart;
+        if (item->creation_time_ != fi_creation) {
+            auto diff = item->creation_time_ - fi_creation;
             gui->show_debug(
                     DebugLevel::Fatal, nullptr,
                     std::format(L"  Different CreationTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
-                                item->creation_time_.count(), u.QuadPart, diff));
+                                item->creation_time_.count(), fi_creation.count(), diff.count()));
         }
 
-        u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
-        u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
 
-        if (item->last_access_time_ != std::chrono::microseconds(u.QuadPart)) {
-            auto diff = item->last_access_time_.count() - u.QuadPart;
+        const auto fi_lastaccess = from_FILETIME(file_information.ftLastAccessTime);
+
+        if (item->last_access_time_ != fi_lastaccess) {
+            auto diff = item->last_access_time_ - fi_lastaccess;
             gui->show_debug(
                     DebugLevel::Fatal, nullptr,
                     std::format(L"  Different LastAccessTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
-                                item->last_access_time_.count(), u.QuadPart, diff));
+                                item->last_access_time_.count(), fi_lastaccess.count(), diff.count()));
         }
     }
 
@@ -411,7 +409,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     FragmentListStruct *fragment;
     HANDLE find_handle;
     WIN32_FIND_DATAW find_file_data;
-    wchar_t *root_path;
+    std::unique_ptr<wchar_t[]> root_path;
     wchar_t *temp_path;
     HANDLE file_handle;
     uint64_t SystemTime;
@@ -431,11 +429,11 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     everything after the last backslash in the mask. The FindFirstFile()
     system call only processes wildcards in the last section (i.e. after
     the last backslash). */
-    root_path = _wcsdup(mask);
+    root_path.reset(_wcsdup(mask));
 
     if (root_path == nullptr) return;
 
-    p1 = wcsrchr(root_path, '\\');
+    p1 = wcsrchr(root_path.get(), L'\\');
 
     if (p1 != nullptr) *p1 = 0;
 
@@ -460,13 +458,11 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     find_handle = FindFirstFileW(mask, &find_file_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
-        delete root_path;
         return;
     }
 
     item = nullptr;
 
-    wchar_t path_buf1[MAX_PATH];
     wchar_t path_buf2[MAX_PATH];
 
     do {
@@ -496,19 +492,15 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         item = new ItemStruct();
         item->fragments_ = nullptr;
 
-        length = wcslen(root_path) + wcslen(find_file_data.cFileName) + 2;
+        length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 2;
         _ASSERT(MAX_PATH > length);
-        swprintf_s(path_buf1, length, L"%s\\%s", root_path, find_file_data.cFileName);
-//        item->long_path_ = path_buf1;
-//        item->long_filename_ = find_file_data.cFileName;
+        auto path_buf1 = std::format(L"{}\\{}", root_path.get(), find_file_data.cFileName);
 
-        length = wcslen(root_path) + wcslen(find_file_data.cAlternateFileName) + 2;
+        length = wcslen(root_path.get()) + wcslen(find_file_data.cAlternateFileName) + 2;
         _ASSERT(MAX_PATH > length);
-        swprintf_s(path_buf2, length, L"%s\\%s", root_path, find_file_data.cAlternateFileName);
-//        item->short_path_ = path_buf2;
-//        item->short_filename_ = find_file_data.cAlternateFileName;
+        swprintf_s(path_buf2, length, L"%s\\%s", root_path.get(), find_file_data.cAlternateFileName);
 
-        item->set_names(path_buf1, find_file_data.cFileName, path_buf2, find_file_data.cAlternateFileName);
+        item->set_names(path_buf1.c_str(), find_file_data.cFileName, path_buf2, find_file_data.cAlternateFileName);
 
         item->bytes_ = find_file_data.nFileSizeHigh * ((uint64_t) MAXDWORD + 1) +
                        find_file_data.nFileSizeLow;
@@ -559,12 +551,12 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
         if (item->is_dir_) {
             data->count_directories_ = data->count_directories_ + 1;
 
-            length = wcslen(root_path) + wcslen(find_file_data.cFileName) + 4;
+            length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 4;
 
             temp_path = new wchar_t[length];
 
             if (temp_path != nullptr) {
-                swprintf_s(temp_path, length, L"%s\\%s\\*", root_path, find_file_data.cFileName);
+                swprintf_s(temp_path, length, L"%s\\%s\\*", root_path.get(), find_file_data.cFileName);
                 scan_dir(data, temp_path, item);
                 delete temp_path;
             }
@@ -622,8 +614,6 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     FindClose(find_handle);
 
     // Cleanup
-    delete root_path;
-
     if (item != nullptr) {
         while (item->fragments_ != nullptr) {
             fragment = item->fragments_->next_;
@@ -641,7 +631,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 memory for later use by the optimizer. */
 void DefragLib::analyze_volume(DefragDataStruct *data) {
     ItemStruct *item;
-    micro64_t system_time;
+    filetime64_t system_time;
     SYSTEMTIME time1;
     FILETIME time2;
     int i;
@@ -658,10 +648,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
     if (SystemTimeToFileTime(&time1, &time2) == FALSE) {
         system_time = {};
     } else {
-        ULARGE_INTEGER time3;
-        time3.LowPart = time2.dwLowDateTime;
-        time3.HighPart = time2.dwHighDateTime;
-        system_time = std::chrono::microseconds(time3.QuadPart);
+        system_time = from_FILETIME(time2);
     }
 
     // Scan NTFS disks
@@ -747,11 +734,11 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         /* The item is a SpaceHog if it's larger than 50 megabytes, or last access time
         is more than 30 days ago, or if it's filename matches a SpaceHog mask. */
         if (!item->is_excluded_ && !item->is_dir_) {
-            if (data->use_default_space_hogs_ && item->bytes_ > 50 * 1024 * 1024) {
+            if (data->use_default_space_hogs_ && item->bytes_ > kilobytes(50)) {
                 item->is_hog_ = true;
             } else if (data->use_default_space_hogs_ &&
                        data->use_last_access_time_ == TRUE &&
-                       item->last_access_time_ + std::chrono::microseconds(30UL * 24UL * 3600UL) < system_time) {
+                       item->last_access_time_ + std::chrono::seconds(30UL * 24UL * 3600UL) < system_time) {
                 item->is_hog_ = true;
             } else {
                 for (const auto &s: data->space_hogs_) {

@@ -10,7 +10,6 @@ ScanFAT::load_directory(const DefragDataStruct *data, const FatDiskInfoStruct *d
     std::unique_ptr<BYTE[]> buffer;
     uint64_t fragment_length;
     OVERLAPPED g_overlapped;
-    ULARGE_INTEGER trans;
     DWORD bytes_read;
     int max_iterate;
     wchar_t s1[BUFSIZ];
@@ -98,10 +97,10 @@ ScanFAT::load_directory(const DefragDataStruct *data, const FatDiskInfoStruct *d
         if (cluster != last_cluster + 1 && last_cluster != 0) {
             fragment_length =
                     (last_cluster - first_cluster + 1) * disk_info->sectors_per_cluster_ * disk_info->bytes_per_sector_;
+            ULARGE_INTEGER trans;
             trans.QuadPart =
                     (disk_info->first_data_sector_ + (first_cluster - 2) * disk_info->sectors_per_cluster_) *
-                    disk_info->
-                            bytes_per_sector_;
+                    disk_info->bytes_per_sector_;
 
             g_overlapped.Offset = trans.LowPart;
             g_overlapped.OffsetHigh = trans.HighPart;
@@ -149,9 +148,10 @@ ScanFAT::load_directory(const DefragDataStruct *data, const FatDiskInfoStruct *d
     if (last_cluster != 0) {
         fragment_length =
                 (last_cluster - first_cluster + 1) * disk_info->sectors_per_cluster_ * disk_info->bytes_per_sector_;
+        ULARGE_INTEGER trans;
         trans.QuadPart =
-                (disk_info->first_data_sector_ + (first_cluster - 2) * disk_info->sectors_per_cluster_) * disk_info->
-                        bytes_per_sector_;
+                (disk_info->first_data_sector_ + (first_cluster - 2) * disk_info->sectors_per_cluster_)
+                * disk_info->bytes_per_sector_;
 
         g_overlapped.Offset = trans.LowPart;
         g_overlapped.OffsetHigh = trans.HighPart;

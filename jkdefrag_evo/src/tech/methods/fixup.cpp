@@ -8,7 +8,6 @@
 */
 void DefragLib::fixup(DefragDataStruct *data) {
     WIN32_FILE_ATTRIBUTE_DATA attributes;
-    ULARGE_INTEGER u;
     DefragGui *gui = DefragGui::get_instance();
 
     call_show_status(data, DefragPhase::Fixup, -1); /* "Phase 3: Fixup" */

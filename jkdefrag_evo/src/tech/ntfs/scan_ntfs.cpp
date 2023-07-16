@@ -66,8 +66,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
     int64_t vcn = 0;
 
     while (run_data[index] != 0) {
-        ULARGE_INTEGER trans;
-        // Decode the RunData and calculate the next Lcn. 
+        // Decode the RunData and calculate the next Lcn.
         const int run_length_size = run_data[index] & 0x0F;
         const int run_offset_size = (run_data[index] & 0xF0) >> 4;
 
@@ -151,6 +150,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
                                     extent_lcn / (disk_info->bytes_per_sector_ * disk_info->sectors_per_cluster_),
                                     extent_vcn - offset));
 
+        ULARGE_INTEGER trans;
         trans.QuadPart = extent_lcn;
 
         g_overlapped.Offset = trans.LowPart;

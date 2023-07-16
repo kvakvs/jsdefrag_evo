@@ -402,21 +402,10 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
         item->last_access_time_.count() == 0 &&
         item->mft_change_time_.count() == 0 &&
         GetFileInformationByHandle(file_handle, &file_information) != 0) {
-        ULARGE_INTEGER u;
-        u.LowPart = file_information.ftCreationTime.dwLowDateTime;
-        u.HighPart = file_information.ftCreationTime.dwHighDateTime;
 
-        item->creation_time_ = std::chrono::microseconds(u.QuadPart);
-
-        u.LowPart = file_information.ftLastAccessTime.dwLowDateTime;
-        u.HighPart = file_information.ftLastAccessTime.dwHighDateTime;
-
-        item->last_access_time_ = std::chrono::microseconds(u.QuadPart);
-
-        u.LowPart = file_information.ftLastWriteTime.dwLowDateTime;
-        u.HighPart = file_information.ftLastWriteTime.dwHighDateTime;
-
-        item->mft_change_time_ = std::chrono::microseconds(u.QuadPart);
+        item->creation_time_ = from_FILETIME(file_information.ftCreationTime);
+        item->last_access_time_ = from_FILETIME(file_information.ftLastAccessTime);
+        item->mft_change_time_ = from_FILETIME(file_information.ftLastWriteTime);
     }
 
     /* Show debug message: "Getting cluster bitmap: %s" */

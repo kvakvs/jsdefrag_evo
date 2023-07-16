@@ -292,7 +292,7 @@ void DefragGui::write_stats(const DefragDataStruct *data) {
     ItemStruct *item;
     log_->log(std::format(L"- Total disk space: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
                           data->bytes_per_cluster_ * data->total_clusters_,
-                          (double) (data->bytes_per_cluster_ * data->total_clusters_) / GIGABYTE_DBL,
+                          (double) (data->bytes_per_cluster_ * data->total_clusters_) / gigabytes(1.0),
                           data->total_clusters_));
     log_->log(std::format(L"- Bytes per cluster: " NUM_FMT " bytes", data->bytes_per_cluster_));
     log_->log(std::format(L"- Number of files: " NUM_FMT, data->count_all_files_));
@@ -300,7 +300,7 @@ void DefragGui::write_stats(const DefragDataStruct *data) {
     log_->log(std::format(
             L"- Total size of analyzed items: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
             data->count_all_clusters_ * data->bytes_per_cluster_,
-            (double) (data->count_all_clusters_ * data->bytes_per_cluster_) / (1024 * 1024 * 1024),
+            (double) (data->count_all_clusters_ * data->bytes_per_cluster_) / gigabytes(1.0),
             data->count_all_clusters_));
 
     if (data->count_all_files_ + data->count_directories_ > 0) {

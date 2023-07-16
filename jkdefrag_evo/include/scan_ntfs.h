@@ -2,7 +2,7 @@
 
 #include <memory>
 
-constexpr size_t mftbuffersize = 256 * 1024; // 256 KB seems to be the optimum
+constexpr size_t mftbuffersize = kilobytes(256); // 256 KB seems to be the optimum
 
 struct INODE_REFERENCE {
     ULONG inode_number_low_part_;

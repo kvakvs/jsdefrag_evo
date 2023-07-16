@@ -34,16 +34,11 @@ uint8_t ScanFAT::calculate_short_name_check_sum(const UCHAR *name) {
 filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const USHORT time10) {
     FILETIME time1;
     FILETIME time2;
-    ULARGE_INTEGER time3;
 
     if (DosDateTimeToFileTime(date, time, &time1) == 0) return {};
     if (LocalFileTimeToFileTime(&time1, &time2) == 0) return {};
 
-    time3.LowPart = time2.dwLowDateTime;
-    time3.HighPart = time2.dwHighDateTime;
-    time3.QuadPart = time3.QuadPart + time10 * 100000;
-
-    return std::chrono::microseconds(time3.QuadPart);
+    return from_FILETIME(time2) + std::chrono::microseconds(time10 * 100000);
 }
 
 // Determine the number of clusters in an item and translate the FAT clusterlist

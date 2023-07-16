@@ -1,7 +1,10 @@
 #pragma once
 
-// constexpr uint64_t GIGABYTE = 1024 * 1024 * 1024;
-constexpr double GIGABYTE_DBL = 1024.0 * 1024.0 * 1024.0;
+template<typename NUM>
+constexpr NUM kilobytes(NUM val) { return val * NUM{1024}; }
+
+template<typename NUM>
+constexpr NUM gigabytes(NUM val) { return val * NUM{1024} * NUM{1024} * NUM{1024}; }
 
 namespace Str {
     std::wstring from_char(const char *input);

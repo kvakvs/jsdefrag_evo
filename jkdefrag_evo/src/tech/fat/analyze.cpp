@@ -36,7 +36,6 @@
 */
 bool ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
     FatDiskInfoStruct disk_info{};
-    ULARGE_INTEGER trans;
     OVERLAPPED g_overlapped;
     DWORD bytes_read;
     size_t fat_size;
@@ -146,7 +145,7 @@ bool ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
             L"\n  ReservedSectors: " NUM_FMT
             L"\n  NumberFATs: " NUM_FMT
             L"\n  RootEntriesCount: " NUM_FMT
-            L"\n  MediaType: {}"
+            L"\n  MediaType: {:x}"
             L"\n  SectorsPerTrack: " NUM_FMT
             L"\n  NumberOfHeads: " NUM_FMT
             L"\n  HiddenSectors: " NUM_FMT,
@@ -218,6 +217,7 @@ bool ScanFAT::analyze_fat_volume(DefragDataStruct *data) {
 
     disk_info.fat_data_.fat12 = new BYTE[fat_size];
 
+    ULARGE_INTEGER trans;
     trans.QuadPart = boot_sector.bpb_rsvd_sec_cnt_ * disk_info.bytes_per_sector_;
     g_overlapped.Offset = trans.LowPart;
     g_overlapped.OffsetHigh = trans.HighPart;

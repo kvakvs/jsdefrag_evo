@@ -28,7 +28,6 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
     // Walk through all the attributes and gather information
     for (ULONG attribute_offset = 0;
          attribute_offset < buf_length; attribute_offset = attribute_offset + attribute->length_) {
-        ULARGE_INTEGER trans;
         attribute = (ATTRIBUTE_LIST *) &buffer[attribute_offset];
 
         // Exit if no more attributes. AttributeLists are usually not closed by the
@@ -101,6 +100,7 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
         // Fetch the record of the referenced Inode from disk
         buffer_2 = std::make_unique<BYTE[]>((size_t) disk_info->bytes_per_mft_record_);
 
+        ULARGE_INTEGER trans;
         trans.QuadPart = (fragment->lcn_ - real_vcn) * disk_info->bytes_per_sector_ *
                          disk_info->sectors_per_cluster_ + ref_inode * disk_info->bytes_per_mft_record_;
 
