@@ -128,6 +128,7 @@ const wchar_t *DefragLib::stristr_w(const wchar_t *haystack, const wchar_t *need
     return nullptr;
 }
 
+// TODO: return std::wstring
 /* Return a string with the error message for GetLastError(). */
 void DefragLib::system_error_str(const uint32_t error_code, wchar_t *out, const size_t width) {
     wchar_t buffer[BUFSIZ];
@@ -197,30 +198,27 @@ void DefragLib::show_hex([[maybe_unused]] DefragDataStruct *data, const BYTE *bu
     }
 }
 
-/*
 
-Compare a string with a mask, case-insensitive. If it matches then return
-true, otherwise false. The mask may contain wildcard characters '?' (any
-character) '*' (any characters).
-
-*/
+// Compare a string with a mask, case-insensitive. If it matches then return
+// true, otherwise false. The mask may contain wildcard characters '?' (any
+// character) '*' (any characters).
 bool DefragLib::match_mask(const wchar_t *string, const wchar_t *mask) {
-    if (string == nullptr) return false; /* Just to speed up things. */
+    if (string == nullptr) return false; // Just to speed up things
     if (mask == nullptr) return false;
     if (wcscmp(mask, L"*") == 0) return true;
 
     auto m = mask;
     auto s = string;
 
-    while (*m != '\0' && *s != '\0') {
+    while (*m != L'\0' && *s != L'\0') {
         if (lower_case(*m) != lower_case(*s) && *m != '?') {
-            if (*m != '*') return false;
+            if (*m != L'*') return false;
 
             m++;
 
-            if (*m == '\0') return true;
+            if (*m == L'\0') return true;
 
-            while (*s != '\0') {
+            while (*s != L'\0') {
                 if (match_mask(s, m)) return true;
                 s++;
             }
@@ -232,9 +230,9 @@ bool DefragLib::match_mask(const wchar_t *string, const wchar_t *mask) {
         s++;
     }
 
-    while (*m == '*') m++;
+    while (*m == L'*') m++;
 
-    if (*s == '\0' && *m == '\0') return true;
+    if (*s == L'\0' && *m == L'\0') return true;
 
     return false;
 }
@@ -248,14 +246,12 @@ void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path)
     path += item->get_short_fn(); // will append short if not empty otherwise will append long
 }
 
-/*
-Return a string with the full path of an item, constructed from the short names.
-*/
+// Return a string with the full path of an item, constructed from the short names.
 std::wstring DefragLib::get_short_path(const DefragDataStruct *data, const ItemStruct *item) {
-    /* Sanity check. */
+    // Sanity check
     if (item == nullptr) return {};
 
-    /* Count the size of all the ShortFilename's. */
+    // Count the size of all the ShortFilename's
     size_t length = wcslen(data->disk_.mount_point_.get()) + 1;
 
     for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {

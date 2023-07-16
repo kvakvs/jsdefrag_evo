@@ -10,8 +10,8 @@
  * \param direction 0: move up, 1: move down
  * \return
  */
-int DefragLib::move_item(DefragDataStruct *data, ItemStruct *item, const uint64_t new_lcn,
-                         const uint64_t offset, const uint64_t size, const MoveDirection direction) const {
+bool DefragLib::move_item(DefragDataStruct *data, ItemStruct *item, const uint64_t new_lcn,
+                          const uint64_t offset, const uint64_t size, const MoveDirection direction) const {
     // If the Item is Unmovable, Excluded, or has zero size then we cannot move it
     if (item->is_unmovable_) return false;
     if (item->is_excluded_) return false;

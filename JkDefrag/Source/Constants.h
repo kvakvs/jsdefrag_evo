@@ -83,6 +83,16 @@ enum class DrawColor : uint8_t {
     // Background
 };
 
+enum class MoveStrategy {
+    Whole,
+    InFragments,
+};
+
+enum class MoveDirection {
+    Up,
+    Down,
+};
+
 // Format string to use for numbers formatting with thousands separators
 #define NUM_FMT L"{:L}"
 // Format floating point with 0 decimals

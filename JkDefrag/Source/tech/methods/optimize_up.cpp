@@ -1,0 +1,92 @@
+#include "precompiled_header.h"
+
+// Optimize the harddisk by moving the selected items up
+void DefragLib::optimize_up(DefragDataStruct *data) {
+    ItemStruct *item;
+
+    uint64_t gap_begin;
+    uint64_t gap_end;
+
+    DefragGui *gui = DefragGui::get_instance();
+
+    call_show_status(data, 6, -1); /* "Phase 3: Move Up" */
+
+    /* Setup the progress counter: the total number of clusters in all files. */
+    for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+        data->phase_todo_ = data->phase_todo_ + item->clusters_count_;
+    }
+
+    /* Exit if nothing to do. */
+    if (data->item_tree_ == nullptr) return;
+
+    /* Walk through all the gaps. */
+    gap_end = data->total_clusters_;
+    int retry = 0;
+
+    while (*data->running_ == RunningState::RUNNING) {
+        /* Find the previous gap. */
+        bool result = find_gap(data, data->zones_[1], gap_end, 0, true, true, &gap_begin, &gap_end, FALSE);
+
+        if (!result) break;
+
+        /* Update the progress counter: the number of clusters in all the files
+        below the gap. */
+        uint64_t phase_temp = 0;
+
+        for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
+            if (item->is_unmovable_) continue;
+            if (item->is_excluded_) continue;
+            if (get_item_lcn(item) >= gap_end) break;
+
+            phase_temp = phase_temp + item->clusters_count_;
+        }
+
+        data->phase_todo_ = data->phase_done_ + phase_temp;
+        if (phase_temp == 0) break;
+
+        /* Loop until the gap is filled. First look for combinations of files that perfectly
+        fill the gap. If no combination can be found, or if there are less files than
+        the gap is big, then fill with the highest file(s) that fit in the gap. */
+        bool perfect_fit = true;
+        if (gap_end - gap_begin > phase_temp) perfect_fit = false;
+
+        while (gap_begin < gap_end && retry < 5 && *data->running_ == RunningState::RUNNING) {
+            /* Find the Item that is the best fit for the gap. If nothing found (no files
+            fit the gap) then exit the loop. */
+            if (perfect_fit) {
+                item = find_best_item(data, gap_begin, gap_end, 0, 3);
+
+                if (item == nullptr) {
+                    perfect_fit = false;
+                    item = find_highest_item(data, gap_begin, gap_end, 0, 3);
+                }
+            } else {
+                item = find_highest_item(data, gap_begin, gap_end, 0, 3);
+            }
+
+            if (item == nullptr) break;
+
+            // Move the item
+            result = move_item(data, item, gap_end - item->clusters_count_, 0, item->clusters_count_,
+                               MoveDirection::Down);
+
+            if (result) {
+                gap_end = gap_end - item->clusters_count_;
+                retry = 0;
+            } else {
+                gap_begin = gap_end; /* Force re-scan of gap. */
+                retry = retry + 1;
+            }
+        }
+
+        /* If the gap could not be filled then skip. */
+        if (gap_begin < gap_end) {
+            /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            std::format(SKIPPING_GAP_FMT, gap_begin, gap_end - gap_begin));
+
+            gap_end = gap_begin;
+            retry = 0;
+        }
+    }
+}

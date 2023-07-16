@@ -32,21 +32,34 @@ set(SOURCE_FILES
         ${SRC}/precompiled_header.cpp
         ${SRC}/main.cpp
         ${SRC}/defrag.cpp
+        ${SRC}/time_util.cpp
+        ${SRC}/printing.cpp
+        ${SRC}/defrag_log.cpp
+
         ${SRC}/gui/defrag_gui.cpp
         ${SRC}/gui/colormap.cpp
         ${SRC}/gui/paint.cpp
+
         ${SRC}/tech/defrag_lib.cpp
-        ${SRC}/defrag_log.cpp
         ${SRC}/tech/defrag_struct.cpp
         ${SRC}/tech/scan_fat.cpp
         ${SRC}/tech/scan_ntfs.cpp
         ${SRC}/tech/itemstruct.cpp
-        ${SRC}/printing.cpp
         ${SRC}/tech/defrag_lib_finding.cpp
-        ${SRC}/tech/defrag_lib_methods.cpp
         ${SRC}/tech/defrag_lib_moving.cpp
         ${SRC}/tech/defrag_lib_tree.cpp
-        ${SRC}/tech/defrag_lib_scan.cpp)
+        ${SRC}/tech/defrag_lib_scan.cpp
+        ${SRC}/tech/defrag_lib_methods.cpp
+        ${SRC}/tech/methods/fixup.cpp
+        ${SRC}/tech/methods/defragment.cpp
+        ${SRC}/tech/methods/forced_fill.cpp
+        ${SRC}/tech/methods/vacate.cpp
+        ${SRC}/tech/methods/optimize_sort.cpp
+        ${SRC}/tech/methods/optimize_volume.cpp
+        ${SRC}/tech/methods/optimize_up.cpp
+        ${SRC}/tech/methods/defrag_one_path.cpp
+        ${SRC}/tech/methods/defrag_mountpoints.cpp
+        )
 
 add_executable(${APP_NAME} ${OPTIONS}
         ${HEADER_FILES}

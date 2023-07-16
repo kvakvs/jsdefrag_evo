@@ -280,8 +280,9 @@ private:
     int move_item_try_strategies(DefragDataStruct *data, ItemStruct *item, HANDLE file_handle, uint64_t new_lcn,
                                  uint64_t offset, uint64_t size, MoveDirection direction) const;
 
-    int move_item(DefragDataStruct *data, ItemStruct *item, uint64_t new_lcn, uint64_t offset, uint64_t size,
-                  MoveDirection direction) const;
+    bool move_item(DefragDataStruct *data, ItemStruct *item, const uint64_t new_lcn, const uint64_t offset,
+                   const uint64_t size,
+                   const MoveDirection direction) const;
 
     static ItemStruct *
     find_highest_item(const DefragDataStruct *data, uint64_t cluster_start, uint64_t cluster_end, int direction,
@@ -306,7 +307,7 @@ private:
 
     void vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes);
 
-    void move_mft_to_begin_of_disk(DefragDataStruct *data);
+    [[maybe_unused]] void move_mft_to_begin_of_disk(DefragDataStruct *data);
 
     void optimize_volume(DefragDataStruct *data);
 
