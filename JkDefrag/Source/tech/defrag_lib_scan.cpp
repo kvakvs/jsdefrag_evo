@@ -23,7 +23,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
     int i;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Calculate the number of clusters in movable items for every zone. */
+    // Calculate the number of clusters in movable items for every zone
     for (zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
 
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
@@ -39,7 +39,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
         size_of_movable_files[zone] = size_of_movable_files[zone] + item->clusters_count_;
     }
 
-    /* Iterate until the calculation does not change anymore, max 10 times. */
+    // Iterate until the calculation does not change anymore, max 10 times
     for (zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
     for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
@@ -54,7 +54,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
 
         zone_end[2] = zone_end[1] + size_of_movable_files[2] + size_of_unmovable_fragments[2];
 
-        /* Exit if there was no change. */
+        // Exit if there was no change
         if (old_zone_end[0] == zone_end[0] &&
             old_zone_end[1] == zone_end[1] &&
             old_zone_end[2] == zone_end[2]) {
@@ -63,7 +63,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
 
         for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = zone_end[zone];
 
-        /* Show debug info. */
+        // Show debug info
         gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
                         std::format(
                                 L"Zone calculation, iteration {}: 0 - " NUM_FMT " - " NUM_FMT " - " NUM_FMT,
@@ -73,7 +73,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
         based on the just calculates ZoneEnd's. */
         for (zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
-        /* The MFT reserved areas are counted as unmovable data. */
+        // The MFT reserved areas are counted as unmovable data
         for (i = 0; i < 3; i++) {
             if (data->mft_excludes_[i].start_ < zone_end[0]) {
                 size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0]
@@ -126,7 +126,7 @@ void DefragLib::calculate_zones(DefragDataStruct *data) {
         }
     }
 
-    /* Calculated the begin of the zones. */
+    // Calculated the begin of the zones
     data->zones_[0] = 0;
 
     for (i = 1; i <= 3; i++) data->zones_[i] = zone_end[i - 1];
@@ -140,7 +140,7 @@ the info from the real item, but the MFT contains the info from the symbolic
 link. */
 [[maybe_unused]] void DefragLib::compare_items([[maybe_unused]] DefragDataStruct *data, const ItemStruct *item) const {
     HANDLE file_handle;
-    uint64_t clusters; /* Total number of clusters. */
+    uint64_t clusters; // Total number of clusters
     STARTING_VCN_INPUT_BUFFER retrieve_param;
 
     struct {
@@ -179,14 +179,12 @@ link. */
     }
 
     if (file_handle == INVALID_HANDLE_VALUE) {
-        system_error_str(GetLastError(), error_string, BUFSIZ);
-
-        gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"  Could not open: {}", error_string));
-
+        gui->show_debug(DebugLevel::Fatal, nullptr,
+                        std::format(L"  Could not open: {}", system_error_str(GetLastError())));
         return;
     }
 
-    /* Fetch the date/times of the file. */
+    // Fetch the date/times of the file
     if (GetFileInformationByHandle(file_handle, &file_information) != 0) {
         u.LowPart = file_information.ftCreationTime.dwLowDateTime;
         u.HighPart = file_information.ftCreationTime.dwHighDateTime;
@@ -268,7 +266,7 @@ link. */
         /* Walk through the clustermap, count the total number of clusters, and
         save all fragments in memory. */
         for (i = 0; i < extent_data.extent_count_; i++) {
-            /* Show debug message. */
+            // Show debug message
 #ifdef jk
             if (ExtentData.Extents[i].Lcn != VIRTUALFRAGMENT) {
                 Data->ShowDebug(DebugLevel::Fatal,nullptr,L"  Extent 2: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u",
@@ -287,7 +285,7 @@ link. */
                 clusters = clusters + extent_data.extents_[i].next_vcn_ - vcn;
             }
 
-            /* Compare the fragment. */
+            // Compare the fragment
             if (fragment == nullptr) {
                 gui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             } else {
@@ -306,18 +304,17 @@ link. */
                 fragment = fragment->next_;
             }
 
-            /* The Vcn of the next fragment is the NextVcn field in this record. */
+            // The Vcn of the next fragment is the NextVcn field in this record
             vcn = extent_data.extents_[i].next_vcn_;
         }
 
-        /* Loop until we have processed the entire clustermap of the file. */
+        // Loop until we have processed the entire clustermap of the file
     } while (error_code == ERROR_MORE_DATA);
 
-    /* If there was an error while reading the clustermap then return false. */
+    // If there was an error while reading the clustermap then return false
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
-        system_error_str(error_code, error_string, BUFSIZ);
-        gui->show_debug(DebugLevel::Fatal, item, std::format(L"  Error while processing clustermap: {}", error_string));
-
+        gui->show_debug(DebugLevel::Fatal, item,
+                        std::format(L"  Error while processing clustermap: {}", system_error_str(error_code)));
         return;
     }
 
@@ -346,14 +343,14 @@ Return values:
 int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field) {
     int result;
 
-    /* If one of the items is nullptr then the other item is bigger. */
+    // If one of the items is nullptr then the other item is bigger
     if (item_1 == nullptr) return -1;
     if (item_2 == nullptr) return 1;
 
-    /* Return zero if the items are exactly the same. */
+    // Return zero if the items are exactly the same
     if (item_1 == item_2) return 0;
 
-    /* Compare the sort_field of the items and return 1 or -1 if they are not equal. */
+    // Compare the sort_field of the items and return 1 or -1 if they are not equal
     if (sort_field == 0) {
         result = _wcsicmp(item_1->get_long_path(), item_2->get_long_path());
         if (result != 0) return result;
@@ -396,7 +393,7 @@ int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_fi
     if (item_1->creation_time_ < item_2->creation_time_) return -1;
     if (item_1->creation_time_ > item_2->creation_time_) return 1;
 
-    /* As a last resort compare the location on harddisk. */
+    // As a last resort compare the location on harddisk
     if (get_item_lcn(item_1) < get_item_lcn(item_2)) return -1;
     if (get_item_lcn(item_1) > get_item_lcn(item_2)) return 1;
 
@@ -442,7 +439,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
     // Show debug message: "Analyzing: %s"
     gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(L"Analyzing: %s", mask));
 
-    /* Fetch the current time in the uint64_t format (1 second = 10000000). */
+    // Fetch the current time in the uint64_t format (1 second = 10000000)
     GetSystemTime(&time_1);
 
     if (SystemTimeToFileTime(&time_1, &time_2) == FALSE) {
@@ -481,7 +478,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
             continue;
         }
 
-        /* Cleanup old item. */
+        // Cleanup old item
         if (item != nullptr) {
             while (item->fragments_ != nullptr) {
                 fragment = item->fragments_->next_;
@@ -492,7 +489,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
             delete item;
         }
 
-        /* Create new item. */
+        // Create new item
         item = new ItemStruct();
         item->fragments_ = nullptr;
 
@@ -539,7 +536,7 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 
         if (result == false) continue;
 
-        /* Increment counters. */
+        // Increment counters
         data->count_all_files_ = data->count_all_files_ + 1;
         data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
         data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
@@ -552,10 +549,10 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
 
         data->phase_done_ = data->phase_done_ + item->clusters_count_;
 
-        /* Show progress message. */
+        // Show progress message
         gui->show_analyze(data, item);
 
-        /* If it's a directory then iterate subdirectories. */
+        // If it's a directory then iterate subdirectories
         if (item->is_dir_) {
             data->count_directories_ = data->count_directories_ + 1;
 
@@ -614,14 +611,14 @@ void DefragLib::scan_dir(DefragDataStruct *data, const wchar_t *mask, ItemStruct
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"Special file attribute: Temporary");
         }
 
-        /* Add the item to the ItemTree in memory. */
+        // Add the item to the ItemTree in memory
         tree_insert(data, item);
         item = nullptr;
     } while (FindNextFileW(find_handle, &find_file_data) != 0);
 
     FindClose(find_handle);
 
-    /* Cleanup. */
+    // Cleanup
     delete root_path;
 
     if (item != nullptr) {
@@ -652,7 +649,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
 
     call_show_status(data, 1, -1); /* "Phase 1: Analyze" */
 
-    /* Fetch the current time in the uint64_t format (1 second = 10000000). */
+    // Fetch the current time in the uint64_t format (1 second = 10000000)
     GetSystemTime(&time1);
 
     if (SystemTimeToFileTime(&time1, &time2) == FALSE) {
@@ -664,32 +661,32 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         system_time = std::chrono::microseconds(time3.QuadPart);
     }
 
-    /* Scan NTFS disks. */
+    // Scan NTFS disks
     bool result = scan_ntfs->analyze_ntfs_volume(data);
 
-    /* Scan FAT disks. */
+    // Scan FAT disks
     if (result == FALSE && *data->running_ == RunningState::RUNNING) result = scan_fat->analyze_fat_volume(data);
 
-    /* Scan all other filesystems. */
+    // Scan all other filesystems
     if (result == FALSE && *data->running_ == RunningState::RUNNING) {
         gui->show_debug(DebugLevel::Fatal, nullptr, L"This is not a FAT or NTFS disk, using the slow scanner.");
 
-        /* Setup the width of the progress bar. */
+        // Setup the width of the progress bar
         data->phase_todo_ = data->total_clusters_ - data->count_free_clusters_;
 
         for (i = 0; i < 3; i++) {
             data->phase_todo_ = data->phase_todo_ - (data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_);
         }
 
-        /* Scan all the files. */
+        // Scan all the files
         scan_dir(data, data->include_mask_, nullptr);
     }
 
-    /* Update the diskmap with the colors. */
+    // Update the diskmap with the colors
     data->phase_done_ = data->phase_todo_;
     gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
-    /* Setup the progress counter and the file/dir counters. */
+    // Setup the progress counter and the file/dir counters
     data->phase_done_ = 0;
     data->phase_todo_ = 0;
 
@@ -699,11 +696,11 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
 
     gui->show_analyze(nullptr, nullptr);
 
-    /* Walk through all the items one by one. */
+    // Walk through all the items one by one
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
         if (*data->running_ != RunningState::RUNNING) break;
 
-        /* If requested then redraw the diskmap. */
+        // If requested then redraw the diskmap
         //		if (*Data->RedrawScreen == 1) m_jkGui->show_diskmap(Data);
 
         /* Construct the full path's of the item. The MFT contains only the filename, plus
@@ -734,7 +731,7 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
             }
         }
 
-        /* Exclude my own logfile. */
+        // Exclude my own logfile
         if (!item->is_excluded_ &&
             (_wcsicmp(item->get_long_fn(), L"jkdefrag.exe.log") == 0 ||
              _wcsicmp(item->get_long_fn(), L"jkdefragcmd.log") == 0 ||
@@ -792,13 +789,13 @@ void DefragLib::analyze_volume(DefragDataStruct *data) {
         if (data->phase_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, DrawColor::Empty);
     }
 
-    /* Force the percentage to 100%. */
+    // Force the percentage to 100%
     data->phase_done_ = data->phase_todo_;
     gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
-    /* Calculate the begin of the zone's. */
+    // Calculate the begin of the zone's
     calculate_zones(data);
 
-    /* Call the ShowAnalyze() callback one last time. */
+    // Call the ShowAnalyze() callback one last time
     gui->show_analyze(data, nullptr);
 }

@@ -22,17 +22,17 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
-        BYTE buffer_[65536]; /* Most efficient if binary multiple. */
+        BYTE buffer_[65536]; // Most efficient if binary multiple
     } bitmap_data{};
 
     uint32_t error_code;
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Sanity check. */
+    // Sanity check
     if (minimum_lcn >= data->total_clusters_) return false;
 
-    /* Main loop to walk through the entire clustermap. */
+    // Main loop to walk through the entire clustermap
     uint64_t lcn = minimum_lcn;
     uint64_t cluster_start = 0;
     int prev_in_use = 1;
@@ -42,7 +42,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
     uint64_t largest_end_lcn = 0;
 
     do {
-        /* Fetch a block of cluster data. If error then return false. */
+        // Fetch a block of cluster data. If error then return false
         bitmap_param.StartingLcn.QuadPart = lcn;
         error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                      &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
@@ -54,20 +54,19 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
         }
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
-            wchar_t s1[BUFSIZ];
-
             // Show debug message: "ERROR: could not get volume bitmap: %s"
-            system_error_str(GetLastError(), s1, BUFSIZ);
-            gui->show_debug(DebugLevel::Warning, nullptr, std::format(L"ERROR: could not get volume bitmap: {}", s1));
+            auto error_string = system_error_str(GetLastError());
+            gui->show_debug(DebugLevel::Warning, nullptr,
+                            std::format(L"ERROR: could not get volume bitmap: {}", error_string));
 
             return false;
         }
 
-        /* Sanity check. */
+        // Sanity check
         if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) return false;
         if (maximum_lcn == 0) maximum_lcn = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
-        /* Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the criteria then return it's LCN (Logical Cluster Number). */
+        // Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the criteria then return it's LCN (Logical Cluster Number)
         lcn = bitmap_data.starting_lcn_;
         int index = 0;
         BYTE mask = 1;
@@ -108,7 +107,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
                         highest_end_lcn = lcn;
                     }
 
-                    /* Remember the largest gap on the volume. */
+                    // Remember the largest gap on the volume
                     if (largest_begin_lcn == 0 ||
                         largest_end_lcn - largest_begin_lcn < lcn - cluster_start) {
                         largest_begin_lcn = cluster_start;
@@ -134,7 +133,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
              lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_ &&
              lcn < maximum_lcn);
 
-    /* Process the last gap. */
+    // Process the last gap
     if (prev_in_use == 0) {
         /* Show debug message: "Gap found: LCN=%I64d, Size=%I64d" */
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
@@ -152,7 +151,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
             highest_end_lcn = lcn;
         }
 
-        /* Remember the largest gap on the volume. */
+        // Remember the largest gap on the volume
         if (largest_begin_lcn == 0 ||
             largest_end_lcn - largest_begin_lcn < lcn - cluster_start) {
             largest_begin_lcn = cluster_start;
@@ -160,7 +159,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
         }
     }
 
-    /* If the FindHighestGap flag is true then return the highest gap we have found. */
+    // If the FindHighestGap flag is true then return the highest gap we have found
     if (find_highest_gap && highest_begin_lcn != 0) {
         if (begin_lcn != nullptr) *begin_lcn = highest_begin_lcn;
         if (end_lcn != nullptr) *end_lcn = highest_end_lcn;
@@ -168,7 +167,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
         return true;
     }
 
-    /* If the MustFit flag is false then return the largest gap we have found. */
+    // If the MustFit flag is false then return the largest gap we have found
     if (must_fit == false && largest_begin_lcn != 0) {
         if (begin_lcn != nullptr) *begin_lcn = largest_begin_lcn;
         if (end_lcn != nullptr) *end_lcn = largest_end_lcn;
@@ -176,7 +175,7 @@ bool DefragLib::find_gap(const DefragDataStruct *data, const uint64_t minimum_lc
         return true;
     }
 
-    /* No gap found, return false. */
+    // No gap found, return false
     return false;
 }
 
@@ -265,14 +264,14 @@ ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64
     for (auto item = tree_first(data->item_tree_, direction);
          item != nullptr;
          item = tree_next_prev(item, direction)) {
-        /* If we have passed the top of the gap then.... */
+        // If we have passed the top of the gap then...
         const uint64_t item_lcn = get_item_lcn(item);
 
         if (item_lcn == 0) continue;
 
         if ((direction == 1 && item_lcn < cluster_end) ||
             (direction == 0 && item_lcn > cluster_end)) {
-            /* If we did not find an item that fits inside the gap then exit. */
+            // If we did not find an item that fits inside the gap then exit
             if (first_item == nullptr) break;
 
             /* Exit if the total size of all the items is less than the size of the gap.
@@ -285,7 +284,7 @@ ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64
                 return nullptr;
             }
 
-            /* Exit if the running time is more than 0.5 seconds. */
+            // Exit if the running time is more than 0.5 seconds
             _ftime64_s(&time);
 
             if (time.time * 1000 + time.millitm > MaxTime) {
@@ -304,7 +303,7 @@ ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64
             continue;
         }
 
-        /* Ignore all unsuitable items. */
+        // Ignore all unsuitable items
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
@@ -336,7 +335,7 @@ ItemStruct *DefragLib::find_best_item(const DefragDataStruct *data, const uint64
         the gap. We are now looking to fill a smaller gap. */
         gap_size = gap_size - item->clusters_count_;
 
-        /* Remember the first item that fits inside the gap. */
+        // Remember the first item that fits inside the gap
         if (first_item == nullptr) first_item = item;
     }
 
@@ -351,7 +350,7 @@ Return the LCN of the fragment that contains a cluster at the LCN. If the
 item has no fragment that occupies the LCN then return zero.
 */
 uint64_t DefragLib::find_fragment_begin(const ItemStruct *item, const uint64_t lcn) {
-    /* Sanity check. */
+    // Sanity check
     if (item == nullptr || lcn == 0) return 0;
 
     /* Walk through all the fragments of the item. If a fragment is found
@@ -368,7 +367,7 @@ uint64_t DefragLib::find_fragment_begin(const ItemStruct *item, const uint64_t l
         vcn = fragment->next_vcn_;
     }
 
-    /* Not found: return zero. */
+    // Not found: return zero
     return 0;
 }
 
@@ -401,6 +400,6 @@ pointer to the item. If not found then return nullptr.
         if (find_fragment_begin(item, lcn) != 0) return item;
     }
 
-    /* LCN not found, return nullptr. */
+    // LCN not found, return nullptr
     return nullptr;
 }

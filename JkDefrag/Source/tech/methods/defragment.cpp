@@ -30,10 +30,10 @@ void DefragLib::defragment(DefragDataStruct *data) {
         data->phase_todo_ = data->phase_todo_ + item->clusters_count_;
     }
 
-    /* Exit if nothing to do. */
+    // Exit if nothing to do
     if (data->phase_todo_ == 0) return;
 
-    /* Walk through all files and defrag. */
+    // Walk through all files and defrag
     next_item = tree_smallest(data->item_tree_);
 
     while (next_item != nullptr && *data->running_ == RunningState::RUNNING) {
@@ -43,7 +43,7 @@ void DefragLib::defragment(DefragDataStruct *data) {
 
         next_item = tree_next(item);
 
-        /* Ignore if the item cannot be moved, or is Excluded, or is not fragmented. */
+        // Ignore if the item cannot be moved, or is Excluded, or is not fragmented
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->clusters_count_ == 0) continue;
@@ -124,11 +124,11 @@ void DefragLib::defragment(DefragDataStruct *data) {
 
             if (clusters_done >= item->clusters_count_) break;
 
-            /* Move the segment. */
+            // Move the segment
             result = move_item_try_strategies(data, item, file_handle, gap_begin, clusters_done, clusters,
                                               MoveDirection::Up);
 
-            /* Next segment. */
+            // Next segment
             clusters_done = clusters_done + clusters;
 
             /* Find a gap large enough to hold the remainder, or the largest gap
@@ -141,8 +141,8 @@ void DefragLib::defragment(DefragDataStruct *data) {
             }
         } while (clusters_done < item->clusters_count_ && *data->running_ == RunningState::RUNNING);
 
-        /* Close the item. */
-        FlushFileBuffers(file_handle); /* Is this useful? Can't hurt. */
+        // Close the item
+        FlushFileBuffers(file_handle); // Is this useful? Can't hurt
         CloseHandle(file_handle);
     }
 }

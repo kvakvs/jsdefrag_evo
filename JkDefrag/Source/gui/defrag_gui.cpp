@@ -79,7 +79,7 @@ int DefragGui::initialize(HINSTANCE instance, const int cmd_show, DefragLog *log
         return 0;
     }
 
-    /* Show the window in the state that Windows has specified, minimized or maximized. */
+    // Show the window in the state that Windows has specified, minimized or maximized
     ShowWindow(wnd_, cmd_show);
     UpdateWindow(wnd_);
 
@@ -89,7 +89,7 @@ int DefragGui::initialize(HINSTANCE instance, const int cmd_show, DefragLog *log
 }
 
 WPARAM DefragGui::do_modal() {
-    /* The main message thread. */
+    // The main message thread
     while (true) {
         const int get_message_result = GetMessage(&message_, nullptr, 0, 0);
 
@@ -132,7 +132,7 @@ void DefragGui::set_display_data(HDC dc) {
     bmp_ = std::make_unique<Bitmap>(client_size_.Width, client_size_.Height);
 }
 
-/* Callback: clear the screen. */
+// Callback: clear the screen
 void DefragGui::clear_screen(std::wstring &&text) {
     // Save the message in messages[0]
     messages_[0] = std::move(text);
@@ -199,7 +199,7 @@ void DefragGui::show_analyze(const DefragDataStruct *data, const ItemStruct *ite
         messages_[3] = L"Applying Exclude and SpaceHogs masks....";
     }
 
-    /* Save the name of the file in Messages 4. */
+    // Save the name of the file in Messages 4
     if (item != nullptr && item->have_long_path()) {
         messages_[4] = item->get_long_path();
     } else {
@@ -208,7 +208,7 @@ void DefragGui::show_analyze(const DefragDataStruct *data, const ItemStruct *ite
     repaint_window(dc_);
 }
 
-/* Callback: show a debug message. */
+// Callback: show a debug message
 void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::wstring &&text) {
     if (debug_level_ < level) return;
 
@@ -296,7 +296,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
     // Reset all the messages.
     for (auto &message: messages_) message.clear();
 
-    /* Update Message 0 and 1. */
+    // Update Message 0 and 1
     if (data != nullptr) {
         messages_[0] = data->disk_.mount_point_.get();
 
@@ -331,7 +331,7 @@ void DefragGui::show_status(const DefragDataStruct *data) {
         log_->log(messages_[1]);
     }
 
-    /* Write some statistics to the logfile. */
+    // Write some statistics to the logfile
     if (data != nullptr && data->phase_ == 7) {
         ItemStruct *largest_items[25];
         uint64_t total_clusters;
@@ -604,7 +604,7 @@ void DefragGui::on_paint(HDC dc) const {
     graphics.DrawImage(bmp_.get(), 0, 0);
 }
 
-/* Message handler. */
+// Message handler
 LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, const WPARAM w_param,
                                               const LPARAM l_param) {
     switch (message) {
@@ -617,7 +617,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             return 0;
 
         case WM_PAINT: {
-            /* Grab the display mutex, to make sure that we are the only thread changing the window. */
+            // Grab the display mutex, to make sure that we are the only thread changing the window
             WaitForSingleObject(instance_->display_mutex_, 100);
             instance_->display_mutex_ = CreateMutex(nullptr, FALSE, DISPLAY_MUTEX);
 
@@ -676,7 +676,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
         uint64_t StartingLcn;
         uint64_t BitmapSize;
 
-        BYTE Buffer[65536]; /* Most efficient if binary multiple. */
+        BYTE Buffer[65536]; // Most efficient if binary multiple
     } bitmap_data{};
 
     uint64_t Lcn;
@@ -694,10 +694,10 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
         return;
     }
 
-    /* Clear screen. */
+    // Clear screen
     clear_screen({});
 
-    /* Show the map of all the clusters in use. */
+    // Show the map of all the clusters in use
     Lcn = 0;
     cluster_start = 0;
     prev_in_use = 1;
@@ -707,7 +707,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
         //		if (*data->RedrawScreen != 2) break;
         if (data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
-        /* Fetch a block of cluster data. */
+        // Fetch a block of cluster data
         bitmap_param.StartingLcn.QuadPart = Lcn;
 
         error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
@@ -741,7 +741,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
             starting value. */
             if (Lcn == 0) prev_in_use = in_use;
 
-            /* At the beginning and end of an Exclude draw the cluster. */
+            // At the beginning and end of an Exclude draw the cluster
             if (Lcn == data->mft_excludes_[0].start_ || Lcn == data->mft_excludes_[0].end_ ||
                 Lcn == data->mft_excludes_[1].start_ || Lcn == data->mft_excludes_[1].end_ ||
                 Lcn == data->mft_excludes_[2].start_ || Lcn == data->mft_excludes_[2].end_) {
@@ -817,7 +817,7 @@ void DefragGui::show_diskmap(DefragDataStruct *data) {
         defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
     }
 
-    /* Set the flag to "no". */
+    // Set the flag to "no"
     //	if (*data->RedrawScreen == 2) *data->RedrawScreen = 0;
 }
 

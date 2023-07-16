@@ -56,7 +56,7 @@ bool DefragLib::move_item(DefragDataStruct *data, ItemStruct *item, const uint64
         if (!result) break;
 
         clusters_done = clusters_done + clusters_todo;
-        FlushFileBuffers(file_handle); /* Is this useful? Can't hurt. */
+        FlushFileBuffers(file_handle); // Is this useful? Can't hurt
         CloseHandle(file_handle);
     }
 
@@ -111,7 +111,7 @@ DWORD DefragLib::move_item_whole(DefragDataStruct *data, HANDLE file_handle, con
         vcn = fragment->next_vcn_;
     }
 
-    /* Setup the parameters for the move. */
+    // Setup the parameters for the move
     move_params.FileHandle = file_handle;
     move_params.StartingLcn.QuadPart = new_lcn;
     move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
@@ -224,7 +224,7 @@ DWORD DefragLib::move_item_in_fragments(DefragDataStruct *data, HANDLE file_hand
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
                                   DrawColor::Busy);
 
-                /* Call Windows to perform the move. */
+                // Call Windows to perform the move
                 error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
                                              sizeof move_params, nullptr, 0, &w, nullptr);
 
@@ -234,22 +234,22 @@ DWORD DefragLib::move_item_in_fragments(DefragDataStruct *data, HANDLE file_hand
                     error_code = GetLastError();
                 }
 
-                /* Update the PhaseDone counter for the progress bar. */
+                // Update the PhaseDone counter for the progress bar
                 data->phase_done_ = data->phase_done_ + move_params.ClusterCount;
 
-                /* Undraw the destination clusters on the screen. */
+                // Undraw the destination clusters on the screen
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
                                   DrawColor::Empty);
 
-                /* If there was an error then exit. */
+                // If there was an error then exit
                 if (error_code != NO_ERROR) return error_code;
             }
 
             real_vcn = real_vcn + fragment->next_vcn_ - vcn;
         }
 
-        /* Next fragment. */
+        // Next fragment
         vcn = fragment->next_vcn_;
     }
 
@@ -271,7 +271,6 @@ bool
 DefragLib::move_item_with_strat(DefragDataStruct *data, ItemStruct *item, HANDLE file_handle, const uint64_t new_lcn,
                                 const uint64_t offset, const uint64_t size, const MoveStrategy strategy) const {
     DWORD error_code;
-    wchar_t error_string[BUFSIZ];
     DefragGui *gui = DefragGui::get_instance();
 
     // Slow the program down if so selected
@@ -287,8 +286,9 @@ DefragLib::move_item_with_strat(DefragDataStruct *data, ItemStruct *item, HANDLE
     }
 
     // If there was an error then fetch the errormessage and save it
+    std::wstring error_string;
     if (error_code != NO_ERROR) {
-        system_error_str(error_code, error_string, BUFSIZ);
+        error_string = system_error_str(error_code);
     }
 
     // Fetch the new fragment map of the item and refresh the screen
@@ -302,8 +302,7 @@ DefragLib::move_item_with_strat(DefragDataStruct *data, ItemStruct *item, HANDLE
 
     // if windows reported an error while moving the item then show the error message and return false
     if (error_code != NO_ERROR) {
-        gui->show_debug(DebugLevel::DetailedProgress, item, error_string);
-
+        gui->show_debug(DebugLevel::DetailedProgress, item, std::move(error_string));
         return false;
     }
 

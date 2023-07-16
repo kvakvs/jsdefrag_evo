@@ -92,7 +92,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     }
 
 
-    /* Clear the screen and show "Processing '%s'" message. */
+    // Clear the screen and show "Processing '%s'" message
     gui->clear_screen(std::format(L"Processing {}", path));
 
     /* Try to change our permissions so we can access special files and directories
@@ -125,7 +125,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
     if (result == FALSE) wcscpy_s(data->disk_.mount_point_.get(), wcslen(path) + 1, path);
 
-    /* Make two versions of the MountPoint, one with a trailing backslash and one without. */
+    // Make two versions of the MountPoint, one with a trailing backslash and one without
     p1 = wcschr(data->disk_.mount_point_.get(), 0);
 
     if (p1 != data->disk_.mount_point_.get()) {
@@ -145,12 +145,9 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
     if (result == FALSE) {
         if (wcslen(data->disk_.mount_point_slash_.get()) > 52 - 1 - 4) {
             // "Cannot find volume name for mountpoint '%s': %s"
-            wchar_t s1[BUFSIZ];
-            system_error_str(GetLastError(), s1, BUFSIZ);
-
             gui->show_debug(DebugLevel::Fatal, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
-                                        data->disk_.mount_point_slash_.get(), s1));
+                                        data->disk_.mount_point_slash_.get(), system_error_str(GetLastError())));
 
             data->disk_.mount_point_.reset();
             data->disk_.mount_point_slash_.reset();
@@ -161,7 +158,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
         swprintf_s(data->disk_.volume_name_slash_, 52, L"\\\\.\\%s", data->disk_.mount_point_slash_.get());
     }
 
-    /* Make a copy of the VolumeName without the trailing backslash. */
+    // Make a copy of the VolumeName without the trailing backslash
     wcscpy_s(data->disk_.volume_name_, 51, data->disk_.volume_name_slash_);
 
     p1 = wcschr(data->disk_.volume_name_, 0);
@@ -215,12 +212,10 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
             0, nullptr);
 
     if (data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
-        wchar_t last_error[BUFSIZ];
-        system_error_str(GetLastError(), last_error, BUFSIZ);
-
         gui->show_debug(DebugLevel::Warning, nullptr,
                         std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    data->disk_.volume_name_, data->disk_.mount_point_.get(), last_error));
+                                    data->disk_.volume_name_, data->disk_.mount_point_.get(),
+                                    system_error_str(GetLastError())));
 
         data->disk_.mount_point_.reset();
         data->disk_.mount_point_slash_.reset();
@@ -334,7 +329,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
     gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"Input mask: {}", data->include_mask_));
 
-    /* Defragment and optimize. */
+    // Defragment and optimize
     gui->show_diskmap(data);
 
     if (*data->running_ == RunningState::RUNNING) analyze_volume(data);
@@ -350,7 +345,7 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
         if (*data->running_ == RunningState::RUNNING) fixup(data);
         if (*data->running_ == RunningState::RUNNING) optimize_volume(data);
-        if (*data->running_ == RunningState::RUNNING) fixup(data); /* Again, in case of new zone startpoint. */
+        if (*data->running_ == RunningState::RUNNING) fixup(data); // Again, in case of new zone startpoint
     }
 
     if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeGroup) {
@@ -388,13 +383,13 @@ void DefragLib::defrag_one_path(DefragDataStruct *data, const wchar_t *path, Opt
 
     call_show_status(data, 7, -1); /* "Finished." */
 
-    /* Close the volume handles. */
+    // Close the volume handles
     if (data->disk_.volume_handle_ != nullptr &&
         data->disk_.volume_handle_ != INVALID_HANDLE_VALUE) {
         CloseHandle(data->disk_.volume_handle_);
     }
 
-    /* Cleanup. */
+    // Cleanup
     delete_item_tree(data->item_tree_);
 
     data->disk_.mount_point_.reset();

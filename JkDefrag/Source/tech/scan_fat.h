@@ -80,7 +80,7 @@ struct FatLongNameDirStruct {
 
 #pragma pack(pop) // Reset byte alignment
 
-/* The attribute flags. */
+// The attribute flags
 enum {
     ATTR_READ_ONLY = 0x01,
     ATTR_HIDDEN = 0x02,
@@ -92,7 +92,7 @@ enum {
     ATTR_LONG_NAME_MASK = (ATTR_LONG_NAME | ATTR_DIRECTORY | ATTR_ARCHIVE)
 };
 
-/* Struct used by the scanner to store disk information from the bootblock. */
+// Struct used by the scanner to store disk information from the bootblock
 struct FatDiskInfoStruct {
     uint64_t bytes_per_sector_;
     uint64_t sectors_per_cluster_;

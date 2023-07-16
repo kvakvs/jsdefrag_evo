@@ -54,7 +54,7 @@ WPARAM Defrag::start_program(HINSTANCE instance,
                              const int cmd_show) {
     i_am_running_ = RunningState::RUNNING;
 
-    /* Test if another instance is already running. */
+    // Test if another instance is already running
     if (this->is_already_running()) return 0;
 
 #ifdef _DEBUG
@@ -100,13 +100,13 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
     DefragLog *log = instance_->log_.get();
     const DefragLib *defrag_lib = instance_->defrag_lib_;
 
-    /* Exit if we're running inside a debugger. */
+    // Exit if we're running inside a debugger
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
 
     log->log(L"I have crashed!");
     log->log(std::format(L"  Command line: {}", GetCommandLineW()).c_str());
 
-    /* Show the type of exception. */
+    // Show the type of exception
     switch (exception_info->ExceptionRecord->ExceptionCode) {
         case EXCEPTION_ACCESS_VIOLATION:
             strcpy_s(s1, BUFSIZ, "ACCESS_VIOLATION (the memory could not be read or written)");
@@ -200,16 +200,13 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
 
     log->log(std::format(L"  Exception: {}", Str::from_char(s1)));
 
-    /* Try to show the linenumber of the sourcefile. */
+    // Try to show the linenumber of the sourcefile
     SymSetOptions(SymGetOptions() || SYMOPT_LOAD_LINES);
     BOOL result = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
 
     if (result == FALSE) {
-        wchar_t s2[BUFSIZ];
-        DefragLib::system_error_str(GetLastError(), s2, BUFSIZ);
-
-        log->log(std::format(L"  Failed to initialize SymInitialize(): {}", s2).c_str());
-
+        log->log(std::format(L"  Failed to initialize SymInitialize(): {}",
+                             DefragLib::system_error_str(GetLastError())));
         return EXCEPTION_EXECUTE_HANDLER;
     }
 
@@ -306,10 +303,10 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     Wstrings space_hogs;
     bool quit_on_finish = false;
 
-    /* Fetch the commandline. */
+    // Fetch the commandline
     argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 
-    /* Scan the commandline arguments for "-l" and setup the logfile. */
+    // Scan the commandline arguments for "-l" and setup the logfile
     if (argc > 1) {
         for (i = 1; i < argc; i++) {
             if (wcscmp(argv[i], L"-l") == 0) {
@@ -328,7 +325,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
         }
     }
 
-    /* Show some standard information in the logfile. */
+    // Show some standard information in the logfile
     log->log(defrag_struct->versiontext_.c_str());
     time(&now);
 
@@ -344,7 +341,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
                              Str::from_char(os_version.szCSDVersion)));
     }
 
-    /* Scan the commandline again for all the other arguments. */
+    // Scan the commandline again for all the other arguments
     if (argc > 1) {
         for (i = 1; i < argc; i++) {
             if (wcscmp(argv[i], L"-a") == 0) {
@@ -622,7 +619,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
         }
     }
 
-    /* Defragment all the paths that are specified on the commandline one by one. */
+    // Defragment all the paths that are specified on the commandline one by one
     bool do_all_volumes = true;
 
     if (argc > 1) {
@@ -650,16 +647,16 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
         }
     }
 
-    /* If no paths are specified on the commandline then defrag all fixed harddisks. */
+    // If no paths are specified on the commandline then defrag all fixed harddisks
     if (do_all_volumes && instance_->i_am_running_ == RunningState::RUNNING) {
         defrag_lib->run_jk_defrag(nullptr, optimize_mode, speed, free_space, excludes, space_hogs,
                                   &instance_->running_state_);
     }
 
-    /* If the "-q" command line argument was specified then exit the program. */
+    // If the "-q" command line argument was specified then exit the program
     if (quit_on_finish) exit(EXIT_SUCCESS);
 
-    /* End of this thread. */
+    // End of this thread
     return 0;
 }
 
@@ -671,28 +668,22 @@ true.
 
 */
 bool Defrag::is_already_running(void) const {
-    PROCESSENTRY32 pe32;
-    char my_name[MAX_PATH];
-    wchar_t s1[BUFSIZ];
-
-    /* Get a process-snapshot from the kernel. */
-    const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    // Get a process-snapshot from the kernel
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (snapshot == INVALID_HANDLE_VALUE) {
-        wchar_t s2[BUFSIZ];
-        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
-
-        swprintf_s(s2, BUFSIZ, L"Cannot get process snapshot: %s", s1);
-
-        gui_->show_debug(DebugLevel::Fatal, nullptr, s2);
-
+        auto err = std::format(L"Cannot get process snapshot: {}", DefragLib::system_error_str(GetLastError()));
+        gui_->show_debug(DebugLevel::Fatal, nullptr, std::move(err));
         return true;
     }
 
+    PROCESSENTRY32 pe32;
     pe32.dwSize = sizeof(PROCESSENTRY32);
 
-    /* Get my own executable name. */
+    // Get my own executable name
     const uint32_t my_pid = GetCurrentProcessId();
+    char my_name[MAX_PATH];
+
     *my_name = '\0';
 
     if (Process32First(snapshot, &pe32) != FALSE) {
@@ -705,36 +696,32 @@ bool Defrag::is_already_running(void) const {
     }
 
     if (*my_name == '\0') {
-        /* "Cannot find my own name in the process list: %s" */
-        swprintf_s(s1, BUFSIZ, L"Cannot find my own name in the process list: %hs", my_name);
-
-        gui_->show_debug(DebugLevel::Fatal, nullptr, s1);
-
+        // "Cannot find my own name in the process list: %s"
+        auto s1 = std::format(L"Cannot find my own name in the process list: {}", Str::from_char(my_name));
+        gui_->show_debug(DebugLevel::Fatal, nullptr, std::move(s1));
         return true;
     }
 
-    /* Search for any other process with the same executable name as
-    myself. If found then return true. */
+    // Search for any other process with the same executable name as myself. If found then return true.
     Process32First(snapshot, &pe32);
 
     do {
-        if (my_pid == pe32.th32ProcessID) continue; /* Ignore myself. */
+        if (my_pid == pe32.th32ProcessID) continue; // Ignore myself
 
         if (_stricmp(pe32.szExeFile, my_name) == 0 ||
-            _stricmp(pe32.szExeFile, "jkdefrag.exe") == 0 ||
-            _stricmp(pe32.szExeFile, "jkdefragscreensaver.exe") == 0 ||
-            _stricmp(pe32.szExeFile, "jkdefragcmd.exe") == 0) {
+            _stricmp(pe32.szExeFile, EXECUTABLE_NAME) == 0 ||
+            _stricmp(pe32.szExeFile, SCREENSAVER_NAME) == 0 ||
+            _stricmp(pe32.szExeFile, CMD_EXECUTABLE_NAME) == 0) {
             CloseHandle(snapshot);
 
-            swprintf_s(s1, BUFSIZ, L"I am already running: %S", pe32.szExeFile);
+            auto s1 = std::format(L"I am already running: {}", Str::from_char(pe32.szExeFile));
 
-            gui_->show_debug(DebugLevel::Fatal, nullptr, s1);
-
+            gui_->show_debug(DebugLevel::Fatal, nullptr, std::move(s1));
             return true;
         }
     } while (Process32Next(snapshot, &pe32));
 
-    /* Return false, not yet running. */
+    // Return false, not yet running
     CloseHandle(snapshot);
     return false;
 }

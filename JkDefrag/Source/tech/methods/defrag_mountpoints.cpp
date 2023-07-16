@@ -55,10 +55,9 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
                             std::format(L"Ignoring volume '{}' because it is not a harddisk.", mount_point));
         } else {
             // "Cannot find volume name for mountpoint: %s"
-            wchar_t s1[BUFSIZ];
-            system_error_str(error_code, s1, BUFSIZ);
             gui->show_debug(DebugLevel::Fatal, nullptr,
-                            std::format(L"Cannot find volume name for mountpoint '{}': reason {}", mount_point, s1));
+                            std::format(L"Cannot find volume name for mountpoint '{}': reason {}", mount_point,
+                                        system_error_str(error_code)));
         }
         return;
     }
@@ -94,12 +93,9 @@ void DefragLib::defrag_mountpoints(DefragDataStruct *data, const wchar_t *mount_
             nullptr, OPEN_EXISTING, 0, nullptr);
 
     if (volume_handle == INVALID_HANDLE_VALUE) {
-        wchar_t s1[BUFSIZ];
-        system_error_str(GetLastError(), s1, BUFSIZ);
-
         gui->show_debug(DebugLevel::Warning, nullptr,
                         std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    volume_name, mount_point, s1));
+                                    volume_name, mount_point, system_error_str(GetLastError())));
         return;
     }
 

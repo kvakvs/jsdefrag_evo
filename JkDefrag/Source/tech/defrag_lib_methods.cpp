@@ -23,7 +23,7 @@
 
     gui->show_debug(DebugLevel::Progress, nullptr, L"Moving the MFT to the beginning of the volume.");
 
-    /* Exit if this is not an NTFS disk. */
+    // Exit if this is not an NTFS disk
     if (data->disk_.type_ != DiskType::NTFS) {
         gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                         L"Cannot move the MFT because this is not an NTFS disk.");
@@ -31,7 +31,7 @@
         return;
     }
 
-    /* The Microsoft defragmentation api only supports moving the MFT on Vista. */
+    // The Microsoft defragmentation api only supports moving the MFT on Vista
     ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
 
     os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
@@ -43,7 +43,7 @@
         return;
     }
 
-    /* Locate the Item for the MFT. If not found then exit. */
+    // Locate the Item for the MFT. If not found then exit
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
         if (match_mask(item->get_long_path(), L"?:\\$MFT")) break;
     }
@@ -87,7 +87,7 @@
 
             result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
 
-            if (result == false) return; /* No gaps found, exit. */
+            if (result == false) return; // No gaps found, exit
         }
 
         /* If the gap is not big enough to hold the entire MFT then calculate how much
@@ -122,11 +122,11 @@
         clusters_done = clusters_done + clusters;
     }
 
-    /* Make the MFT unmovable. We don't want it moved again by any other subroutine. */
+    // Make the MFT unmovable. We don't want it moved again by any other subroutine
     item->is_unmovable_ = true;
 
     colorize_disk_item(data, item, 0, 0, false);
     calculate_zones(data);
 
-    /* Note: The MftExcludes do not change by moving the MFT. */
+    // Note: The MftExcludes do not change by moving the MFT
 }

@@ -20,17 +20,17 @@ void DefragLib::forced_fill(DefragDataStruct *data) {
 
     call_show_status(data, 3, -1); /* "Phase 3: ForcedFill" */
 
-    /* Walk through all the gaps. */
+    // Walk through all the gaps
     gap_begin = 0;
     max_lcn = data->total_clusters_;
 
     while (*data->running_ == RunningState::RUNNING) {
-        /* Find the next gap. If there are no more gaps then exit. */
+        // Find the next gap. If there are no more gaps then exit
         result = find_gap(data, gap_begin, 0, 0, true, false, &gap_begin, &gap_end, FALSE);
 
         if (result == false) break;
 
-        /* Find the item with the highest fragment on disk. */
+        // Find the item with the highest fragment on disk
         highest_item = nullptr;
         highest_lcn = 0;
         highest_vcn = 0;
@@ -62,10 +62,10 @@ void DefragLib::forced_fill(DefragDataStruct *data) {
 
         if (highest_item == nullptr) break;
 
-        /* If the highest fragment is before the gap then exit, we're finished. */
+        // If the highest fragment is before the gap then exit, we're finished
         if (highest_lcn <= gap_begin) break;
 
-        /* Move as much of the item into the gap as possible. */
+        // Move as much of the item into the gap as possible
         clusters = gap_end - gap_begin;
 
         if (clusters > highest_size) clusters = highest_size;

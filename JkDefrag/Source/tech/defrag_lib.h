@@ -51,7 +51,7 @@ enum class DiskType {
     FAT32 = 32
 };
 
-/* Information about a disk volume. */
+// Information about a disk volume
 
 struct DiskStruct {
     HANDLE volume_handle_;
@@ -65,7 +65,7 @@ struct DiskStruct {
 
     DiskType type_;
 
-    uint64_t mft_locked_clusters_; /* Number of clusters at begin of MFT that cannot be moved. */
+    uint64_t mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
 };
 
 // List of clusters used by the MFT
@@ -200,7 +200,7 @@ public:
 
     static const wchar_t *stristr_w(const wchar_t *haystack, const wchar_t *needle);
 
-    static void system_error_str(uint32_t error_code, wchar_t *out, size_t width);
+    [[nodiscard]] static std::wstring system_error_str(DWORD error_code);
 
     static void show_hex(struct DefragDataStruct *data, const BYTE *buffer, uint64_t count);
 

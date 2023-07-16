@@ -30,7 +30,7 @@ DefragLog::DefragLog() {
 }
 
 void DefragLog::set_log_filename(const wchar_t *file_name) {
-    /* Determine default path to logfile. */
+    // Determine default path to logfile
     log_file_ = file_name;
     _wunlink(file_name);
 }

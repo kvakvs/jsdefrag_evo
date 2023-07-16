@@ -2,7 +2,7 @@
 
 #include <memory>
 
-constexpr size_t mftbuffersize = 256 * 1024; /* 256 KB seems to be the optimum. */
+constexpr size_t mftbuffersize = 256 * 1024; // 256 KB seems to be the optimum
 
 struct INODE_REFERENCE {
     ULONG inode_number_low_part_;
@@ -298,14 +298,14 @@ struct StreamStruct {
     StreamStruct *next_;
     std::wstring stream_name_;
     ATTRIBUTE_TYPE stream_type_;
-    FragmentListStruct *fragments_; /* The fragments of the stream. */
-    uint64_t clusters_; /* Total number of clusters. */
-    uint64_t bytes_; /* Total number of bytes. */
+    FragmentListStruct *fragments_; // The fragments of the stream
+    uint64_t clusters_; // Total number of clusters
+    uint64_t bytes_; // Total number of bytes
 };
 
 struct InodeDataStruct {
-    uint64_t inode_; /* The Inode number. */
-    uint64_t parent_inode_; /* The Inode number of the parent directory. */
+    uint64_t inode_; // The Inode number
+    uint64_t parent_inode_; // The Inode number of the parent directory
 
     bool is_directory_;
 
@@ -319,14 +319,14 @@ struct InodeDataStruct {
     micro64_t mft_change_time_;
     micro64_t last_access_time_;
 
-    StreamStruct *streams_; /* List of StreamStruct. */
-    FragmentListStruct *mft_data_fragments_; /* The Fragments of the $MFT::$DATA stream. */
+    StreamStruct *streams_; // List of StreamStruct
+    FragmentListStruct *mft_data_fragments_; // The Fragments of the $MFT::$DATA stream
 
-    uint64_t mft_data_bytes_; /* Length of the $MFT::$DATA. */
+    uint64_t mft_data_bytes_; // Length of the $MFT::$DATA
 
-    FragmentListStruct *mft_bitmap_fragments_; /* The Fragments of the $MFT::$BITMAP stream. */
+    FragmentListStruct *mft_bitmap_fragments_; // The Fragments of the $MFT::$BITMAP stream
 
-    uint64_t mft_bitmap_bytes_; /* Length of the $MFT::$BITMAP. */
+    uint64_t mft_bitmap_bytes_; // Length of the $MFT::$BITMAP
 };
 
 struct NtfsDiskInfoStruct {

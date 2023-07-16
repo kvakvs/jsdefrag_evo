@@ -114,7 +114,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
             }
         }
 
-        /* If the file does not fit in the current gap then find another gap. */
+        // If the file does not fit in the current gap then find another gap
         if (item->clusters_count_ > gap_end[file_zone] - gap_begin[file_zone]) {
             result = find_gap(data, data->zones_[file_zone], 0, item->clusters_count_, true, false,
                               &gap_begin[file_zone],
@@ -128,7 +128,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
                                 L"Cannot move file away because no gap is big enough: lcn=" NUM_FMT "[" NUM_FMT " clusters]",
                                 get_item_lcn(item), item->clusters_count_));
 
-                gap_end[file_zone] = gap_begin[file_zone]; /* Force re-scan of gap. */
+                gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
 
                 data->phase_done_ = data->phase_done_ + item->clusters_count_;
 
@@ -142,7 +142,7 @@ void DefragLib::fixup(DefragDataStruct *data) {
         if (result) {
             gap_begin[file_zone] = gap_begin[file_zone] + item->clusters_count_;
         } else {
-            gap_end[file_zone] = gap_begin[file_zone]; /* Force re-scan of gap. */
+            gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
         }
 
         // Get new system time

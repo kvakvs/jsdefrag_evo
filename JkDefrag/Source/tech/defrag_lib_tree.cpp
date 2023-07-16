@@ -1,6 +1,6 @@
 #include "precompiled_header.h"
 
-/* Return pointer to the first item in the tree (the first file on the volume). */
+// Return pointer to the first item in the tree (the first file on the volume)
 ItemStruct *DefragLib::tree_smallest(ItemStruct *top) {
     if (top == nullptr) return nullptr;
 
@@ -9,7 +9,7 @@ ItemStruct *DefragLib::tree_smallest(ItemStruct *top) {
     return top;
 }
 
-/* Return pointer to the last item in the tree (the last file on the volume). */
+// Return pointer to the last item in the tree (the last file on the volume)
 ItemStruct *DefragLib::tree_biggest(ItemStruct *top) {
     if (top == nullptr) return nullptr;
 
@@ -30,7 +30,7 @@ ItemStruct *DefragLib::tree_first(ItemStruct *top, const int direction) {
     return tree_biggest(top);
 }
 
-/* Return pointer to the previous item in the tree. */
+// Return pointer to the previous item in the tree
 ItemStruct *DefragLib::tree_prev(ItemStruct *here) {
     ItemStruct *temp;
 
@@ -52,7 +52,7 @@ ItemStruct *DefragLib::tree_prev(ItemStruct *here) {
     return here;
 }
 
-/* Return pointer to the next item in the tree. */
+// Return pointer to the next item in the tree
 ItemStruct *DefragLib::tree_next(ItemStruct *here) {
     ItemStruct *temp;
 
@@ -86,7 +86,7 @@ ItemStruct *DefragLib::tree_next_prev(ItemStruct *here, const bool reverse) {
     return tree_prev(here);
 }
 
-/* Insert a record into the tree. The tree is sorted by LCN (Logical Cluster Number). */
+// Insert a record into the tree. The tree is sorted by LCN (Logical Cluster Number)
 void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
     ItemStruct *b;
 
@@ -94,7 +94,7 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
 
     const uint64_t new_lcn = get_item_lcn(new_item);
 
-    /* Locate the place where the record should be inserted. */
+    // Locate the place where the record should be inserted
     ItemStruct *here = data->item_tree_;
     ItemStruct *ins = nullptr;
     int found = 1;
@@ -113,7 +113,7 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
         }
     }
 
-    /* Insert the record. */
+    // Insert the record
     new_item->parent_ = ins;
     new_item->smaller_ = nullptr;
     new_item->bigger_ = nullptr;
@@ -128,7 +128,7 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
         }
     }
 
-    /* If there have been less than 1000 inserts then return. */
+    // If there have been less than 1000 inserts then return
     data->balance_count_ = data->balance_count_ + 1;
 
     if (data->balance_count_ < 1000) return;
@@ -141,13 +141,13 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
 
     data->balance_count_ = 0;
 
-    /* Convert the tree into a vine. */
+    // Convert the tree into a vine
     ItemStruct *a = data->item_tree_;
     ItemStruct *c = a;
     long count = 0;
 
     while (a != nullptr) {
-        /* If A has no Bigger child then move down the tree. */
+        // If A has no Bigger child then move down the tree
         if (a->bigger_ == nullptr) {
             count = count + 1;
             c = a;
@@ -156,7 +156,7 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
             continue;
         }
 
-        /* Rotate left at A. */
+        // Rotate left at A
         b = a->bigger_;
 
         if (data->item_tree_ == a) data->item_tree_ = b;
@@ -178,18 +178,18 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
         b->smaller_ = a;
         a->parent_ = b;
 
-        /* Do again. */
+        // Do again
         a = b;
     }
 
-    /* Calculate the number of skips. */
+    // Calculate the number of skips
     long skip = 1;
 
     while (skip < count + 2) skip = skip << 1;
 
     skip = count + 1 - (skip >> 1);
 
-    /* Compress the tree. */
+    // Compress the tree
     while (c != nullptr) {
         if (skip <= 0) c = c->parent_;
 
@@ -201,7 +201,7 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
 
             if (a == nullptr) break;
 
-            /* Rotate right at A. */
+            // Rotate right at A
             if (data->item_tree_ == a) data->item_tree_ = b;
 
             a->smaller_ = b->bigger_;
@@ -221,10 +221,10 @@ void DefragLib::tree_insert(DefragDataStruct *data, ItemStruct *new_item) {
             a->parent_ = b;
             b->bigger_ = a;
 
-            /* Next item. */
+            // Next item
             a = b->parent_;
 
-            /* If there were skips then leave if all done. */
+            // If there were skips then leave if all done
             skip = skip - 1;
             if (skip == 0) break;
         }
@@ -238,7 +238,7 @@ See: http://www.stanford.edu/~blp/avl/libavl.html/Deleting-from-a-BST.html
 
 */
 void DefragLib::tree_detach(DefragDataStruct *data, const ItemStruct *item) {
-    /* Sanity check. */
+    // Sanity check
     if (data->item_tree_ == nullptr || item == nullptr) return;
 
     if (item->bigger_ == nullptr) {
@@ -281,11 +281,11 @@ void DefragLib::tree_detach(DefragDataStruct *data, const ItemStruct *item) {
         value because that would be the node itself. The successor can
         therefore be detached and can be used to replace the node. */
 
-        /* Find the inorder successor. */
+        // Find the inorder successor
         ItemStruct *b = item->bigger_;
         while (b->smaller_ != nullptr) b = b->smaller_;
 
-        /* Detach the successor. */
+        // Detach the successor
         if (b->parent_ != nullptr) {
             if (b->parent_->bigger_ == b) {
                 b->parent_->bigger_ = b->bigger_;
@@ -296,7 +296,7 @@ void DefragLib::tree_detach(DefragDataStruct *data, const ItemStruct *item) {
 
         if (b->bigger_ != nullptr) b->bigger_->parent_ = b->parent_;
 
-        /* Replace the node with the successor. */
+        // Replace the node with the successor
         if (item->parent_ != nullptr) {
             if (item->parent_->smaller_ == item) {
                 item->parent_->smaller_ = b;

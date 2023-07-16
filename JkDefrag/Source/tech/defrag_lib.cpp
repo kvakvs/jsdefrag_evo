@@ -128,15 +128,14 @@ const wchar_t *DefragLib::stristr_w(const wchar_t *haystack, const wchar_t *need
     return nullptr;
 }
 
-// TODO: return std::wstring
-/* Return a string with the error message for GetLastError(). */
-void DefragLib::system_error_str(const uint32_t error_code, wchar_t *out, const size_t width) {
+// Return a string with the error message for GetLastError()
+std::wstring DefragLib::system_error_str(const DWORD error_code) {
     wchar_t buffer[BUFSIZ];
 
     FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
                    nullptr, error_code, 0, buffer, BUFSIZ, nullptr);
 
-    /* Strip trailing whitespace. */
+    // Strip trailing whitespace
     wchar_t *p1 = wcschr(buffer, '\0');
 
     while (p1 != buffer) {
@@ -145,18 +144,18 @@ void DefragLib::system_error_str(const uint32_t error_code, wchar_t *out, const 
         *p1 = '\0';
     }
 
-    // Add error number. 
-    swprintf_s(out, width, L"[%lu] %s", error_code, buffer);
+    // Add error number.
+    return std::format(L"[code {}] {}", error_code, buffer);
 }
 
-/* Translate character to lowercase. */
+// Translate character to lowercase
 wchar_t DefragLib::lower_case(const wchar_t c) {
     if (std::iswupper(c)) return c - 'A' + 'a';
 
     return c;
 }
 
-/* Dump a block of data to standard output, for debugging purposes. */
+// Dump a block of data to standard output, for debugging purposes
 void DefragLib::show_hex([[maybe_unused]] DefragDataStruct *data, const BYTE *buffer,
                          const uint64_t count) {
     DefragGui *gui = DefragGui::get_instance();
@@ -238,7 +237,7 @@ bool DefragLib::match_mask(const wchar_t *string, const wchar_t *mask) {
 }
 
 
-/* Subfunction of GetShortPath(). */
+// Subfunction of GetShortPath()
 void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path) {
     if (item->parent_directory_ != nullptr) append_to_short_path(item->parent_directory_, path);
 
@@ -267,7 +266,7 @@ std::wstring DefragLib::get_short_path(const DefragDataStruct *data, const ItemS
     return path;
 }
 
-/* Subfunction of GetLongPath(). */
+// Subfunction of GetLongPath()
 void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) {
     if (item->parent_directory_ != nullptr) append_to_long_path(item->parent_directory_, path);
 
@@ -296,11 +295,11 @@ std::wstring DefragLib::get_long_path(const DefragDataStruct *data, const ItemSt
     return path;
 }
 
-/* Slow the program down. */
+// Slow the program down
 void DefragLib::slow_down(DefragDataStruct *data) {
     __timeb64 t{};
 
-    /* Sanity check. */
+    // Sanity check
     if (data->speed_ <= 0 || data->speed_ >= 100) return;
 
     /* Calculate the time we have to sleep so that the wall time is 100% and the
@@ -313,9 +312,9 @@ void DefragLib::slow_down(DefragDataStruct *data) {
         data->running_time_ = data->running_time_ + now - data->last_checkpoint_;
     }
 
-    if (now < data->start_time_) data->start_time_ = now; /* Should never happen. */
+    if (now < data->start_time_) data->start_time_ = now; // Should never happen
 
-    /* Sleep. */
+    // Sleep
     if (data->running_time_ > 0) {
         int64_t delay = data->running_time_ * (int64_t) 100 / (int64_t) data->speed_ - (now - data->start_time_);
 
@@ -323,13 +322,13 @@ void DefragLib::slow_down(DefragDataStruct *data) {
         if (delay > 0) Sleep((uint32_t) delay);
     }
 
-    /* Save the current wall time, so next time we can calculate the time spent in	the program. */
+    // Save the current wall time, so next time we can calculate the time spent in	the program
     _ftime64_s(&t);
 
     data->last_checkpoint_ = t.time * 1000 + t.millitm;
 }
 
-/* Return the location on disk (LCN, Logical Cluster Number) of an item. */
+// Return the location on disk (LCN, Logical Cluster Number) of an item
 uint64_t DefragLib::get_item_lcn(const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return 0;
@@ -349,7 +348,6 @@ opened then show an error message and return nullptr.
 */
 HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruct *item) {
     HANDLE file_handle;
-    wchar_t error_string[BUFSIZ];
     const size_t length = wcslen(item->get_long_path()) + 5;
     auto path = std::make_unique<wchar_t[]>(length);
 
@@ -367,12 +365,12 @@ HANDLE DefragLib::open_item_handle(const DefragDataStruct *data, const ItemStruc
 
     if (file_handle != INVALID_HANDLE_VALUE) return file_handle;
 
-    /* Show error message: "Could not open '%s': %s" */
-    system_error_str(GetLastError(), error_string, BUFSIZ);
-
+    // Show error message: "Could not open '%s': %s"
+    auto error_string = system_error_str(GetLastError());
     DefragGui *gui = DefragGui::get_instance();
+
     gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
-                    std::format(L"Could not open '{}': {}", item->get_long_path(), error_string));
+                    std::format(L"Could not open '{}': reason {}", item->get_long_path(), error_string));
 
     return nullptr;
 }
@@ -404,7 +402,7 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Initialize. If the item has an old list of fragments then delete it. */
+    // Initialize. If the item has an old list of fragments then delete it
     item->clusters_count_ = 0;
 
     while (item->fragments_ != nullptr) {
@@ -480,7 +478,7 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
         /* Walk through the clustermap, count the total number of clusters, and
         save all fragments in memory. */
         for (uint32_t i = 0; i < extent_data.extent_count_; i++) {
-            /* Show debug message. */
+            // Show debug message
             if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
                 /* "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u" */
                 gui->show_debug(
@@ -501,7 +499,7 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
                 item->clusters_count_ = item->clusters_count_ + extent_data.extents_[i].next_vcn_ - vcn;
             }
 
-            /* Add the fragment to the Fragments. */
+            // Add the fragment to the Fragments
 
             auto new_fragment = new FragmentListStruct();
             new_fragment->lcn_ = extent_data.extents_[i].lcn_;
@@ -516,22 +514,20 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
 
             last_fragment = new_fragment;
 
-            /* The Vcn of the next fragment is the NextVcn field in this record. */
+            // The Vcn of the next fragment is the NextVcn field in this record
             vcn = extent_data.extents_[i].next_vcn_;
         }
 
-        /* Loop until we have processed the entire clustermap of the file. */
+        // Loop until we have processed the entire clustermap of the file
     } while (error_code == ERROR_MORE_DATA);
 
-    /* If there was an error while reading the clustermap then return false. */
+    // If there was an error while reading the clustermap then return false
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
-        wchar_t error_string[BUFSIZ];
         // Show debug message: "Cannot process clustermap of '%s': %s"
-        system_error_str(error_code, error_string, BUFSIZ);
-
         gui->show_debug(
                 DebugLevel::DetailedProgress, nullptr,
-                std::format(L"Cannot process clustermap of '{}': {}", item->get_long_path(), error_string));
+                std::format(L"Cannot process clustermap of '{}': {}", item->get_long_path(),
+                            system_error_str(error_code)));
 
         return false;
     }
@@ -539,7 +535,7 @@ bool DefragLib::get_fragments(const DefragDataStruct *data, ItemStruct *item, HA
     return true;
 }
 
-/* Return the number of fragments in the item. */
+// Return the number of fragments in the item
 int DefragLib::get_fragment_count(const ItemStruct *item) {
     int fragments = 0;
     uint64_t vcn = 0;
@@ -579,7 +575,7 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
     const FragmentListStruct *fragment = item->fragments_;
 
     while (fragment != nullptr) {
-        /* Virtual fragments do not occupy space on disk and do not count as fragments. */
+        // Virtual fragments do not occupy space on disk and do not count as fragments
         if (fragment->lcn_ != VIRTUALFRAGMENT) {
             /* Treat aligned fragments as a single fragment. Windows will frequently
             split files in fragments even though they are perfectly aligned on disk,
@@ -606,12 +602,12 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
             next_lcn = fragment->lcn_ + fragment->next_vcn_ - vcn;
         }
 
-        /* Next fragment. */
+        // Next fragment
         vcn = fragment->next_vcn_;
         fragment = fragment->next_;
     }
 
-    /* Handle the last fragment. */
+    // Handle the last fragment
     if (fragment_begin >= offset + size) return false;
 
     if (fragment_begin > offset ||
@@ -620,7 +616,7 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
         return true;
     }
 
-    /* Return false, the item is not fragmented inside the block. */
+    // Return false, the item is not fragmented inside the block
     return false;
 }
 
@@ -871,7 +867,7 @@ void ShowDiskmap2(struct DefragDataStruct *Data) {
 */
 
 
-/* Update some numbers in the DefragData. */
+// Update some numbers in the DefragData
 void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const int zone) {
     ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
@@ -887,7 +883,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Count the number of free gaps on the disk. */
+    // Count the number of free gaps on the disk
     data->count_gaps_ = 0;
     data->count_free_clusters_ = 0;
     data->biggest_gap_ = 0;
@@ -899,7 +895,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     int prev_in_use = 1;
 
     do {
-        /* Fetch a block of cluster data. */
+        // Fetch a block of cluster data
         bitmap_param.StartingLcn.QuadPart = lcn;
         error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                      &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
@@ -966,7 +962,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
         }
     }
 
-    /* Walk through all files and update the counters. */
+    // Walk through all files and update the counters
     data->count_directories_ = 0;
     data->count_all_files_ = 0;
     data->count_fragmented_items_ = 0;
@@ -1071,7 +1067,7 @@ void DefragLib::call_show_status(DefragDataStruct *data, const int phase, const 
     gui->show_status(data);
 }
 
-/* Run the defragger/optimizer. See the .h file for a full explanation. */
+// Run the defragger/optimizer. See the .h file for a full explanation
 void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
                               const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
     DefragDataStruct data{};
@@ -1080,7 +1076,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
     DWORD length;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Copy the input values to the data struct. */
+    // Copy the input values to the data struct
     data.speed_ = speed;
     data.free_space_ = free_space;
     data.excludes_ = excludes;
@@ -1218,12 +1214,9 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
             drives_size = GetLogicalDriveStringsW(drives_size, drives);
 
             if (drives_size == 0) {
-                wchar_t s1[BUFSIZ];
-                /* "Could not get list of volumes: %s" */
-                system_error_str(GetLastError(), s1, BUFSIZ);
-
+                // "Could not get list of volumes: %s"
                 gui->show_debug(DebugLevel::Warning, nullptr,
-                                std::format(L"Could not get list of volumes: {}", s1));
+                                std::format(L"Could not get list of volumes: {}", system_error_str(GetLastError())));
             } else {
                 wchar_t *drive;
                 drive = drives;

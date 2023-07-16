@@ -102,7 +102,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruc
     uint32_t index = increment - 1;
 
     for (USHORT i = 1; i < record_header->usa_count_; i++) {
-        /* Check if we are inside the buffer. */
+        // Check if we are inside the buffer
         if (index * sizeof(WORD) >= buf_length) {
             gui->show_debug(DebugLevel::Progress, nullptr,
                             L"Warning: USA data indicates that data is missing, the MFT may be corrupt.");
@@ -118,7 +118,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruc
             return false;
         }
 
-        /* Replace the last 2 bytes in the sector with the value from the Usa array. */
+        // Replace the last 2 bytes in the sector with the value from the Usa array
         buffer_w[index] = update_sequence_array[i];
         index = index + increment;
     }
@@ -134,7 +134,6 @@ bool ScanNTFS::fixup_raw_mftdata(DefragDataStruct *data, const NtfsDiskInfoStruc
 BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsDiskInfoStruct *disk_info,
                                        const BYTE *run_data, const uint32_t run_data_length,
                                        const uint64_t offset, uint64_t wanted_length) {
-    BYTE *buffer;
     union UlongBytes {
         struct {
             BYTE bytes_[8];
@@ -170,11 +169,9 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
     }
 
     // Allocate the data buffer. Clear the buffer with zero's in case of sparse content
-    buffer = new BYTE[wanted_length];
+    auto buffer = std::make_unique<BYTE[]>(wanted_length);
 
-    memset(buffer, 0, (size_t) wanted_length);
-
-    /* Walk through the RunData and read the requested data from disk. */
+    // Walk through the RunData and read the requested data from disk
     uint32_t index = 0;
     int64_t lcn = 0;
     int64_t vcn = 0;
@@ -229,10 +226,10 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
         lcn = lcn + run_offset.value;
         vcn = vcn + run_length.value;
 
-        /* Ignore virtual extents. */
+        // Ignore virtual extents
         if (run_offset.value == 0) continue;
 
-        /* I don't think the RunLength can ever be zero, but just in case. */
+        // I don't think the RunLength can ever be zero, but just in case
         if (run_length.value == 0) continue;
 
         /* Determine how many and which bytes we want to read. If we don't need
@@ -258,7 +255,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
 
         if (extent_length == 0) continue;
 
-        /* Read the data from the disk. If error then return FALSE. */
+        // Read the data from the disk. If error then return FALSE
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(L"    Reading " NUM_FMT " bytes from LCN=" NUM_FMT " into offset=" NUM_FMT,
                                     extent_length,
@@ -273,20 +270,16 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragDataStruct *data, const NtfsD
 
         if (const errno_t result = ReadFile(data->disk_.volume_handle_, &buffer[extent_vcn - offset],
                                             (uint32_t) extent_length, &bytes_read, &g_overlapped); result == 0) {
-            wchar_t s1[BUFSIZ];
-            DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
-
-            gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"Error while reading disk: {}", s1));
-
-            delete buffer;
+            gui->show_debug(DebugLevel::Progress, nullptr,
+                            std::format(L"Error while reading disk: {}", DefragLib::system_error_str(GetLastError())));
             return nullptr;
         }
     }
 
-    return buffer;
+    return buffer.release();
 }
 
-/* Read the RunData list and translate into a list of fragments. */
+// Read the RunData list and translate into a list of fragments
 bool ScanNTFS::translate_rundata_to_fragmentlist(
         const DefragDataStruct *data, InodeDataStruct *inode_data, const wchar_t *stream_name,
         ATTRIBUTE_TYPE stream_type, const BYTE *run_data, const uint32_t run_data_length, const uint64_t starting_vcn,
@@ -353,7 +346,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
         if (stream->bytes_ == 0) stream->bytes_ = bytes;
     }
 
-    /* If the stream already has a list of fragments then find the last fragment. */
+    // If the stream already has a list of fragments then find the last fragment
     auto last_fragment = stream->fragments_;
 
     if (last_fragment != nullptr) {
@@ -377,7 +370,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
 
     if (run_data != nullptr)
         while (run_data[index] != 0) {
-            /* Decode the RunData and calculate the next Lcn. */
+            // Decode the RunData and calculate the next Lcn
             const int run_length_size = run_data[index] & 0x0F;
             const int run_offset_size = (run_data[index] & 0xF0) >> 4;
 
@@ -429,7 +422,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
             lcn = lcn + run_offset.value;
             vcn = vcn + run_length.value;
 
-            /* Show debug message. */
+            // Show debug message
             if (run_offset.value != 0) {
                 gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                                 std::format(L"    Extent: Lcn=" NUM_FMT ", Vcn=" NUM_FMT ", NextVcn=" NUM_FMT, lcn,
@@ -449,7 +442,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
                 stream->clusters_ = stream->clusters_ + run_length.value;
             }
 
-            /* Add the extent to the Fragments. */
+            // Add the extent to the Fragments
             const auto new_fragment = new FragmentListStruct();
 
             new_fragment->lcn_ = lcn;
@@ -501,7 +494,7 @@ void ScanNTFS::cleanup_streams(InodeDataStruct *inode_data, const bool cleanup_f
     inode_data->streams_ = nullptr;
 }
 
-/* Construct the full stream name from the filename, the stream name, and the stream type. */
+// Construct the full stream name from the filename, the stream name, and the stream type
 std::wstring
 ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, const StreamStruct *stream) {
     auto file_name = file_name_1;
@@ -578,7 +571,7 @@ ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_
     return p1;
 }
 
-/* Forward declaration for recursion. */
+// Forward declaration for recursion
 /*
 	BOOL process_attributes(
 	struct DefragDataStruct *Data,
@@ -602,7 +595,7 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
     DWORD bytes_read;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Sanity checks. */
+    // Sanity checks
     if (buffer == nullptr || buf_length == 0) return;
 
     if (depth > 1000) {
@@ -636,7 +629,7 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
 
         if (ref_inode == inode_data->inode_) continue;
 
-        /* Show debug message. */
+        // Show debug message
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(L"    List attribute: {}", stream_type_names(attribute->attribute_type_)));
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
@@ -659,7 +652,7 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
                             std::format(L"      AttributeList name = '{}'", p1.get()));
         }
 
-        /* Find the fragment in the MFT that contains the referenced Inode. */
+        // Find the fragment in the MFT that contains the referenced Inode
         uint64_t vcn = 0;
         uint64_t real_vcn = 0;
         const uint64_t ref_inode_vcn = ref_inode * disk_info->bytes_per_mft_record_ /
@@ -687,7 +680,7 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
             continue;
         }
 
-        /* Fetch the record of the referenced Inode from disk. */
+        // Fetch the record of the referenced Inode from disk
         buffer_2 = std::make_unique<BYTE[]>((size_t) disk_info->bytes_per_mft_record_);
 
         trans.QuadPart = (fragment->lcn_ - real_vcn) * disk_info->bytes_per_sector_ *
@@ -702,10 +695,9 @@ ScanNTFS::process_attribute_list(DefragDataStruct *data, NtfsDiskInfoStruct *dis
                               &g_overlapped);
 
         if (result == 0 || bytes_read != disk_info->bytes_per_mft_record_) {
-            wchar_t s1[BUFSIZ];
-            DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
             gui->show_debug(DebugLevel::Progress, nullptr,
-                            std::format(L"      Error while reading Inode " NUM_FMT ": reason {}", ref_inode, s1));
+                            std::format(L"      Error while reading Inode " NUM_FMT ": reason {}", ref_inode,
+                                        DefragLib::system_error_str(GetLastError())));
             return;
         }
 
@@ -773,10 +765,10 @@ bool ScanNTFS::process_attributes(DefragDataStruct *data, NtfsDiskInfoStruct *di
             length_) {
         attribute = (ATTRIBUTE *) &buffer[attribute_offset];
 
-        /* Exit the loop if end-marker. */
+        // Exit the loop if end-marker
         if (attribute_offset + 4 <= buf_length && *(ULONG *) attribute == 0xFFFFFFFF) break;
 
-        /* Sanity check. */
+        // Sanity check
         if (attribute_offset + 4 > buf_length ||
             attribute->length_ < 3 ||
             attribute_offset + attribute->length_ > buf_length) {
@@ -865,14 +857,14 @@ bool ScanNTFS::process_attributes(DefragDataStruct *data, NtfsDiskInfoStruct *di
                 inode_data->last_access_time_ = std::chrono::microseconds(standard_information->last_access_time_);
             }
 
-            /* The value of the AttributeData (0x80) is the actual data of the file. */
+            // The value of the AttributeData (0x80) is the actual data of the file
             if (attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData) {
                 inode_data->bytes_ = resident_attribute->value_length_;
             }
         } else {
             nonresident_attribute = (NONRESIDENT_ATTRIBUTE *) attribute;
 
-            /* Save the length (number of bytes) of the data. */
+            // Save the length (number of bytes) of the data
             if (attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData && inode_data->bytes_ == 0) {
                 inode_data->bytes_ = nonresident_attribute->data_size_;
             }
@@ -900,7 +892,7 @@ bool ScanNTFS::process_attributes(DefragDataStruct *data, NtfsDiskInfoStruct *di
             // Cleanup the streamname
             p2.reset();
 
-            /* Special case: If this is the $MFT then save data. */
+            // Special case: If this is the $MFT then save data
             if (inode_data->inode_ == 0) {
                 if (attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData
                     && inode_data->mft_data_fragments_ == nullptr) {
@@ -965,7 +957,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
     InodeDataStruct inode_data{};
     DefragGui *gui = DefragGui::get_instance();
 
-    /* If the record is not in use then quietly exit. */
+    // If the record is not in use then quietly exit
     const FILE_RECORD_HEADER *file_record_header = (FILE_RECORD_HEADER *) buffer;
 
     if ((file_record_header->flags_ & 1) != 1) {
@@ -992,7 +984,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                     std::format(L"Processing Inode " NUM_FMT "…", inode_number));
 
-    /* Show a warning if the Flags have an unknown value. */
+    // Show a warning if the Flags have an unknown value
     if ((file_record_header->flags_ & 252) != 0) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(L"  Inode " NUM_FMT " has Flags = {}", inode_number, file_record_header->flags_));
@@ -1028,26 +1020,26 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
         return false;
     }
 
-    /* Initialize the InodeData struct. */
-    inode_data.inode_ = inode_number; /* The Inode number. */
-    inode_data.parent_inode_ = 5; /* The Inode number of the parent directory. */
+    // Initialize the InodeData struct
+    inode_data.inode_ = inode_number; // The Inode number
+    inode_data.parent_inode_ = 5; // The Inode number of the parent directory
     inode_data.is_directory_ = false;
 
     if ((file_record_header->flags_ & 2) == 2) inode_data.is_directory_ = true;
 
-    inode_data.long_filename_ = nullptr; /* Long filename. */
-    inode_data.short_filename_ = nullptr; /* Short filename (8.3 DOS). */
+    inode_data.long_filename_ = nullptr; // Long filename
+    inode_data.short_filename_ = nullptr; // Short filename (8.3 DOS)
     inode_data.creation_time_ = {};
     inode_data.mft_change_time_ = {};
     inode_data.last_access_time_ = {};
-    inode_data.bytes_ = 0; /* Size of the $DATA stream. */
-    inode_data.streams_ = nullptr; /* List of StreamStruct. */
+    inode_data.bytes_ = 0; // Size of the $DATA stream
+    inode_data.streams_ = nullptr; // List of StreamStruct
     inode_data.mft_data_fragments_ = *mft_data_fragments;
     inode_data.mft_data_bytes_ = *mft_data_bytes;
     inode_data.mft_bitmap_fragments_ = nullptr;
     inode_data.mft_bitmap_bytes_ = 0;
 
-    /* Make sure that directories are always created. */
+    // Make sure that directories are always created
     if (inode_data.is_directory_) {
         translate_rundata_to_fragmentlist(data, &inode_data, L"$I30", ATTRIBUTE_TYPE::AttributeIndexAllocation, nullptr,
                                           0,
@@ -1059,7 +1051,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
                                                      &buffer[file_record_header->attribute_offset_],
                                                      buf_length - file_record_header->attribute_offset_, 65535, 0);
 
-    /* Save the mft_data_fragments, mft_data_bytes, mft_bitmap_fragments, and MftBitmapBytes. */
+    // Save the mft_data_fragments, mft_data_bytes, mft_bitmap_fragments, and MftBitmapBytes
     if (inode_number == 0) {
         *mft_data_fragments = inode_data.mft_data_fragments_;
         *mft_data_bytes = inode_data.mft_data_bytes_;
@@ -1067,10 +1059,10 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
         *mft_bitmap_bytes = inode_data.mft_bitmap_bytes_;
     }
 
-    /* Create an item in the data->ItemTree for every stream. */
+    // Create an item in the data->ItemTree for every stream
     StreamStruct *stream = inode_data.streams_;
     do {
-        /* Create and fill a new item record in memory. */
+        // Create and fill a new item record in memory
         auto item = new ItemStruct();
 
         auto long_fn_constructed = construct_stream_name(inode_data.long_filename_.get(),
@@ -1101,7 +1093,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
         item->is_excluded_ = false;
         item->is_hog_ = false;
 
-        /* Increment counters. */
+        // Increment counters
         if (item->is_dir_ == true) {
             data->count_directories_ = data->count_directories_ + 1;
         }
@@ -1123,7 +1115,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
                         clusters_;
         }
 
-        /* Add the item record to the sorted item tree in memory. */
+        // Add the item record to the sorted item tree in memory
         DefragLib::tree_insert(data, item);
 
         /* Also add the item to the array that is used to construct the full pathnames.
@@ -1156,7 +1148,7 @@ bool ScanNTFS::interpret_mft_record(DefragDataStruct *data, NtfsDiskInfoStruct *
     return true;
 }
 
-/* Load the MFT into a list of ItemStruct records in memory. */
+// Load the MFT into a list of ItemStruct records in memory
 bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     NtfsDiskInfoStruct disk_info{};
     std::unique_ptr<BYTE[]> buffer;
@@ -1198,22 +1190,24 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
     result = ReadFile(data->disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
 
     if (result == 0 || bytes_read != 512) {
-        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
-        gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"Error while reading bootblock: {}", s1));
+        gui->show_debug(DebugLevel::Progress, nullptr,
+                        std::format(L"Error while reading bootblock: {}", DefragLib::system_error_str(GetLastError())));
         return false;
     }
 
-    /* Test if the boot block is an NTFS boot block. */
-    if (*(ULONGLONG *) &buffer.get()[3] != 0x202020205346544E) {
+    // Test if the boot block is an NTFS boot block
+    constexpr long long int NTFS_BOOT_BLOCK_PASTRY = 0x202020205346544E;
+
+    if (*(ULONGLONG *) &buffer.get()[3] != NTFS_BOOT_BLOCK_PASTRY) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"This is not an NTFS disk (different cookie).");
         return false;
     }
 
-    /* Extract data from the bootblock. */
+    // Extract data from the bootblock
     data->disk_.type_ = DiskType::NTFS;
     disk_info.bytes_per_sector_ = *(USHORT *) &buffer[11];
 
-    /* Still to do: check for impossible values. */
+    // Still to do: check for impossible values
     disk_info.sectors_per_cluster_ = buffer[13];
     disk_info.total_sectors_ = *(ULONGLONG *) &buffer[40];
     disk_info.mft_start_lcn_ = *(ULONGLONG *) &buffer[48];
@@ -1271,26 +1265,25 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
                       &g_overlapped);
 
     if (result == 0 || bytes_read != disk_info.bytes_per_mft_record_) {
-        DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
-        gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"Error while reading first MFT record: {}", s1));
+        gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"Error while reading first MFT record: {}",
+                                                                   DefragLib::system_error_str(GetLastError())));
         return false;
     }
 
-    /* Fixup the raw data from disk. This will also test if it's a valid $MFT record. */
+    // Fixup the raw data from disk. This will also test if it's a valid $MFT record
     if (fixup_raw_mftdata(data, &disk_info, buffer.get(), disk_info.bytes_per_mft_record_) == FALSE) {
         return false;
     }
 
-    /* Extract data from the MFT record and put into an Item struct in memory. If
-    there was an error then exit. */
+    // Extract data from the MFT record and put into an Item struct in memory. If there was an error then exit
     mft_data_bytes = 0;
     mft_data_fragments = nullptr;
     mft_bitmap_bytes = 0;
     mft_bitmap_fragments = nullptr;
 
-    result = interpret_mft_record(data, &disk_info, nullptr, 0, 0, &mft_data_fragments, &mft_data_bytes,
-                                  &mft_bitmap_fragments, &mft_bitmap_bytes, buffer.get(),
-                                  disk_info.bytes_per_mft_record_);
+    result = interpret_mft_record(data, &disk_info, nullptr, 0, 0,
+                                  &mft_data_fragments, &mft_data_bytes, &mft_bitmap_fragments, &mft_bitmap_bytes,
+                                  buffer.get(), disk_info.bytes_per_mft_record_);
 
     if (!result ||
         mft_data_fragments == nullptr || mft_data_bytes == 0 ||
@@ -1359,8 +1352,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
 
             if (result == 0 || bytes_read != (fragment->next_vcn_ - vcn) * disk_info.bytes_per_sector_ * disk_info.
                     sectors_per_cluster_) {
-                DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
-                gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"  {}", s1));
+                gui->show_debug(DebugLevel::Progress, nullptr,
+                                std::format(L"  {}", DefragLib::system_error_str(GetLastError())));
                 DefragLib::delete_item_tree(data->item_tree_);
                 data->item_tree_ = nullptr;
                 return false;
@@ -1415,12 +1408,12 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
             continue;
         }
 
-        /* Update the progress counter. */
+        // Update the progress counter
         data->phase_done_ = data->phase_done_ + 1;
 
-        /* Read a block of inode's into memory. */
+        // Read a block of inode's into memory
         if (inode_number >= block_end) {
-            /* Slow the program down to the percentage that was specified on the command line. */
+            // Slow the program down to the percentage that was specified on the command line
             DefragLib::slow_down(data);
 
             block_start = inode_number;
@@ -1429,7 +1422,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
             if (block_end > mft_bitmap_bytes * 8) block_end = mft_bitmap_bytes * 8;
 
             while (fragment != nullptr) {
-                /* Calculate Inode at the end of the fragment. */
+                // Calculate Inode at the end of the fragment
                 u1 = (real_vcn + fragment->next_vcn_ - vcn) * disk_info.bytes_per_sector_ *
                      disk_info.sectors_per_cluster_ / disk_info.bytes_per_mft_record_;
 
@@ -1472,11 +1465,9 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
                               &g_overlapped);
 
             if (result == 0 || bytes_read != (block_end - block_start) * disk_info.bytes_per_mft_record_) {
-                DefragLib::system_error_str(GetLastError(), s1, BUFSIZ);
-
                 gui->show_debug(DebugLevel::Progress, nullptr,
-                                std::format(L"Error while reading Inodes " NUM_FMT " to " NUM_FMT ": {}",
-                                            inode_number, block_end - 1, s1));
+                                std::format(L"Error while reading Inodes " NUM_FMT " to " NUM_FMT ": reason {}",
+                                            inode_number, block_end - 1, DefragLib::system_error_str(GetLastError())));
 
                 DefragLib::delete_item_tree(data->item_tree_);
                 data->item_tree_ = nullptr;
@@ -1484,7 +1475,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
             }
         }
 
-        /* Fixup the raw data of this Inode. */
+        // Fixup the raw data of this Inode
         if (fixup_raw_mftdata(data, &disk_info, &buffer[(inode_number - block_start) * disk_info.bytes_per_mft_record_],
                               disk_info.bytes_per_mft_record_) == FALSE) {
             gui->show_debug(DebugLevel::Progress, nullptr,
@@ -1494,7 +1485,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragDataStruct *data) {
             continue;
         }
 
-        /* Interpret the Inode's attributes. */
+        // Interpret the Inode's attributes
         result = interpret_mft_record(data, &disk_info, inode_array.get(), inode_number, max_inode,
                                       &mft_data_fragments, &mft_data_bytes, &mft_bitmap_fragments, &mft_bitmap_bytes,
                                       &buffer[(inode_number - block_start) * disk_info.bytes_per_mft_record_],

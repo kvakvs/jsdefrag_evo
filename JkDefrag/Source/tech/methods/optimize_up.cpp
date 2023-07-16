@@ -11,20 +11,20 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
 
     call_show_status(data, 6, -1); /* "Phase 3: Move Up" */
 
-    /* Setup the progress counter: the total number of clusters in all files. */
+    // Setup the progress counter: the total number of clusters in all files
     for (item = tree_smallest(data->item_tree_); item != nullptr; item = tree_next(item)) {
         data->phase_todo_ = data->phase_todo_ + item->clusters_count_;
     }
 
-    /* Exit if nothing to do. */
+    // Exit if nothing to do
     if (data->item_tree_ == nullptr) return;
 
-    /* Walk through all the gaps. */
+    // Walk through all the gaps
     gap_end = data->total_clusters_;
     int retry = 0;
 
     while (*data->running_ == RunningState::RUNNING) {
-        /* Find the previous gap. */
+        // Find the previous gap
         bool result = find_gap(data, data->zones_[1], gap_end, 0, true, true, &gap_begin, &gap_end, FALSE);
 
         if (!result) break;
@@ -74,12 +74,12 @@ void DefragLib::optimize_up(DefragDataStruct *data) {
                 gap_end = gap_end - item->clusters_count_;
                 retry = 0;
             } else {
-                gap_begin = gap_end; /* Force re-scan of gap. */
+                gap_begin = gap_end; // Force re-scan of gap
                 retry = retry + 1;
             }
         }
 
-        /* If the gap could not be filled then skip. */
+        // If the gap could not be filled then skip
         if (gap_begin < gap_end) {
             /* Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]" */
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,

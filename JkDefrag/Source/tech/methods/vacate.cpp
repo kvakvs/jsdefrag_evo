@@ -24,7 +24,7 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                     std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT, clusters, lcn));
 
-    /* Sanity check. */
+    // Sanity check
     if (lcn >= data->total_clusters_) {
         gui->show_debug(DebugLevel::Warning, nullptr, L"Error: trying to vacate an area beyond the end of the disk.");
 
@@ -40,7 +40,7 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
     if (data->zone_ == 1) move_to = data->zones_[2];
 
     if (data->zone_ == 2) {
-        /* Zone 2: end of disk minus all the free space. */
+        // Zone 2: end of disk minus all the free space
         move_to = data->total_clusters_ - data->count_free_clusters_ +
                   (uint64_t) (data->total_clusters_ * 2.0 * data->free_space_ / 100.0);
     }
@@ -49,7 +49,7 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(L"move_to = " NUM_FMT, move_to));
 
-    /* Loop forever. */
+    // Loop forever
     move_gap_begin = 0;
     move_gap_end = 0;
     done_until = lcn;
@@ -130,7 +130,7 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
             return;
         }
 
-        /* Exit if we have moved the item before. We don't want a worm. */
+        // Exit if we have moved the item before. We don't want a worm
         if (lcn >= move_to) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Stopping vacate because of possible worm.");
             return;
@@ -141,7 +141,7 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
         if (bigger_end - bigger_begin >= move_gap_end - move_gap_begin) {
             result = false;
 
-            /* First try to find a gap above the move_to point. */
+            // First try to find a gap above the move_to point
             if (move_to < data->total_clusters_ && move_to >= bigger_end) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                                 std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
@@ -177,10 +177,10 @@ void DefragLib::vacate(DefragDataStruct *data, uint64_t lcn, uint64_t clusters, 
 
             move_gap_begin = move_gap_begin + bigger_end - bigger_begin;
         } else {
-            move_gap_end = move_gap_begin; /* Force re-scan of gap. */
+            move_gap_end = move_gap_begin; // Force re-scan of gap
         }
 
-        /* Adjust the done_until lcn. We don't want an infinite loop. */
+        // Adjust the done_until lcn. We don't want an infinite loop
         done_until = bigger_end;
     }
 }

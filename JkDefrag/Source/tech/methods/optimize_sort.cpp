@@ -14,10 +14,10 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
 
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Sanity check. */
+    // Sanity check
     if (data->item_tree_ == nullptr) return;
 
-    /* Process all the zones. */
+    // Process all the zones
     [[maybe_unused]] uint64_t vacated_until = 0;
     const uint64_t minimum_vacate = data->total_clusters_ / 200;
 
@@ -34,7 +34,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
         gap_end = 0;
 
         while (*data->running_ == RunningState::RUNNING) {
-            /* Find the next item that we want to place. */
+            // Find the next item that we want to place
             ItemStruct *item = nullptr;
             uint64_t phase_temp = 0;
 
@@ -72,7 +72,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
             previous_item = item;
             data->phase_todo_ = data->phase_done_ + phase_temp;
 
-            /* If the item is already at the Lcn then skip. */
+            // If the item is already at the Lcn then skip
             if (get_item_lcn(item) == lcn) {
                 lcn = lcn + item->clusters_count_;
 
@@ -100,7 +100,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
 
                     result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, FALSE);
 
-                    if (result == false) return; /* No gaps found, exit. */
+                    if (result == false) return; // No gaps found, exit
                 }
 
                 /* If the gap is not big enough to hold the entire item then calculate how much
@@ -120,7 +120,7 @@ void DefragLib::optimize_sort(DefragDataStruct *data, const int sort_field) {
                     }
                 }
 
-                /* Move the item to the gap. */
+                // Move the item to the gap
                 result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
 
                 if (result) {

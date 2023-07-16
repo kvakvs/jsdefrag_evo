@@ -5,10 +5,10 @@
 
 #include <optional>
 
-/* List in memory of the fragments of a file. */
+// List in memory of the fragments of a file
 struct FragmentListStruct {
-    uint64_t lcn_; /* Logical cluster number, location on disk. */
-    uint64_t next_vcn_; /* Virtual cluster number of next fragment. */
+    uint64_t lcn_; // Logical cluster number, location on disk
+    uint64_t next_vcn_; // Virtual cluster number of next fragment
     FragmentListStruct *next_;
 };
 

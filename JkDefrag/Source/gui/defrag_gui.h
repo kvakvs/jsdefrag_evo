@@ -67,10 +67,10 @@ private:
 
     DebugLevel debug_level_;
 
-    uint64_t progress_start_time_;       /* The time at percentage zero. */
-    uint64_t progress_time_;            /* When ProgressDone/ProgressTodo were last updated. */
-    uint64_t progress_todo_{};            /* Number of clusters to do. */
-    uint64_t progress_done_;            /* Number of clusters already done. */
+    uint64_t progress_start_time_;       // The time at percentage zero
+    uint64_t progress_time_;            // When ProgressDone/ProgressTodo were last updated
+    uint64_t progress_todo_{};            // Number of clusters to do
+    uint64_t progress_done_;            // Number of clusters already done
 
     std::unique_ptr<DefragStruct> defrag_struct_;
 
@@ -100,7 +100,7 @@ private:
     // Number of disk clusters
     uint64_t num_clusters_;
 
-    /* 0:no, 1:request, 2: busy. */
+    // 0:no, 1:request, 2: busy
     //	int RedrawScreen;
 
     // Current window size
