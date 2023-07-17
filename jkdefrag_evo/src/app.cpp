@@ -17,12 +17,12 @@
  */
 
 #include "precompiled_header.h"
-#include "defrag.h"
+#include "app.h"
 
 #include <ctime>
 #include <memory>
 
-Defrag::Defrag()
+DefragApp::DefragApp()
         : running_state_(RunningState::STOPPED),
           i_am_running_(RunningState::STOPPED),
           debug_level_(DebugLevel::Warning) {
@@ -32,24 +32,24 @@ Defrag::Defrag()
     defrag_struct_ = std::make_unique<DefragStruct>();
 }
 
-Defrag::~Defrag() = default;
+DefragApp::~DefragApp() = default;
 
-Defrag *Defrag::get_instance() {
+DefragApp *DefragApp::get_instance() {
     if (instance_ == nullptr) {
-        instance_ = std::make_unique<Defrag>();
+        instance_ = std::make_unique<DefragApp>();
     }
 
     return instance_.get();
 }
 
-void Defrag::release_instance() {
+void DefragApp::release_instance() {
     instance_.reset();
 }
 
-WPARAM Defrag::start_program(HINSTANCE instance,
-                             [[maybe_unused]] HINSTANCE prev_instance,
-                             [[maybe_unused]] LPSTR cmd_line,
-                             const int cmd_show) {
+WPARAM DefragApp::start_program(HINSTANCE instance,
+                                [[maybe_unused]] HINSTANCE prev_instance,
+                                [[maybe_unused]] LPSTR cmd_line,
+                                const int cmd_show) {
     i_am_running_ = RunningState::RUNNING;
 
     // Test if another instance is already running
@@ -57,13 +57,13 @@ WPARAM Defrag::start_program(HINSTANCE instance,
 
 #ifdef _DEBUG
     // Setup crash report handler
-    SetUnhandledExceptionFilter(&Defrag::crash_report);
+    SetUnhandledExceptionFilter(&DefragApp::crash_report);
 #endif
 
     gui_->initialize(instance, cmd_show, log_.get(), debug_level_);
 
     // Start up the defragmentation and timer threads
-    std::thread defrag_thread_object(&Defrag::defrag_thread);
+    std::thread defrag_thread_object(&DefragApp::defrag_thread);
 
     const WPARAM w_param = gui_->do_modal();
 
@@ -81,17 +81,9 @@ WPARAM Defrag::start_program(HINSTANCE instance,
 
 #ifdef _DEBUG
 
-/*
-
-Write a crash report to the log.
-To test the crash handler add something like this:
-char *p1;
-p1 = 0;
-*p1 = 0;
-
-*/
-
-LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
+// Write a crash report to the log.
+// To test the crash handler add something like this: char *p1; p1 = 0; *p1 = 0;
+LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
     IMAGEHLP_LINE64 source_line;
     DWORD line_displacement;
     STACKFRAME64 stack_frame;
@@ -277,8 +269,8 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
 
 // The main thread that performs all the work. Interpret the commandline
 // parameters and call the defragger library.
-//DWORD WINAPI Defrag::defrag_thread(LPVOID) {
-void Defrag::defrag_thread() {
+// DWORD WINAPI Defrag::defrag_thread(LPVOID) {
+void DefragApp::defrag_thread() {
     OptimizeMode optimize_mode = {}; // 1...11
     LPWSTR *argv;
     int argc;
@@ -665,7 +657,7 @@ running or if there was an error getting the processlist then return
 true.
 
 */
-bool Defrag::is_already_running(void) const {
+bool DefragApp::is_already_running(void) const {
     // Get a process-snapshot from the kernel
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 

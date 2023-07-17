@@ -4,14 +4,14 @@
 
 #include "constants.h"
 
-class Defrag {
+class DefragApp {
 public:
-    Defrag();
+    DefragApp();
 
-    ~Defrag();
+    ~DefragApp();
 
     // Return non-owning pointer to instance of the class
-    static Defrag *get_instance();
+    static DefragApp *get_instance();
 
     // Reset the owning instance pointer
     static void release_instance();
@@ -44,5 +44,5 @@ private:
     std::unique_ptr<DefragStruct> defrag_struct_;
 
     // Owning; singleton instance
-    inline static std::unique_ptr<Defrag> instance_;
+    inline static std::unique_ptr<DefragApp> instance_;
 };

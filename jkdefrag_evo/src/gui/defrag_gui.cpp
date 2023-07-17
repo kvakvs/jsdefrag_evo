@@ -49,10 +49,7 @@ int DefragGui::initialize(HINSTANCE instance, const int cmd_show, DefragLog *log
     log_ = log;
     debug_level_ = debug_level;
 
-    static const auto mutex_name = APP_NAME "Mutex";
     static const auto window_class_name = APP_NAME "Class";
-
-    display_mutex_ = CreateMutex(nullptr, FALSE, mutex_name);
 
     wnd_class_.cbClsExtra = 0;
     wnd_class_.cbWndExtra = 0;
@@ -284,9 +281,7 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
     if (dc_ == nullptr) return;
     if (cluster_start == cluster_end) return;
 
-    WaitForSingleObject(display_mutex_, 100);
-
-    display_mutex_ = CreateMutex(nullptr, FALSE, DISPLAY_MUTEX);
+    std::lock_guard<std::mutex> display_lock(display_mutex_);
 
     if (num_clusters_ != data.total_clusters_ || cluster_info_ == nullptr) {
         num_clusters_ = data.total_clusters_;
@@ -309,7 +304,6 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
 
     prepare_cells_for_cluster_range(cluster_start_square_num, cluster_end_square_num);
 
-    ReleaseMutex(display_mutex_);
     repaint_window(dc_);
 }
 
@@ -384,16 +378,13 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 
         case WM_PAINT: {
             // Grab the display mutex, to make sure that we are the only thread changing the window
-            WaitForSingleObject(instance_->display_mutex_, 100);
-            instance_->display_mutex_ = CreateMutex(nullptr, FALSE, DISPLAY_MUTEX);
+            std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
 
-            PAINTSTRUCT ps;
+            PAINTSTRUCT ps{};
 
             instance_->dc_ = BeginPaint(wnd, &ps);
             instance_->on_paint(instance_->dc_);
             EndPaint(wnd, &ps);
-
-            ReleaseMutex(instance_->display_mutex_);
         }
 
             return 0;
@@ -404,21 +395,16 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
         }
 
         case WM_SIZE: {
-            PAINTSTRUCT ps;
+            std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
 
-            WaitForSingleObject(instance_->display_mutex_, 100);
+            PAINTSTRUCT ps{};
 
-            instance_->display_mutex_ = CreateMutex(nullptr, FALSE, DISPLAY_MUTEX);
+            instance_->dc_ = BeginPaint(wnd, &ps);
+            instance_->set_display_data(instance_->dc_);
+            instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
+            instance_->repaint_window(instance_->dc_);
+            EndPaint(wnd, &ps);
 
-            {
-                instance_->dc_ = BeginPaint(wnd, &ps);
-                instance_->set_display_data(instance_->dc_);
-                instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
-                instance_->repaint_window(instance_->dc_);
-                EndPaint(wnd, &ps);
-            }
-
-            ReleaseMutex(instance_->display_mutex_);
             return 0;
         }
     }

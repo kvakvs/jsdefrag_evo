@@ -16,20 +16,20 @@
  */
 
 #include "precompiled_header.h"
-#include "defrag.h"
+#include "app.h"
 
 void set_locale();
 
 int __stdcall WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show) {
     set_locale();
 
-    Defrag *defrag = Defrag::get_instance();
+    DefragApp *defrag = DefragApp::get_instance();
     WPARAM ret_value = 0;
 
     if (defrag != nullptr) {
         ret_value = defrag->start_program(instance, prev_instance, cmd_line, cmd_show);
 
-        Defrag::release_instance();
+        DefragApp::release_instance();
     }
 
     return (int) ret_value;

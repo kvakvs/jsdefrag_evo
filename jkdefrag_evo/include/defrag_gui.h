@@ -118,7 +118,7 @@ private:
     Rect client_size_;
 
     // Mutex to make the display single-threaded.
-    HANDLE display_mutex_{};
+    std::mutex display_mutex_{};
 
     // Handle to graphics device context
     HDC dc_{};

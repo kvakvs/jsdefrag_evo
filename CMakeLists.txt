@@ -19,7 +19,7 @@ set(HEADER_FILES
         ${INCL}/precompiled_header.h
         ${INCL}/printing.h
         ${INCL}/defrag_log.h
-        ${INCL}/defrag.h
+        ${INCL}/app.h
         ${INCL}/time_util.h
         ${INCL}/scan_ntfs.h
         ${INCL}/scan_fat.h
@@ -33,8 +33,7 @@ set(HEADER_FILES
         )
 set(SOURCE_FILES
         ${SRC}/precompiled_header.cpp
-        ${SRC}/main.cpp
-        ${SRC}/defrag.cpp
+        ${SRC}/main.cpp ${SRC}/app.cpp
         ${SRC}/time_util.cpp
         ${SRC}/printing.cpp
         ${SRC}/defrag_log.cpp

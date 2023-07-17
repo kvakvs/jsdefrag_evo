@@ -76,8 +76,6 @@ enum class DebugLevel {
 
 #define APP_NAME "JkDefragEvo"
 #define APP_NAME_W L"JkDefragEvo"
-// Used by the GUI to lock itself
-#define DISPLAY_MUTEX APP_NAME "DisplayMutex"
 
 constexpr COLORREF display_colors[9] = {
         RGB(240, 240, 240),     // 0 Empty         - Empty diskspace
