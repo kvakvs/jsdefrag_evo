@@ -13,8 +13,8 @@ enum class Zone {
     ZoneCommon = 1,
     // Zone for space hogs, rare modified large files
     ZoneLast = 2,
-    // Used as stop-value in for-loops not a real value
-    Zone3_MaxValue = 3,
+    // Marks "All Zones" in some contexts. Used as stop-value in for-loops not a real value
+    ZoneAll_MaxValue = 3,
 };
 
 std::wstring zone_to_str(Zone zone);
@@ -147,3 +147,5 @@ enum class MoveDirection {
 #define EXECUTABLE_NAME         "jkdefrag.exe"
 #define CMD_EXECUTABLE_NAME     "jkdefragcmd.exe"
 #define SCREENSAVER_NAME        "jkdefragscreensaver.exe"
+
+#define PARAM_OUT               /* output param */

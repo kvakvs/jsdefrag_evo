@@ -19,43 +19,19 @@
 
 // Load the MFT into a list of ItemStruct records in memory
 bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
-    NtfsDiskInfoStruct disk_info{};
-    std::unique_ptr<BYTE[]> buffer;
-    OVERLAPPED g_overlapped;
-    DWORD bytes_read;
-    FragmentListStruct *mft_data_fragments;
-    uint64_t mft_data_bytes;
-    FragmentListStruct *mft_bitmap_fragments;
-    uint64_t mft_bitmap_bytes;
-    uint64_t max_mft_bitmap_bytes;
-    std::unique_ptr<BYTE[]> mft_bitmap;
-    FragmentListStruct *fragment;
-    std::unique_ptr<ItemStruct *[]> inode_array;
-    uint64_t max_inode;
-    ItemStruct *item;
-    uint64_t vcn;
-    uint64_t real_vcn;
-    uint64_t inode_number;
-    uint64_t block_start;
-    uint64_t block_end;
-    BYTE bitmap_masks[8] = {1, 2, 4, 8, 16, 32, 64, 128};
-    bool result;
-    ULONG clusters_per_mft_record;
-    __timeb64 time{};
-    milli64_t start_time;
-    milli64_t end_time;
-    wchar_t s1[BUFSIZ];
-    uint64_t u1;
     DefragGui *gui = DefragGui::get_instance();
 
     // Read the boot block from the disk
-    buffer = std::make_unique<BYTE[]>(mftbuffersize);
+    auto buffer = std::make_unique<BYTE[]>(mftbuffersize);
 
-    g_overlapped.Offset = 0;
-    g_overlapped.OffsetHigh = 0;
-    g_overlapped.hEvent = nullptr;
+    OVERLAPPED g_overlapped{
+            .Offset = 0,
+            .OffsetHigh = 0,
+            .hEvent = nullptr,
+    };
 
-    result = ReadFile(data->disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
+    DWORD bytes_read;
+    auto result = ReadFile(data->disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
 
     if (result == 0 || bytes_read != 512) {
         gui->show_debug(DebugLevel::Progress, nullptr,
@@ -72,6 +48,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     }
 
     // Extract data from the bootblock
+    NtfsDiskInfoStruct disk_info{};
+
     data->disk_.type_ = DiskType::NTFS;
     disk_info.bytes_per_sector_ = *(USHORT *) &buffer[11];
 
@@ -80,7 +58,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     disk_info.total_sectors_ = *(ULONGLONG *) &buffer[40];
     disk_info.mft_start_lcn_ = *(ULONGLONG *) &buffer[48];
     disk_info.mft2_start_lcn_ = *(ULONGLONG *) &buffer[56];
-    clusters_per_mft_record = *(ULONG *) &buffer[64];
+
+    ULONG clusters_per_mft_record = *(ULONG *) &buffer[64];
 
     if (clusters_per_mft_record >= 128) {
         // TODO: Bug with << 256 here
@@ -133,8 +112,9 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                       &g_overlapped);
 
     if (result == 0 || bytes_read != disk_info.bytes_per_mft_record_) {
-        gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"Error while reading first MFT record: {}",
-                                                                   DefragLib::system_error_str(GetLastError())));
+        gui->show_debug(DebugLevel::Progress, nullptr,
+                        std::format(L"Error while reading first MFT record: {}",
+                                    DefragLib::system_error_str(GetLastError())));
         return false;
     }
 
@@ -144,13 +124,14 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     }
 
     // Extract data from the MFT record and put into an Item struct in memory. If there was an error then exit
-    mft_data_bytes = 0;
-    mft_data_fragments = nullptr;
-    mft_bitmap_bytes = 0;
-    mft_bitmap_fragments = nullptr;
+    uint64_t mft_data_bytes = 0;
+    FragmentListStruct *mft_data_fragments = nullptr;
+    uint64_t mft_bitmap_bytes = 0;
+    FragmentListStruct *mft_bitmap_fragments = nullptr;
 
     result = interpret_mft_record(data, &disk_info, nullptr, 0, 0,
-                                  &mft_data_fragments, &mft_data_bytes, &mft_bitmap_fragments, &mft_bitmap_bytes,
+                                  PARAM_OUT mft_data_fragments, PARAM_OUT mft_data_bytes,
+                                  PARAM_OUT mft_bitmap_fragments, PARAM_OUT mft_bitmap_bytes,
                                   buffer.get(), disk_info.bytes_per_mft_record_);
 
     if (!result ||
@@ -171,9 +152,10 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     is only to make it easier to read the fragments, the extra bytes are not used. */
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Reading $MFT::$BITMAP into memory");
 
-    vcn = 0;
-    max_mft_bitmap_bytes = 0;
+    uint64_t vcn = 0;
+    uint64_t max_mft_bitmap_bytes = 0;
 
+    FragmentListStruct *fragment;
     for (fragment = mft_bitmap_fragments; fragment != nullptr; fragment = fragment->next_) {
         if (fragment->lcn_ != VIRTUALFRAGMENT) {
             max_mft_bitmap_bytes = max_mft_bitmap_bytes +
@@ -186,11 +168,11 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     if (max_mft_bitmap_bytes < mft_bitmap_bytes) max_mft_bitmap_bytes = (size_t) mft_bitmap_bytes;
 
-    mft_bitmap = std::make_unique<BYTE[]>(max_mft_bitmap_bytes);
+    auto mft_bitmap = std::make_unique<BYTE[]>(max_mft_bitmap_bytes);
     std::memset(mft_bitmap.get(), 0, (size_t) mft_bitmap_bytes);
 
     vcn = 0;
-    real_vcn = 0;
+    uint64_t real_vcn = 0;
 
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Reading $MFT::$BITMAP into memory");
 
@@ -233,40 +215,44 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
         vcn = fragment->next_vcn_;
     }
 
-    /* Construct an array of all the items in memory, indexed by Inode.
-    Note: the maximum number of Inodes is primarily determined by the size of the
-    bitmap. But that is rounded up to 8 Inodes, and the MFT can be shorter. */
-    max_inode = mft_bitmap_bytes * 8;
+    // Construct an array of all the items in memory, indexed by Inode.
+    // Note: the maximum number of Inodes is primarily determined by the size of the
+    // bitmap. But that is rounded up to 8 Inodes, and the MFT can be shorter.
+    uint64_t max_inode = mft_bitmap_bytes * 8;
 
     if (max_inode > mft_data_bytes / disk_info.bytes_per_mft_record_) {
         max_inode = mft_data_bytes / disk_info.bytes_per_mft_record_;
     }
 
-    inode_array = std::make_unique<ItemStruct *[]>(max_inode);
+    auto inode_array = std::make_unique<ItemStruct *[]>(max_inode);
     inode_array[0] = data->item_tree_;
     std::fill(inode_array.get() + 1, inode_array.get() + max_inode, nullptr);
 
     // Read and process all the records in the MFT. The records are read into a
     // buffer and then given one by one to the interpret_mft_record() subroutine.
+    uint64_t block_start;
+    uint64_t block_end = 0;
+
     fragment = mft_data_fragments;
-    block_end = 0;
     vcn = 0;
     real_vcn = 0;
 
     data->phase_done_ = 0;
     data->phase_todo_ = 0;
 
+    __timeb64 time{};
     _ftime64_s(&time);
 
-    start_time = std::chrono::milliseconds(time.time * 1000 + time.millitm);
+    milli64_t start_time = std::chrono::seconds(time.time) + std::chrono::milliseconds(time.millitm);
 
-    for (inode_number = 1; inode_number < max_inode; inode_number++) {
+    static const BYTE bitmap_masks[8] = {1, 2, 4, 8, 16, 32, 64, 128};
+    for (auto inode_number = 1; inode_number < max_inode; inode_number++) {
         if ((mft_bitmap[inode_number >> 3] & bitmap_masks[inode_number % 8]) == 0) continue;
 
         data->phase_todo_ = data->phase_todo_ + 1;
     }
 
-    for (inode_number = 1; inode_number < max_inode; inode_number++) {
+    for (auto inode_number = 1; inode_number < max_inode; inode_number++) {
         if (*data->running_ != RunningState::RUNNING) break;
 
         // Ignore the Inode if the bitmap says it's not in use
@@ -288,6 +274,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
             block_end = block_start + mftbuffersize / disk_info.bytes_per_mft_record_;
 
             if (block_end > mft_bitmap_bytes * 8) block_end = mft_bitmap_bytes * 8;
+
+            uint64_t u1;
 
             while (fragment != nullptr) {
                 // Calculate Inode at the end of the fragment
@@ -355,13 +343,14 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
         // Interpret the Inode's attributes
         result = interpret_mft_record(data, &disk_info, inode_array.get(), inode_number, max_inode,
-                                      &mft_data_fragments, &mft_data_bytes, &mft_bitmap_fragments, &mft_bitmap_bytes,
+                                      PARAM_OUT mft_data_fragments, PARAM_OUT mft_data_bytes,
+                                      PARAM_OUT mft_bitmap_fragments, PARAM_OUT mft_bitmap_bytes,
                                       &buffer[(inode_number - block_start) * disk_info.bytes_per_mft_record_],
                                       disk_info.bytes_per_mft_record_);
     }
 
     _ftime64_s(&time);
-    end_time = std::chrono::milliseconds(time.time * 1000 + time.millitm);
+    milli64_t end_time = std::chrono::milliseconds(time.time * 1000 + time.millitm);
 
     if (end_time > start_time) {
         gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"  Analysis speed: " NUM_FMT " items per second",
@@ -375,7 +364,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     }
 
     // Setup the ParentDirectory in all the items with the info in the InodeArray
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         item->parent_directory_ = inode_array[item->parent_inode_];
 
         if (item->parent_inode_ == 5) item->parent_directory_ = nullptr;

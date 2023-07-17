@@ -27,18 +27,13 @@
 // Note: the program only knows if a file is unmovable after it has tried to move a file. So we have to recalculate the
 // beginning of the zones every time we encounter an unmovable file.
 void DefragLib::calculate_zones(DefragState *data) {
-    ItemStruct *item;
-    uint64_t size_of_movable_files[3];
-    uint64_t size_of_unmovable_fragments[3];
-    uint64_t zone_end[3];
-    uint64_t old_zone_end[3];
-    int i;
     DefragGui *gui = DefragGui::get_instance();
 
     // Calculate the number of clusters in movable items for every zone
-    for (auto zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
+    uint64_t size_of_movable_files[3] = {};
+    // for (auto zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
 
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
@@ -48,9 +43,12 @@ void DefragLib::calculate_zones(DefragState *data) {
     }
 
     // Iterate until the calculation does not change anymore, max 10 times
-    for (auto zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
+    uint64_t size_of_unmovable_fragments[3] = {};
+    // for (auto zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
-    for (auto zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
+    uint64_t old_zone_end[3] = {};
+    uint64_t zone_end[3] = {};
+    // for (auto zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
 
     for (int iterate = 1; iterate <= 10; iterate++) {
         // Calculate the end of the zones
@@ -77,12 +75,12 @@ void DefragLib::calculate_zones(DefragState *data) {
                                 L"Zone calculation, iteration {}: 0 - " NUM_FMT " - " NUM_FMT " - " NUM_FMT,
                                 iterate, zone_end[0], zone_end[1], zone_end[2]));
 
-        /* Reset the SizeOfUnmovableFragments array. We are going to (re)calculate these numbers
-        based on the just calculates ZoneEnd's. */
+        // Reset the SizeOfUnmovableFragments array. We are going to (re)calculate these numbers
+        // based on the just calculates ZoneEnd's
         for (auto zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
         // The MFT reserved areas are counted as unmovable data
-        for (i = 0; i < 3; i++) {
+        for (auto i = 0; i < 3; i++) {
             if (data->mft_excludes_[i].start_ < zone_end[0]) {
                 size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0]
                                                  + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
@@ -95,41 +93,37 @@ void DefragLib::calculate_zones(DefragState *data) {
             }
         }
 
-        /* Walk through all items and count the unmovable fragments. Ignore unmovable fragments
-        in the MFT zones, we have already counted the zones. */
-        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+        // Walk through all items and count the unmovable fragments. Ignore unmovable fragments
+        // in the MFT zones, we have already counted the zones
+        for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
             if (!item->is_unmovable_ &&
                 !item->is_excluded_ &&
-                (!item->is_dir_ || data->cannot_move_dirs_ <= 20))
+                (!item->is_dir_ || data->cannot_move_dirs_ <= 20)) {
                 continue;
+            }
 
             uint64_t vcn = 0;
             uint64_t real_vcn = 0;
 
-            for (const FragmentListStruct *Fragment = item->fragments_; Fragment != nullptr; Fragment = Fragment->
-                    next_) {
-                if (Fragment->lcn_ != VIRTUALFRAGMENT) {
-                    if ((Fragment->lcn_ < data->mft_excludes_[0].start_ || Fragment->lcn_ >= data->mft_excludes_[0].
-                            end_)
-                        &&
-                        (Fragment->lcn_ < data->mft_excludes_[1].start_ || Fragment->lcn_ >= data->mft_excludes_[1].
-                                end_)
-                        &&
-                        (Fragment->lcn_ < data->mft_excludes_[2].start_ || Fragment->lcn_ >= data->mft_excludes_[2].
-                                end_)) {
-                        if (Fragment->lcn_ < zone_end[0]) {
-                            size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + Fragment->next_vcn_ - vcn;
-                        } else if (Fragment->lcn_ < zone_end[1]) {
-                            size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1] + Fragment->next_vcn_ - vcn;
-                        } else if (Fragment->lcn_ < zone_end[2]) {
-                            size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2] + Fragment->next_vcn_ - vcn;
+            for (auto frag = item->fragments_; frag != nullptr; frag = frag->next_) {
+                if (frag->lcn_ != VIRTUALFRAGMENT) {
+                    if ((frag->lcn_ < data->mft_excludes_[0].start_ || frag->lcn_ >= data->mft_excludes_[0].end_)
+                        && (frag->lcn_ < data->mft_excludes_[1].start_ || frag->lcn_ >= data->mft_excludes_[1].end_)
+                        && (frag->lcn_ < data->mft_excludes_[2].start_ || frag->lcn_ >= data->mft_excludes_[2].end_)) {
+
+                        if (frag->lcn_ < zone_end[0]) {
+                            size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + frag->next_vcn_ - vcn;
+                        } else if (frag->lcn_ < zone_end[1]) {
+                            size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1] + frag->next_vcn_ - vcn;
+                        } else if (frag->lcn_ < zone_end[2]) {
+                            size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2] + frag->next_vcn_ - vcn;
                         }
                     }
 
-                    real_vcn = real_vcn + Fragment->next_vcn_ - vcn;
+                    real_vcn = real_vcn + frag->next_vcn_ - vcn;
                 }
 
-                vcn = Fragment->next_vcn_;
+                vcn = frag->next_vcn_;
             }
         }
     }
@@ -137,7 +131,7 @@ void DefragLib::calculate_zones(DefragState *data) {
     // Calculated the begin of the zones
     data->zones_[0] = 0;
 
-    for (i = 1; i <= 3; i++) data->zones_[i] = zone_end[i - 1];
+    for (auto i = 1; i <= 3; i++) data->zones_[i] = zone_end[i - 1];
 }
 
 /* For debugging only: compare the data with the output from the
@@ -454,7 +448,6 @@ void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *par
     std::unique_ptr<ItemStruct> item;
 
     wchar_t path_buf2[MAX_PATH];
-    FragmentListStruct *fragment;
 
     do {
         if (*data->running_ != RunningState::RUNNING) break;
@@ -526,9 +519,8 @@ void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *par
             scan_dir(data, temp_path.c_str(), item.get());
         }
 
-        /* Ignore the item if it has no clusters or no LCN. Very small
-        files are stored in the MFT and are reported by Windows as
-        having zero clusters and no fragments. */
+        // Ignore the item if it has no clusters or no LCN. Very small files are stored in the MFT and are reported by
+        // Windows as having zero clusters and no fragments
         if (item->clusters_count_ == 0 || item->fragments_ == nullptr) continue;
 
         // Draw the item on the screen

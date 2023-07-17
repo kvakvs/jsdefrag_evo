@@ -71,14 +71,14 @@ void DefragLib::optimize_up(DefragState *data) {
             /* Find the Item that is the best fit for the gap. If nothing found (no files
             fit the gap) then exit the loop. */
             if (perfect_fit) {
-                item = find_best_item(data, gap_begin, gap_end, Tree::Direction::First, Zone::Zone3_MaxValue);
+                item = find_best_item(data, gap_begin, gap_end, Tree::Direction::First, Zone::ZoneAll_MaxValue);
 
                 if (item == nullptr) {
                     perfect_fit = false;
-                    item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::First, Zone::Zone3_MaxValue);
+                    item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::First, Zone::ZoneAll_MaxValue);
                 }
             } else {
-                item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::First, Zone::Zone3_MaxValue);
+                item = find_highest_item(data, gap_begin, gap_end, Tree::Direction::First, Zone::ZoneAll_MaxValue);
             }
 
             if (item == nullptr) break;

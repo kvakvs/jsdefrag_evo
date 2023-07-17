@@ -17,7 +17,7 @@ std::wstring zone_to_str(Zone zone) {
             return L"<All Files>";
         case Zone::ZoneLast:
             return L"<Disk End>";
-        case Zone::Zone3_MaxValue:
+        case Zone::ZoneAll_MaxValue:
             return L"<Zone 3>";
         default:
             return L"None";

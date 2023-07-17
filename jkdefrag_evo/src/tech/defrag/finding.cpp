@@ -108,8 +108,8 @@ bool DefragLib::find_gap(const DefragState *data, const uint64_t minimum_lcn, ui
                             DebugLevel::DetailedGapFinding, nullptr,
                             std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
 
-                    /* If the gap is bigger/equal than the mimimum size then return it,
-                    or remember it, depending on the FindHighestGap parameter. */
+                    // If the gap is bigger/equal than the mimimum size then return it,
+                    // or remember it, depending on the FindHighestGap parameter. */
                     if (cluster_start >= minimum_lcn &&
                         lcn - cluster_start >= minimum_size) {
                         if (!find_highest_gap) {
@@ -233,7 +233,7 @@ ItemStruct *DefragLib::find_highest_item(const DefragState *data, const uint64_t
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
-        if (zone != Zone::Zone3_MaxValue) {
+        if (zone != Zone::ZoneAll_MaxValue) {
             auto preferred_zone = item->get_preferred_zone();
             if (zone != preferred_zone) continue;
         }
@@ -315,8 +315,8 @@ ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cl
                 return nullptr;
             }
 
-            /* Rewind and try again. The item that we have found previously fits in the
-            gap, but it does not combine with other items to perfectly fill the gap. */
+            // Rewind and try again. The item that we have found previously fits in the
+            // gap, but it does not combine with other items to perfectly fill the gap.
             item = first_item;
             first_item = nullptr;
             gap_size = cluster_end - cluster_start;
@@ -329,7 +329,7 @@ ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cl
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
-        if (zone != Zone::Zone3_MaxValue) {
+        if (zone != Zone::ZoneAll_MaxValue) {
             auto preferred_zone = item->get_preferred_zone();
             if (zone != preferred_zone) continue;
         }

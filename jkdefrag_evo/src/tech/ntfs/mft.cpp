@@ -17,11 +17,13 @@
 
 #include "precompiled_header.h"
 
-bool ScanNTFS::interpret_mft_record(DefragState *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
-                                    const uint64_t inode_number, const uint64_t max_inode,
-                                    FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
-                                    FragmentListStruct **mft_bitmap_fragments, uint64_t *mft_bitmap_bytes,
-                                    BYTE *buffer, const uint64_t buf_length) {
+bool ScanNTFS::interpret_mft_record(
+        DefragState *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
+        const uint64_t inode_number, const uint64_t max_inode,
+        PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
+        PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
+        BYTE *buffer, const uint64_t buf_length
+) {
     InodeDataStruct inode_data{};
     DefragGui *gui = DefragGui::get_instance();
 
@@ -102,8 +104,8 @@ bool ScanNTFS::interpret_mft_record(DefragState *data, NtfsDiskInfoStruct *disk_
     inode_data.last_access_time_ = {};
     inode_data.bytes_ = 0; // Size of the $DATA stream
     inode_data.streams_ = nullptr; // List of StreamStruct
-    inode_data.mft_data_fragments_ = *mft_data_fragments;
-    inode_data.mft_data_bytes_ = *mft_data_bytes;
+    inode_data.mft_data_fragments_ = mft_data_fragments;
+    inode_data.mft_data_bytes_ = mft_data_bytes;
     inode_data.mft_bitmap_fragments_ = nullptr;
     inode_data.mft_bitmap_bytes_ = 0;
 
@@ -121,10 +123,10 @@ bool ScanNTFS::interpret_mft_record(DefragState *data, NtfsDiskInfoStruct *disk_
 
     // Save the mft_data_fragments, mft_data_bytes, mft_bitmap_fragments, and MftBitmapBytes
     if (inode_number == 0) {
-        *mft_data_fragments = inode_data.mft_data_fragments_;
-        *mft_data_bytes = inode_data.mft_data_bytes_;
-        *mft_bitmap_fragments = inode_data.mft_bitmap_fragments_;
-        *mft_bitmap_bytes = inode_data.mft_bitmap_bytes_;
+        mft_data_fragments = inode_data.mft_data_fragments_;
+        mft_data_bytes = inode_data.mft_data_bytes_;
+        mft_bitmap_fragments = inode_data.mft_bitmap_fragments_;
+        mft_bitmap_bytes = inode_data.mft_bitmap_bytes_;
     }
 
     // Create an item in the data->ItemTree for every stream

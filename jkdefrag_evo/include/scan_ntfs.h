@@ -387,8 +387,10 @@ private:
 
     bool interpret_mft_record(
             DefragState *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array, uint64_t inode_number,
-            uint64_t max_inode, FragmentListStruct **mft_data_fragments, uint64_t *mft_data_bytes,
-            FragmentListStruct **mft_bitmap_fragments, uint64_t *mft_bitmap_bytes, BYTE *buffer, uint64_t buf_length);
+            uint64_t max_inode, PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
+            PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
+            BYTE *buffer, uint64_t buf_length
+    );
 
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanNTFS> instance_;
