@@ -54,11 +54,8 @@ void DefragLib::optimize_volume(DefragState *data) {
                 if (item->is_unmovable_) continue;
                 if (item->is_excluded_) continue;
 
-                auto file_zone = Zone::ZoneCommon;
-
-                if (item->is_hog_) file_zone = Zone::ZoneLast;
-                if (item->is_dir_) file_zone = Zone::ZoneFirst;
-                if (file_zone != zone) continue;
+                auto preferred_zone = item->get_preferred_zone();
+                if (preferred_zone != zone) continue;
 
                 phase_temp = phase_temp + item->clusters_count_;
             }

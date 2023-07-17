@@ -32,30 +32,25 @@ void DefragLib::calculate_zones(DefragState *data) {
     uint64_t size_of_unmovable_fragments[3];
     uint64_t zone_end[3];
     uint64_t old_zone_end[3];
-    int zone;
     int i;
     DefragGui *gui = DefragGui::get_instance();
 
     // Calculate the number of clusters in movable items for every zone
-    for (zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
+    for (auto zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
 
     for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
 
-        zone = 1;
-
-        if (item->is_hog_) zone = 2;
-        if (item->is_dir_) zone = 0;
-
-        size_of_movable_files[zone] = size_of_movable_files[zone] + item->clusters_count_;
+        auto preferred_zone = item->get_preferred_zone();
+        size_of_movable_files[(size_t) preferred_zone] += item->clusters_count_;
     }
 
     // Iterate until the calculation does not change anymore, max 10 times
-    for (zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
+    for (auto zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
-    for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
+    for (auto zone = 0; zone <= 2; zone++) old_zone_end[zone] = 0;
 
     for (int iterate = 1; iterate <= 10; iterate++) {
         // Calculate the end of the zones
@@ -74,7 +69,7 @@ void DefragLib::calculate_zones(DefragState *data) {
             break;
         }
 
-        for (zone = 0; zone <= 2; zone++) old_zone_end[zone] = zone_end[zone];
+        for (auto zone = 0; zone <= 2; zone++) old_zone_end[zone] = zone_end[zone];
 
         // Show debug info
         gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
@@ -84,7 +79,7 @@ void DefragLib::calculate_zones(DefragState *data) {
 
         /* Reset the SizeOfUnmovableFragments array. We are going to (re)calculate these numbers
         based on the just calculates ZoneEnd's. */
-        for (zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
+        for (auto zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
         // The MFT reserved areas are counted as unmovable data
         for (i = 0; i < 3; i++) {

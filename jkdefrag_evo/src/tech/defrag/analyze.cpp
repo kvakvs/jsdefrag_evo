@@ -62,7 +62,7 @@ void DefragLib::analyze_volume(DefragState *data) {
     data->phase_done_ = data->phase_todo_;
     gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
-    // Setup the progress counter and the file/dir counters
+    // Set up the progress counter and the file/dir counters
     data->phase_done_ = 0;
     data->phase_todo_ = 0;
 

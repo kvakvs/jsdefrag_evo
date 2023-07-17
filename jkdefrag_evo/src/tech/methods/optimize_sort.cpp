@@ -61,11 +61,8 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 if (temp_item->is_excluded_) continue;
                 if (temp_item->clusters_count_ == 0) continue;
 
-                auto file_zone = Zone::ZoneCommon;
-
-                if (temp_item->is_hog_) file_zone = Zone::ZoneLast;
-                if (temp_item->is_dir_) file_zone = Zone::ZoneFirst;
-                if (file_zone != data->zone_) continue;
+                auto preferred_zone = temp_item->get_preferred_zone();
+                if (preferred_zone != data->zone_) continue;
 
                 if (previous_item != nullptr &&
                     compare_items(previous_item, temp_item, sort_field) >= 0) {

@@ -43,6 +43,12 @@ public:
         return fragment == nullptr ? 0 : fragment->lcn_;
     }
 
+    [[nodiscard]] Zone get_preferred_zone() const {
+        if (is_dir_) return Zone::ZoneFirst;
+        if (is_hog_) return Zone::ZoneLast;
+        return Zone::ZoneCommon;
+    }
+
 public:
     ItemStruct *parent_;
     // Next smaller item
