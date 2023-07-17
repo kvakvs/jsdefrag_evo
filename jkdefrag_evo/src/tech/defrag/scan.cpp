@@ -423,7 +423,7 @@ void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *par
     if (p1 != nullptr) *p1 = 0;
 
     // Show debug message: "Analyzing: %s"
-    gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(L"Analyzing: %s", mask));
+    gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(L"Analyzing: {}", mask));
 
     // Fetch the current time in the uint64_t format (1 second = 10000000)
     SYSTEMTIME time_1;

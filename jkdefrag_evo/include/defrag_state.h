@@ -14,9 +14,9 @@ public:
     // The current Phase (1...3)
     DefragPhase phase_ = DefragPhase::Analyze;
     // The current Zone (0..2) for Phase 3
-    Zone zone_;
+    Zone zone_{};
     // If not RUNNING then stop defragging
-    RunningState *running_;
+    RunningState *running_{};
     // If TRUE then use LastAccessTime for SpaceHogs
     bool use_last_access_time_{};
     // If bigger than 20 then do not move dirs
@@ -39,13 +39,13 @@ public:
     int balance_count_{};
 
     // Array with exclude masks
-    Wstrings excludes_;
+    Wstrings excludes_{};
 
     // use the built-in SpaceHogs
-    bool use_default_space_hogs_;
+    bool use_default_space_hogs_{};
 
     // Array with SpaceHog masks
-    std::vector<std::wstring> space_hogs_;
+    std::vector<std::wstring> space_hogs_{};
 
     // Begin (LCN) of the zones
     uint64_t zones_[4] = {};
@@ -102,15 +102,10 @@ public:
     // Number of items already done in this Phase
     uint64_t phase_done_{};
 
-    // Variables used to throttle the speed
-    //struct {
-    // Speed as a percentage 1..100
-    int speed_{};
-    int64_t start_time_{};
-    int64_t running_time_{};
-    int64_t last_checkpoint_{};
-    //} throttle_;
+    // Variables used to throttle the speed; Speed as a percentage 1..100
+    uint64_t speed_{};
 
-    // The array with error messages
-    // Wstrings debug_msg_;
+    Clock::time_point start_time_{};
+    Clock::duration running_time_{};
+    Clock::time_point last_checkpoint_{};
 };

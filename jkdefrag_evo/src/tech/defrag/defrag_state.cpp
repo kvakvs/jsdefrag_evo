@@ -18,9 +18,5 @@
 #include "precompiled_header.h"
 
 DefragState::DefragState() {
-    __timeb64 t{};
-    _ftime64_s(&t);
-
-    start_time_ = t.time * 1000 + t.millitm;
-    last_checkpoint_ = start_time_;
+    last_checkpoint_ = start_time_ = Clock::now();
 }

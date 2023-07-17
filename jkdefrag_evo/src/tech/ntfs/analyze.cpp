@@ -22,7 +22,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     DefragGui *gui = DefragGui::get_instance();
 
     // Read the boot block from the disk
-    auto buffer = std::make_unique<BYTE[]>(mftbuffersize);
+    auto buffer = std::make_unique<BYTE[]>(MFT_BUFFER_SIZE);
 
     OVERLAPPED g_overlapped{
             .Offset = 0,
@@ -63,7 +63,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     if (clusters_per_mft_record >= 128) {
         // TODO: Bug with << 256 here
-        disk_info.bytes_per_mft_record_ = (uint64_t) 1 << 256 - clusters_per_mft_record;
+        disk_info.bytes_per_mft_record_ = (uint64_t) 1 << (256 - clusters_per_mft_record);
     } else {
         disk_info.bytes_per_mft_record_ = clusters_per_mft_record * disk_info.bytes_per_sector_ * disk_info.
                 sectors_per_cluster_;
@@ -96,8 +96,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
             disk_info.mft2_start_lcn_, disk_info.bytes_per_mft_record_, disk_info.clusters_per_index_record_,
             buffer[21], *(ULONGLONG *) &buffer[72]));
 
-    /* Calculate the size of first 16 Inodes in the MFT. The Microsoft defragmentation
-    API cannot move these inodes. */
+    // Calculate the size of first 16 Inodes in the MFT. The Microsoft defragmentation
+    // API cannot move these inodes
     data->disk_.mft_locked_clusters_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_ / disk_info.
             bytes_per_mft_record_;
 
@@ -147,9 +147,9 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                     std::format(L"MftDataBytes = " NUM_FMT ", MftBitmapBytes = " NUM_FMT,
                                 mft_data_bytes, mft_bitmap_bytes));
 
-    /* Read the complete $MFT::$BITMAP into memory.
-    Note: The allocated size of the bitmap is a multiple of the cluster size. This
-    is only to make it easier to read the fragments, the extra bytes are not used. */
+    // Read the complete $MFT::$BITMAP into memory.
+    // Note: The allocated size of the bitmap is a multiple of the cluster size. This
+    // is only to make it easier to read the fragments, the extra bytes are not used
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Reading $MFT::$BITMAP into memory");
 
     uint64_t vcn = 0;
@@ -176,6 +176,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr, L"Reading $MFT::$BITMAP into memory");
 
+    // Follow the chain of MFT bitmap fragments
     for (fragment = mft_bitmap_fragments; fragment != nullptr; fragment = fragment->next_) {
         if (fragment->lcn_ != VIRTUALFRAGMENT) {
             gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
@@ -230,9 +231,6 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     // Read and process all the records in the MFT. The records are read into a
     // buffer and then given one by one to the interpret_mft_record() subroutine.
-    uint64_t block_start;
-    uint64_t block_end = 0;
-
     fragment = mft_data_fragments;
     vcn = 0;
     real_vcn = 0;
@@ -240,10 +238,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     data->phase_done_ = 0;
     data->phase_todo_ = 0;
 
-    __timeb64 time{};
-    _ftime64_s(&time);
-
-    milli64_t start_time = std::chrono::seconds(time.time) + std::chrono::milliseconds(time.millitm);
+    Clock::time_point start_time = Clock::now();
 
     static const BYTE bitmap_masks[8] = {1, 2, 4, 8, 16, 32, 64, 128};
     for (auto inode_number = 1; inode_number < max_inode; inode_number++) {
@@ -252,6 +247,10 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
         data->phase_todo_ = data->phase_todo_ + 1;
     }
 
+    uint64_t block_start;
+    uint64_t block_end = 0;
+
+    // For all inodes, while we are in the RUNNING state
     for (auto inode_number = 1; inode_number < max_inode; inode_number++) {
         if (*data->running_ != RunningState::RUNNING) break;
 
@@ -271,7 +270,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
             DefragLib::slow_down(data);
 
             block_start = inode_number;
-            block_end = block_start + mftbuffersize / disk_info.bytes_per_mft_record_;
+            block_end = block_start + MFT_BUFFER_SIZE / disk_info.bytes_per_mft_record_;
 
             if (block_end > mft_bitmap_bytes * 8) block_end = mft_bitmap_bytes * 8;
 
@@ -299,6 +298,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                         L"  Extent Lcn=" NUM_FMT ", RealVcn=" NUM_FMT ", Size=" NUM_FMT,
                         fragment->lcn_, real_vcn, fragment->next_vcn_ - vcn));
             }
+
             if (fragment == nullptr) break;
             if (block_end >= u1) block_end = u1;
 
@@ -349,12 +349,13 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                                       disk_info.bytes_per_mft_record_);
     }
 
-    _ftime64_s(&time);
-    milli64_t end_time = std::chrono::milliseconds(time.time * 1000 + time.millitm);
+    Clock::time_point end_time = Clock::now();
 
     if (end_time > start_time) {
-        gui->show_debug(DebugLevel::Progress, nullptr, std::format(L"  Analysis speed: " NUM_FMT " items per second",
-                                                                   max_inode * 1000 / (end_time - start_time).count()));
+        auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        gui->show_debug(DebugLevel::Progress, nullptr,
+                        std::format(L"  Analysis speed: " NUM_FMT " items per second",
+                                    max_inode * 1000 / diff_ms));
     }
 
     if (*data->running_ != RunningState::RUNNING) {

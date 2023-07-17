@@ -74,6 +74,9 @@ void DefragGui::paint_strings(Graphics *graphics) const {
     Font font(&font_family, 12, FontStyleRegular, UnitPixel);
     PointF point_f(2.0f, 0.0f);
 
+    // [Messages[0]] [Messages[1]]              [Messages[2]]   [Messages[3]]
+    // [Messages[4]]
+    // [Messages[5] debug only]
     graphics->DrawString(messages_[0].c_str(), -1, &font, point_f, &brush);
 
     point_f = PointF(40.0f, 0.0f);

@@ -65,15 +65,21 @@ private:
     MSG message_{};
 
     // The texts displayed on the screen
-    std::wstring messages_[6];
+    std::wstring messages_[6] = {};
 
     DebugLevel debug_level_;
 
-    uint64_t progress_start_time_;       // The time at percentage zero
-    uint64_t progress_time_;            // When ProgressDone/ProgressTodo were last updated
-    uint64_t progress_todo_{};            // Number of clusters to do
-    uint64_t progress_done_;            // Number of clusters already done
+    // The time at percentage zero
+    Clock::time_point progress_start_time_{};
+    // When ProgressDone/ProgressTodo were last updated
+    Clock::time_point progress_time_{};
 
+    // Number of clusters to do
+    uint64_t progress_todo_{};
+    // Number of clusters already done
+    uint64_t progress_done_{};
+
+    // Owning pointer
     std::unique_ptr<DefragStruct> defrag_struct_;
 
     //

@@ -27,16 +27,8 @@ DefragGui::DefragGui() : debug_level_(), color_map_(), diskmap_pos_() {
     defrag_struct_ = std::make_unique<DefragStruct>();
 
     square_size_ = 6;
-
     drawing_area_offset_ = {.x=8, .y=8};
-
     num_clusters_ = 1;
-
-    progress_start_time_ = 0;
-    progress_time_ = 0;
-    progress_done_ = 0;
-
-    for (auto &m: messages_) m[0] = L'\0';
 }
 
 DefragGui *DefragGui::get_instance() {
@@ -256,14 +248,11 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
 // Callback: paint a cluster on the screen in a given palette color
 void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_start, const uint64_t cluster_end,
                              const DrawColor color) {
-    __timeb64 now{};
     [[maybe_unused]] Rect window_size = client_size_;
 
     // Save the PhaseTodo and PhaseDone counters for later use by the progress counter
     if (data->phase_todo_ != 0) {
-        _ftime64_s(&now);
-
-        progress_time_ = now.time * 1000 + now.millitm;
+        progress_time_ = Clock::now();
         progress_done_ = data->phase_done_;
         progress_todo_ = data->phase_todo_;
     }
@@ -314,10 +303,7 @@ void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_sta
 // Callback: just before the defragger starts a new Phase, and when it finishes
 void DefragGui::show_status(const DefragState *data) {
     // Reset the progress counter
-    __timeb64 now{};
-    _ftime64_s(&now);
-
-    progress_start_time_ = now.time * 1000 + now.millitm;
+    progress_start_time_ = Clock::now();
     progress_time_ = progress_start_time_;
     progress_done_ = 0;
     progress_todo_ = 0;

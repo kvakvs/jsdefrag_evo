@@ -290,35 +290,31 @@ std::wstring DefragLib::get_long_path(const DefragState *data, const ItemStruct 
 
 // Slow the program down
 void DefragLib::slow_down(DefragState *data) {
-    __timeb64 t{};
-
     // Sanity check
     if (data->speed_ <= 0 || data->speed_ >= 100) return;
 
-    /* Calculate the time we have to sleep so that the wall time is 100% and the
-    actual running time is the "-s" parameter percentage. */
-    _ftime64_s(&t);
-
-    const int64_t now = t.time * 1000 + t.millitm;
+    // Calculate the time we have to sleep so that the wall time is 100% and the actual running time is the "-s" parameter percentage
+    auto now = Clock::now();
 
     if (now > data->last_checkpoint_) {
-        data->running_time_ = data->running_time_ + now - data->last_checkpoint_;
+        data->running_time_ += (now - data->last_checkpoint_);
     }
 
     if (now < data->start_time_) data->start_time_ = now; // Should never happen
 
     // Sleep
-    if (data->running_time_ > 0) {
-        int64_t delay = data->running_time_ * (int64_t) 100 / (int64_t) data->speed_ - (now - data->start_time_);
+    if (data->running_time_ > Clock::duration::zero()) {
+        Clock::duration delay = data->running_time_ * 100UL / data->speed_ - (now - data->start_time_);
 
-        if (delay > 30000) delay = 30000;
-        if (delay > 0) Sleep((uint32_t) delay);
+        if (delay > std::chrono::milliseconds(200)) delay = std::chrono::milliseconds(200);
+        if (delay > Clock::duration::zero()) {
+            auto delay_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delay);
+            Sleep(delay_ms.count());
+        }
     }
 
     // Save the current wall time, so next time we can calculate the time spent in	the program
-    _ftime64_s(&t);
-
-    data->last_checkpoint_ = t.time * 1000 + t.millitm;
+    data->last_checkpoint_ = Clock::now();
 }
 
 // Open the item as a file or as a directory. If the item could not be opened then show an error message and return nullptr.
@@ -830,7 +826,6 @@ void ShowDiskmap2(struct DefragState *Data) {
 	if (*Data->RedrawScreen == 2) *Data->RedrawScreen = 0;
 }
 */
-
 
 // Update some numbers in the DefragData
 void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, const Zone zone) {

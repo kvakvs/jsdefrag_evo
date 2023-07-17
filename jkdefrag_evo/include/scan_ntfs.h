@@ -2,7 +2,7 @@
 
 #include <memory>
 
-constexpr size_t mftbuffersize = kilobytes(256); // 256 KB seems to be the optimum
+constexpr size_t MFT_BUFFER_SIZE = kilobytes(256); // 256 KB seems to be the optimum
 
 struct INODE_REFERENCE {
     ULONG inode_number_low_part_;
@@ -339,7 +339,7 @@ struct NtfsDiskInfoStruct {
     uint64_t clusters_per_index_record_;
 
     struct {
-        BYTE buffer_[mftbuffersize];
+        BYTE buffer_[MFT_BUFFER_SIZE];
         uint64_t offset_;
         int age_;
     } buffers_[3];

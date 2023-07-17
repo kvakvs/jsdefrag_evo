@@ -269,13 +269,10 @@ ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cl
                     std::format(L"Looking for perfect fit start=" NUM_FMT " [" NUM_FMT " clusters]",
                                 cluster_start, cluster_end - cluster_start));
 
-    /* Walk backwards through all the items on disk and select the first item that
-    fits inside the free block, and combined with other items will fill the gap
-    perfectly. If we find an exact match then immediately return it. */
-
-    _ftime64_s(&time);
-
-    const int64_t MaxTime = time.time * 1000 + time.millitm + 500;
+    // Walk backwards through all the items on disk and select the first item that
+    // fits inside the free block, and combined with other items will fill the gap
+    // perfectly. If we find an exact match then immediately return it.
+    const Clock::time_point max_time = Clock::now() + std::chrono::milliseconds(500);
     ItemStruct *first_item = nullptr;
     uint64_t gap_size = cluster_end - cluster_start;
     uint64_t total_items_size = 0;
@@ -307,9 +304,7 @@ ItemStruct *DefragLib::find_best_item(const DefragState *data, const uint64_t cl
             }
 
             // Exit if the running time is more than 0.5 seconds
-            _ftime64_s(&time);
-
-            if (time.time * 1000 + time.millitm > MaxTime) {
+            if (Clock::now() > max_time) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No perfect fit found, out of time.");
 
                 return nullptr;

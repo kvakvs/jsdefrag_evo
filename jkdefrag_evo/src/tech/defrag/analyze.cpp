@@ -116,8 +116,8 @@ void DefragLib::analyze_volume(DefragState *data) {
             colorize_disk_item(data, item, 0, 0, false);
         }
 
-        /* The item is a SpaceHog if it's larger than 50 megabytes, or last access time
-        is more than 30 days ago, or if it's filename matches a SpaceHog mask. */
+        // The item is a SpaceHog if it's larger than 50 megabytes, or last access time
+        // is more than 30 days ago, or if it's filename matches a SpaceHog mask. */
         if (!item->is_excluded_ && !item->is_dir_) {
             if (data->use_default_space_hogs_ && item->bytes_ > kilobytes(50)) {
                 item->is_hog_ = true;
