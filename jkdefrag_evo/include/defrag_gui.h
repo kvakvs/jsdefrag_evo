@@ -36,7 +36,7 @@ public:
 
     void set_display_data(HDC dc);
 
-    WPARAM do_modal();
+    WPARAM windows_event_loop();
 
     void on_paint(HDC dc) const;
 

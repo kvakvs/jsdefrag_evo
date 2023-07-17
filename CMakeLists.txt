@@ -33,7 +33,7 @@ set(HEADER_FILES
         )
 set(SOURCE_FILES
         ${SRC}/precompiled_header.cpp
-        ${SRC}/main.cpp ${SRC}/app.cpp
+        ${SRC}/main.cpp ${SRC}/app.cpp ${SRC}/app_debug.cpp
         ${SRC}/time_util.cpp
         ${SRC}/printing.cpp
         ${SRC}/defrag_log.cpp

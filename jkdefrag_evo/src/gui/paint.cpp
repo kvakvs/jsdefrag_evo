@@ -139,7 +139,6 @@ void DefragGui::prepare_cells_for_cluster_range(uint64_t cluster_start_square_nu
     auto colors_map = cluster_info_.get();
 
     for (uint64_t ii = cluster_start_square_num; ii < cluster_end_square_num; ii++) {
-        [[maybe_unused]] auto current_color = DrawColor::Empty;
         ClusterSquareStruct::ColorBits cluster_group_colors{};
 
         for (uint64_t kk = ii * cluster_per_square;

@@ -88,12 +88,12 @@ int DefragGui::initialize(HINSTANCE instance, const int cmd_show, DefragLog *log
     ShowWindow(wnd_, cmd_show);
     UpdateWindow(wnd_);
 
-    SetTimer(wnd_, 1, 300, nullptr);
+    SetTimer(wnd_, 1, 1000, nullptr);
 
     return 1;
 }
 
-WPARAM DefragGui::do_modal() {
+WPARAM DefragGui::windows_event_loop() {
     // The main message thread
     while (true) {
         const int get_message_result = GetMessage(&message_, nullptr, 0, 0);
@@ -394,18 +394,22 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             return 0;
         }
 
+            // case WM_SIZING:
         case WM_SIZE: {
             std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
-
             PAINTSTRUCT ps{};
 
             instance_->dc_ = BeginPaint(wnd, &ps);
             instance_->set_display_data(instance_->dc_);
             instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
+
             instance_->repaint_window(instance_->dc_);
             EndPaint(wnd, &ps);
 
             return 0;
+        }
+
+        default: {
         }
     }
 
