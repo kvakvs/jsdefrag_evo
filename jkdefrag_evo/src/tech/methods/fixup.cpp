@@ -23,7 +23,7 @@
 - Move SpaceHogs out of the directory- and regular zones.
 - Move items out of the MFT reserved zones
 */
-void DefragLib::fixup(DefragState *data) {
+void DefragLib::fixup(DefragState &data) {
     WIN32_FILE_ATTRIBUTE_DATA attributes;
     DefragGui *gui = DefragGui::get_instance();
 
@@ -34,18 +34,18 @@ void DefragLib::fixup(DefragState *data) {
 
     // Initialize the width of the progress bar: the total number of clusters of all the items
     ItemStruct *item;
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
         if (item->clusters_count_ == 0) continue;
 
-        data->phase_todo_ = data->phase_todo_ + item->clusters_count_;
+        data.phase_todo_ += item->clusters_count_;
     }
 
     // [[maybe_unused]] micro64_t last_calc_time = system_time;
 
     // Exit if nothing to do
-    if (data->phase_todo_ == 0) return;
+    if (data.phase_todo_ == 0) return;
 
     // Walk through all files and move the files that need to be moved.
     uint64_t gap_begin[3];
@@ -57,9 +57,9 @@ void DefragLib::fixup(DefragState *data) {
         gap_end[file_zone] = 0;
     }
 
-    auto next_item = Tree::smallest(data->item_tree_);
+    auto next_item = Tree::smallest(data.item_tree_);
 
-    while (next_item != nullptr && *data->running_ == RunningState::RUNNING) {
+    while (next_item != nullptr && *data.running_ == RunningState::RUNNING) {
         // The loop will change the position of the item in the tree, so we have to determine the next item before executing the loop.
         item = next_item;
 
@@ -88,29 +88,29 @@ void DefragLib::fixup(DefragState *data) {
         }
 
         if (move_me == false &&
-            ((item_lcn >= data->mft_excludes_[0].start_ && item_lcn < data->mft_excludes_[0].end_) ||
-             (item_lcn >= data->mft_excludes_[1].start_ && item_lcn < data->mft_excludes_[1].end_) ||
-             (item_lcn >= data->mft_excludes_[2].start_ && item_lcn < data->mft_excludes_[2].end_))
-            && (data->disk_.type_ != DiskType::NTFS || !match_mask(item->get_long_path(), L"?:\\$MFT"))) {
+            ((item_lcn >= data.mft_excludes_[0].start_ && item_lcn < data.mft_excludes_[0].end_) ||
+             (item_lcn >= data.mft_excludes_[1].start_ && item_lcn < data.mft_excludes_[1].end_) ||
+             (item_lcn >= data.mft_excludes_[2].start_ && item_lcn < data.mft_excludes_[2].end_))
+            && (data.disk_.type_ != DiskType::NTFS || !match_mask(item->get_long_path(), L"?:\\$MFT"))) {
             // "I am in MFT reserved space."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am in MFT reserved space.");
             move_me = true;
         }
 
-        if (file_zone == 1 && item_lcn < data->zones_[1] && move_me == false) {
+        if (file_zone == 1 && item_lcn < data.zones_[1] && move_me == false) {
             // "I am a regular file in zone 1."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a regular file in zone 1.");
             move_me = true;
         }
 
-        if (file_zone == 2 && item_lcn < data->zones_[2] && move_me == false) {
+        if (file_zone == 2 && item_lcn < data.zones_[2] && move_me == false) {
             // "I am a spacehog in zone 1 or 2."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a spacehog in zone 1 or 2.");
             move_me = true;
         }
 
         if (move_me == false) {
-            data->phase_done_ = data->phase_done_ + item->clusters_count_;
+            data.clusters_done_ += item->clusters_count_;
             continue;
         }
 
@@ -124,7 +124,7 @@ void DefragLib::fixup(DefragState *data) {
                 const filetime64_t file_time = from_FILETIME(attributes.ftLastWriteTime);
 
                 if (file_time + std::chrono::minutes(15) > system_time) {
-                    data->phase_done_ = data->phase_done_ + item->clusters_count_;
+                    data.clusters_done_ += item->clusters_count_;
                     continue;
                 }
             }
@@ -132,7 +132,7 @@ void DefragLib::fixup(DefragState *data) {
 
         // If the file does not fit in the current gap then find another gap
         if (item->clusters_count_ > gap_end[file_zone] - gap_begin[file_zone]) {
-            result = find_gap(data, data->zones_[file_zone], 0, item->clusters_count_, true, false,
+            result = find_gap(data, data.zones_[file_zone], 0, item->clusters_count_, true, false,
                               &gap_begin[file_zone],
                               &gap_end[file_zone], FALSE);
 
@@ -146,8 +146,7 @@ void DefragLib::fixup(DefragState *data) {
 
                 gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
 
-                data->phase_done_ = data->phase_done_ + item->clusters_count_;
-
+                data.clusters_done_ += item->clusters_count_;
                 continue;
             }
         }

@@ -26,17 +26,17 @@
 //
 // Note: the program only knows if a file is unmovable after it has tried to move a file. So we have to recalculate the
 // beginning of the zones every time we encounter an unmovable file.
-void DefragLib::calculate_zones(DefragState *data) {
+void DefragLib::calculate_zones(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
 
     // Calculate the number of clusters in movable items for every zone
     uint64_t size_of_movable_files[3] = {};
     // for (auto zone = 0; zone <= 2; zone++) size_of_movable_files[zone] = 0;
 
-    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
-        if (item->is_dir_ && data->cannot_move_dirs_ > 20) continue;
+        if (item->is_dir_ && data.cannot_move_dirs_ > 20) continue;
 
         auto preferred_zone = item->get_preferred_zone();
         size_of_movable_files[(size_t) preferred_zone] += item->clusters_count_;
@@ -53,10 +53,10 @@ void DefragLib::calculate_zones(DefragState *data) {
     for (int iterate = 1; iterate <= 10; iterate++) {
         // Calculate the end of the zones
         zone_end[0] = size_of_movable_files[0] + size_of_unmovable_fragments[0] +
-                      (uint64_t) (data->total_clusters_ * data->free_space_ / 100.0);
+                      (uint64_t) (data.total_clusters_ * data.free_space_ / 100.0);
 
         zone_end[1] = zone_end[0] + size_of_movable_files[1] + size_of_unmovable_fragments[1] +
-                      (uint64_t) (data->total_clusters_ * data->free_space_ / 100.0);
+                      (uint64_t) (data.total_clusters_ * data.free_space_ / 100.0);
 
         zone_end[2] = zone_end[1] + size_of_movable_files[2] + size_of_unmovable_fragments[2];
 
@@ -81,24 +81,24 @@ void DefragLib::calculate_zones(DefragState *data) {
 
         // The MFT reserved areas are counted as unmovable data
         for (auto i = 0; i < 3; i++) {
-            if (data->mft_excludes_[i].start_ < zone_end[0]) {
+            if (data.mft_excludes_[i].start_ < zone_end[0]) {
                 size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0]
-                                                 + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
-            } else if (data->mft_excludes_[i].start_ < zone_end[1]) {
+                                                 + data.mft_excludes_[i].end_ - data.mft_excludes_[i].start_;
+            } else if (data.mft_excludes_[i].start_ < zone_end[1]) {
                 size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1]
-                                                 + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
-            } else if (data->mft_excludes_[i].start_ < zone_end[2]) {
+                                                 + data.mft_excludes_[i].end_ - data.mft_excludes_[i].start_;
+            } else if (data.mft_excludes_[i].start_ < zone_end[2]) {
                 size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2]
-                                                 + data->mft_excludes_[i].end_ - data->mft_excludes_[i].start_;
+                                                 + data.mft_excludes_[i].end_ - data.mft_excludes_[i].start_;
             }
         }
 
         // Walk through all items and count the unmovable fragments. Ignore unmovable fragments
         // in the MFT zones, we have already counted the zones
-        for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (!item->is_unmovable_ &&
                 !item->is_excluded_ &&
-                (!item->is_dir_ || data->cannot_move_dirs_ <= 20)) {
+                (!item->is_dir_ || data.cannot_move_dirs_ <= 20)) {
                 continue;
             }
 
@@ -107,9 +107,9 @@ void DefragLib::calculate_zones(DefragState *data) {
 
             for (auto frag = item->fragments_; frag != nullptr; frag = frag->next_) {
                 if (frag->lcn_ != VIRTUALFRAGMENT) {
-                    if ((frag->lcn_ < data->mft_excludes_[0].start_ || frag->lcn_ >= data->mft_excludes_[0].end_)
-                        && (frag->lcn_ < data->mft_excludes_[1].start_ || frag->lcn_ >= data->mft_excludes_[1].end_)
-                        && (frag->lcn_ < data->mft_excludes_[2].start_ || frag->lcn_ >= data->mft_excludes_[2].end_)) {
+                    if ((frag->lcn_ < data.mft_excludes_[0].start_ || frag->lcn_ >= data.mft_excludes_[0].end_)
+                        && (frag->lcn_ < data.mft_excludes_[1].start_ || frag->lcn_ >= data.mft_excludes_[1].end_)
+                        && (frag->lcn_ < data.mft_excludes_[2].start_ || frag->lcn_ >= data.mft_excludes_[2].end_)) {
 
                         if (frag->lcn_ < zone_end[0]) {
                             size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + frag->next_vcn_ - vcn;
@@ -129,9 +129,9 @@ void DefragLib::calculate_zones(DefragState *data) {
     }
 
     // Calculated the begin of the zones
-    data->zones_[0] = 0;
+    data.zones_[0] = 0;
 
-    for (auto i = 1; i <= 3; i++) data->zones_[i] = zone_end[i - 1];
+    for (auto i = 1; i <= 3; i++) data.zones_[i] = zone_end[i - 1];
 }
 
 /* For debugging only: compare the data with the output from the
@@ -140,7 +140,7 @@ Note: Reparse points will usually be flagged as different. A reparse point is
 a symbolic link. The CreateFile call will resolve the symbolic link and retrieve
 the info from the real item, but the MFT contains the info from the symbolic
 link. */
-[[maybe_unused]] void DefragLib::compare_items([[maybe_unused]] DefragState *data, const ItemStruct *item) const {
+[[maybe_unused]] void DefragLib::compare_items([[maybe_unused]] DefragState &data, const ItemStruct *item) const {
     HANDLE file_handle;
     uint64_t clusters; // Total number of clusters
     STARTING_VCN_INPUT_BUFFER retrieve_param;
@@ -405,7 +405,7 @@ int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_fi
 
 // Scan all files in a directory and all it's subdirectories (recursive)
 // and store the information in a tree in memory for later use by the optimizer
-void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *parent_directory) {
+void DefragLib::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *parent_directory) {
     DefragGui *gui = DefragGui::get_instance();
 
     /* Slow the program down to the percentage that was specified on the
@@ -450,7 +450,7 @@ void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *par
     wchar_t path_buf2[MAX_PATH];
 
     do {
-        if (*data->running_ != RunningState::RUNNING) break;
+        if (*data.running_ != RunningState::RUNNING) break;
 
         if (wcscmp(find_file_data.cFileName, L".") == 0) continue;
         if (wcscmp(find_file_data.cFileName, L"..") == 0) continue;
@@ -496,24 +496,24 @@ void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *par
         if (!result) continue;
 
         // Increment counters
-        data->count_all_files_ = data->count_all_files_ + 1;
-        data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
-        data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
+        data.count_all_files_ += 1;
+        data.count_all_bytes_ += item->bytes_;
+        data.count_all_clusters_ += item->clusters_count_;
 
         if (is_fragmented(item.get(), 0, item->clusters_count_)) {
-            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
-            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + item->bytes_;
-            data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + item->clusters_count_;
+            data.count_fragmented_items_ += 1;
+            data.count_fragmented_bytes_ += item->bytes_;
+            data.count_fragmented_clusters_ += item->clusters_count_;
         }
 
-        data->phase_done_ = data->phase_done_ + item->clusters_count_;
+        data.clusters_done_ += item->clusters_count_;
 
         // Show progress message
         gui->show_analyze(data, item.get());
 
         // If it's a directory then iterate subdirectories
         if (item->is_dir_) {
-            data->count_directories_ = data->count_directories_ + 1;
+            data.count_directories_ += 1;
             // length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 4;
             auto temp_path = std::format(L"{}\\{}\\*", root_path.get(), find_file_data.cFileName);
             scan_dir(data, temp_path.c_str(), item.get());
@@ -563,7 +563,7 @@ void DefragLib::scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *par
         }
 
         // Add the item to the ItemTree in memory
-        Tree::insert(data->item_tree_, data->balance_count_, item.release());
+        Tree::insert(data.item_tree_, data.balance_count_, item.release());
     } while (FindNextFileW(find_handle, &find_file_data) != 0);
 
     FindClose(find_handle);

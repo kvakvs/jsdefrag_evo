@@ -19,7 +19,7 @@
 
 // Scan all files in a volume and store the information in a tree in
 // memory for later use by the optimizer.
-void DefragLib::analyze_volume(DefragState *data) {
+void DefragLib::analyze_volume(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
     ScanFAT *scan_fat = ScanFAT::get_instance();
     ScanNTFS *scan_ntfs = ScanNTFS::get_instance();
@@ -41,40 +41,40 @@ void DefragLib::analyze_volume(DefragState *data) {
     bool result = scan_ntfs->analyze_ntfs_volume(data);
 
     // Scan FAT disks
-    if (result == FALSE && *data->running_ == RunningState::RUNNING) result = scan_fat->analyze_fat_volume(data);
+    if (result == FALSE && *data.running_ == RunningState::RUNNING) result = scan_fat->analyze_fat_volume(data);
 
     // Scan all other filesystems
-    if (result == FALSE && *data->running_ == RunningState::RUNNING) {
+    if (result == FALSE && *data.running_ == RunningState::RUNNING) {
         gui->show_debug(DebugLevel::Fatal, nullptr, L"This is not a FAT or NTFS disk, using the slow scanner.");
 
         // Setup the width of the progress bar
-        data->phase_todo_ = data->total_clusters_ - data->count_free_clusters_;
+        data.phase_todo_ = data.total_clusters_ - data.count_free_clusters_;
 
-        for (auto &mft_exclude: data->mft_excludes_) {
-            data->phase_todo_ = data->phase_todo_ - (mft_exclude.end_ - mft_exclude.start_);
+        for (auto &mft_exclude: data.mft_excludes_) {
+            data.phase_todo_ -= (mft_exclude.end_ - mft_exclude.start_);
         }
 
         // Scan all the files
-        scan_dir(data, data->include_mask_, nullptr);
+        scan_dir(data, data.include_mask_, nullptr);
     }
 
     // Update the diskmap with the colors
-    data->phase_done_ = data->phase_todo_;
+    data.clusters_done_ = data.phase_todo_;
     gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
     // Set up the progress counter and the file/dir counters
-    data->phase_done_ = 0;
-    data->phase_todo_ = 0;
+    data.clusters_done_ = 0;
+    data.phase_todo_ = 0;
 
-    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
-        data->phase_todo_ = data->phase_todo_ + 1;
+    for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        data.phase_todo_ += 1;
     }
 
-    gui->show_analyze(nullptr, nullptr);
+    gui->show_analyze(data, nullptr);
 
     // Walk through all the items one by one
-    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
-        if (*data->running_ != RunningState::RUNNING) break;
+    for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        if (*data.running_ != RunningState::RUNNING) break;
 
         // If requested then redraw the diskmap
         //		if (*Data->RedrawScreen == 1) m_jkGui->show_diskmap(Data);
@@ -86,15 +86,15 @@ void DefragLib::analyze_volume(DefragState *data) {
         if (!item->have_short_path()) item->set_short_path(get_short_path(data, item).c_str());
 
         // Apply the Mask and set the Exclude flag of all items that do not match
-        if (!match_mask(item->get_long_path(), data->include_mask_) &&
-            !match_mask(item->get_short_path(), data->include_mask_)) {
+        if (!match_mask(item->get_long_path(), data.include_mask_) &&
+            !match_mask(item->get_short_path(), data.include_mask_)) {
             item->is_excluded_ = true;
             colorize_disk_item(data, item, 0, 0, false);
         }
 
         // Determine if the item is to be excluded by comparing its name with the Exclude masks.
         if (!item->is_excluded_) {
-            for (auto &s: data->excludes_) {
+            for (auto &s: data.excludes_) {
                 if (match_mask(item->get_long_path(), s.c_str()) ||
                     match_mask(item->get_short_path(), s.c_str())) {
                     item->is_excluded_ = true;
@@ -119,14 +119,14 @@ void DefragLib::analyze_volume(DefragState *data) {
         // The item is a SpaceHog if it's larger than 50 megabytes, or last access time
         // is more than 30 days ago, or if it's filename matches a SpaceHog mask. */
         if (!item->is_excluded_ && !item->is_dir_) {
-            if (data->use_default_space_hogs_ && item->bytes_ > kilobytes(50)) {
+            if (data.use_default_space_hogs_ && item->bytes_ > kilobytes(50)) {
                 item->is_hog_ = true;
-            } else if (data->use_default_space_hogs_ &&
-                       data->use_last_access_time_ == TRUE &&
+            } else if (data.use_default_space_hogs_ &&
+                       data.use_last_access_time_ == TRUE &&
                        item->last_access_time_ + std::chrono::seconds(30UL * 24UL * 3600UL) < system_time) {
                 item->is_hog_ = true;
             } else {
-                for (const auto &s: data->space_hogs_) {
+                for (const auto &s: data.space_hogs_) {
                     if (match_mask(item->get_long_path(), s.c_str()) ||
                         match_mask(item->get_short_path(), s.c_str())) {
                         item->is_hog_ = true;
@@ -159,13 +159,13 @@ void DefragLib::analyze_volume(DefragState *data) {
         }
 
         // Update the progress percentage
-        data->phase_done_ = data->phase_done_ + 1;
+        data.clusters_done_ += 1;
 
-        if (data->phase_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, DrawColor::Empty);
+        if (data.clusters_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, DrawColor::Empty);
     }
 
     // Force the percentage to 100%
-    data->phase_done_ = data->phase_todo_;
+    data.clusters_done_ = data.phase_todo_;
     gui->draw_cluster(data, 0, 0, DrawColor::Empty);
 
     // Calculate the begin of the zone's

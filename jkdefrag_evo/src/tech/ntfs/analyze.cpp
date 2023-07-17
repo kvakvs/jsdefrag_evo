@@ -18,7 +18,7 @@
 #include "precompiled_header.h"
 
 // Load the MFT into a list of ItemStruct records in memory
-bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
+bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
 
     // Read the boot block from the disk
@@ -31,7 +31,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     };
 
     DWORD bytes_read;
-    auto result = ReadFile(data->disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
+    auto result = ReadFile(data.disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
 
     if (result == 0 || bytes_read != 512) {
         gui->show_debug(DebugLevel::Progress, nullptr,
@@ -50,7 +50,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     // Extract data from the bootblock
     NtfsDiskInfoStruct disk_info{};
 
-    data->disk_.type_ = DiskType::NTFS;
+    data.disk_.type_ = DiskType::NTFS;
     disk_info.bytes_per_sector_ = *(USHORT *) &buffer[11];
 
     // Still to do: check for impossible values
@@ -71,10 +71,10 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     disk_info.clusters_per_index_record_ = *(ULONG *) &buffer[68];
 
-    data->bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
+    data.bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
 
     if (disk_info.sectors_per_cluster_ > 0) {
-        data->total_clusters_ = disk_info.total_sectors_ / disk_info.sectors_per_cluster_;
+        data.total_clusters_ = disk_info.total_sectors_ / disk_info.sectors_per_cluster_;
     }
 
     gui->show_debug(DebugLevel::Fatal, nullptr, std::format(
@@ -98,7 +98,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     // Calculate the size of first 16 Inodes in the MFT. The Microsoft defragmentation
     // API cannot move these inodes
-    data->disk_.mft_locked_clusters_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_ / disk_info.
+    data.disk_.mft_locked_clusters_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_ / disk_info.
             bytes_per_mft_record_;
 
     // Read the $MFT record from disk into memory, which is always the first record in the MFT
@@ -107,7 +107,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     g_overlapped.Offset = trans.LowPart;
     g_overlapped.OffsetHigh = trans.HighPart;
     g_overlapped.hEvent = nullptr;
-    result = ReadFile(data->disk_.volume_handle_, buffer.get(),
+    result = ReadFile(data.disk_.volume_handle_, buffer.get(),
                       (uint32_t) disk_info.bytes_per_mft_record_, &bytes_read,
                       &g_overlapped);
 
@@ -138,8 +138,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
         mft_data_fragments == nullptr || mft_data_bytes == 0 ||
         mft_bitmap_fragments == nullptr || mft_bitmap_bytes == 0) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"Fatal error, cannot process this disk.");
-        Tree::delete_tree(data->item_tree_);
-        data->item_tree_ = nullptr;
+        Tree::delete_tree(data.item_tree_);
+        data.item_tree_ = nullptr;
         return false;
     }
 
@@ -195,7 +195,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                                         (fragment->next_vcn_ - vcn) * disk_info.bytes_per_sector_ *
                                         disk_info.sectors_per_cluster_, fragment->lcn_));
 
-            result = ReadFile(data->disk_.volume_handle_,
+            result = ReadFile(data.disk_.volume_handle_,
                               &mft_bitmap[real_vcn * disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_],
                               (uint32_t) ((fragment->next_vcn_ - vcn) * disk_info.bytes_per_sector_ * disk_info.
                                       sectors_per_cluster_),
@@ -205,8 +205,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                     sectors_per_cluster_) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
                                 std::format(L"  {}", DefragLib::system_error_str(GetLastError())));
-                Tree::delete_tree(data->item_tree_);
-                data->item_tree_ = nullptr;
+                Tree::delete_tree(data.item_tree_);
+                data.item_tree_ = nullptr;
                 return false;
             }
 
@@ -226,7 +226,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     }
 
     auto inode_array = std::make_unique<ItemStruct *[]>(max_inode);
-    inode_array[0] = data->item_tree_;
+    inode_array[0] = data.item_tree_;
     std::fill(inode_array.get() + 1, inode_array.get() + max_inode, nullptr);
 
     // Read and process all the records in the MFT. The records are read into a
@@ -235,8 +235,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     vcn = 0;
     real_vcn = 0;
 
-    data->phase_done_ = 0;
-    data->phase_todo_ = 0;
+    data.clusters_done_ = 0;
+    data.phase_todo_ = 0;
 
     Clock::time_point start_time = Clock::now();
 
@@ -244,7 +244,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
     for (auto inode_number = 1; inode_number < max_inode; inode_number++) {
         if ((mft_bitmap[inode_number >> 3] & bitmap_masks[inode_number % 8]) == 0) continue;
 
-        data->phase_todo_ = data->phase_todo_ + 1;
+        data.phase_todo_ += 1;
     }
 
     uint64_t block_start;
@@ -252,7 +252,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
 
     // For all inodes, while we are in the RUNNING state
     for (auto inode_number = 1; inode_number < max_inode; inode_number++) {
-        if (*data->running_ != RunningState::RUNNING) break;
+        if (*data.running_ != RunningState::RUNNING) break;
 
         // Ignore the Inode if the bitmap says it's not in use
         if ((mft_bitmap[inode_number >> 3] & bitmap_masks[inode_number % 8]) == 0) {
@@ -262,7 +262,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
         }
 
         // Update the progress counter
-        data->phase_done_ = data->phase_done_ + 1;
+        data.clusters_done_ += 1;
 
         // Read a block of inode's into memory
         if (inode_number >= block_end) {
@@ -316,7 +316,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                                     (block_end - block_start) * disk_info.bytes_per_mft_record_,
                                     trans.QuadPart / (disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_)));
 
-            result = ReadFile(data->disk_.volume_handle_, buffer.get(),
+            result = ReadFile(data.disk_.volume_handle_, buffer.get(),
                               (uint32_t) ((block_end - block_start) * disk_info.bytes_per_mft_record_), &bytes_read,
                               &g_overlapped);
 
@@ -325,8 +325,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                                 std::format(L"Error while reading Inodes " NUM_FMT " to " NUM_FMT ": reason {}",
                                             inode_number, block_end - 1, DefragLib::system_error_str(GetLastError())));
 
-                Tree::delete_tree(data->item_tree_);
-                data->item_tree_ = nullptr;
+                Tree::delete_tree(data.item_tree_);
+                data.item_tree_ = nullptr;
                 return FALSE;
             }
         }
@@ -358,14 +358,14 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState *data) {
                                     max_inode * 1000 / diff_ms));
     }
 
-    if (*data->running_ != RunningState::RUNNING) {
-        Tree::delete_tree(data->item_tree_);
-        data->item_tree_ = nullptr;
+    if (*data.running_ != RunningState::RUNNING) {
+        Tree::delete_tree(data.item_tree_);
+        data.item_tree_ = nullptr;
         return false;
     }
 
     // Setup the ParentDirectory in all the items with the info in the InodeArray
-    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         item->parent_directory_ = inode_array[item->parent_inode_];
 
         if (item->parent_inode_ == 5) item->parent_directory_ = nullptr;

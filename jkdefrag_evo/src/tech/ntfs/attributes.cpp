@@ -21,7 +21,7 @@
  * \brief Process a list of attributes and store the gathered information in the Item struct. Return FALSE if an error occurred.
  */
 void
-ScanNTFS::process_attribute_list(DefragState *data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data,
+ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data,
                                  BYTE *buffer, const uint64_t buf_length, const int depth) {
     std::unique_ptr<BYTE[]> buffer_2;
     ATTRIBUTE_LIST *attribute;
@@ -125,7 +125,7 @@ ScanNTFS::process_attribute_list(DefragState *data, NtfsDiskInfoStruct *disk_inf
         g_overlapped.OffsetHigh = trans.HighPart;
         g_overlapped.hEvent = nullptr;
 
-        int result = ReadFile(data->disk_.volume_handle_, buffer_2.get(), (uint32_t) disk_info->bytes_per_mft_record_,
+        int result = ReadFile(data.disk_.volume_handle_, buffer_2.get(), (uint32_t) disk_info->bytes_per_mft_record_,
                               &bytes_read,
                               &g_overlapped);
 
@@ -184,7 +184,7 @@ ScanNTFS::process_attribute_list(DefragState *data, NtfsDiskInfoStruct *disk_inf
 
 // Process a list of attributes and store the gathered information in the Item
 // struct. Return FALSE if an error occurred
-bool ScanNTFS::process_attributes(DefragState *data, NtfsDiskInfoStruct *disk_info,
+bool ScanNTFS::process_attributes(DefragState &data, NtfsDiskInfoStruct *disk_info,
                                   InodeDataStruct *inode_data, BYTE *buffer, const uint64_t buf_length,
                                   const USHORT instance, const int depth) {
     std::unique_ptr<BYTE[]> buffer_2;

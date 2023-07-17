@@ -37,7 +37,7 @@ ScanNTFS *ScanNTFS::get_instance() {
  * \param offset Bytes to skip from begin of data
  * \return Return a malloc'ed buffer with the data, or nullptr if error. Note: The caller owns the returned buffer.
  */
-BYTE *ScanNTFS::read_non_resident_data(const DefragState *data, const NtfsDiskInfoStruct *disk_info,
+BYTE *ScanNTFS::read_non_resident_data(const DefragState &data, const NtfsDiskInfoStruct *disk_info,
                                        const BYTE *run_data, const uint32_t run_data_length,
                                        const uint64_t offset, uint64_t wanted_length) {
     union UlongBytes {
@@ -174,7 +174,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragState *data, const NtfsDiskIn
         g_overlapped.OffsetHigh = trans.HighPart;
         g_overlapped.hEvent = nullptr;
 
-        if (const errno_t result = ReadFile(data->disk_.volume_handle_, &buffer[extent_vcn - offset],
+        if (const errno_t result = ReadFile(data.disk_.volume_handle_, &buffer[extent_vcn - offset],
                                             (uint32_t) extent_length, &bytes_read, &g_overlapped); result == 0) {
             gui->show_debug(DebugLevel::Progress, nullptr,
                             std::format(L"Error while reading disk: {}", DefragLib::system_error_str(GetLastError())));
@@ -187,7 +187,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragState *data, const NtfsDiskIn
 
 // Read the RunData list and translate into a list of fragments
 bool ScanNTFS::translate_rundata_to_fragmentlist(
-        const DefragState *data, InodeDataStruct *inode_data, const wchar_t *stream_name,
+        const DefragState &data, InodeDataStruct *inode_data, const wchar_t *stream_name,
         ATTRIBUTE_TYPE stream_type, const BYTE *run_data, const uint32_t run_data_length, const uint64_t starting_vcn,
         const uint64_t bytes) {
     StreamStruct *stream;
@@ -207,7 +207,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
-    if (data == nullptr || inode_data == nullptr) return FALSE;
+    if (inode_data == nullptr) return false;
 
     // Find the stream in the list of streams. If not found then create a new stream
     for (stream = inode_data->streams_; stream != nullptr; stream = stream->next_) {

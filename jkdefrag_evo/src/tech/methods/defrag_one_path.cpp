@@ -19,7 +19,7 @@
 
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
-void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, OptimizeMode opt_mode) {
+void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, OptimizeMode opt_mode) {
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
@@ -29,7 +29,7 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     DefragGui *gui = DefragGui::get_instance();
 
     // Compare the item with the Exclude masks. If a mask matches then return, ignoring the item.
-    for (const auto &s: data->excludes_) {
+    for (const auto &s: data.excludes_) {
         if (DefragLib::match_mask(path, s.c_str())) break;
         if (wcschr(s.c_str(), L'*') == nullptr && s.length() <= 3 && lower_case(path[0]) == lower_case(s[0])) {
             break;
@@ -37,10 +37,10 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     }
 
     // TODO: fix this?
-//    if (data->excludes_.size() >= i) {
+//    if (data.excludes_.size() >= i) {
 //        // Show debug message: "Ignoring volume '%s' because of exclude mask '%s'."
 //        gui->show_debug(DebugLevel::Fatal, nullptr,
-//                        std::format(L"Ignoring volume '{}' because of exclude mask '{}'.", path, data->excludes_[i]));
+//                        std::format(L"Ignoring volume '{}' because of exclude mask '{}'.", path, data.excludes_[i]));
 //        return;
 //    }
 
@@ -74,61 +74,61 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     /* Try finding the MountPoint by treating the input path as a path to
     something on the disk. If this does not succeed then use the Path as
     a literal MountPoint name. */
-    data->disk_.mount_point_.reset(_wcsdup(path));
+    data.disk_.mount_point_.reset(_wcsdup(path));
 
-    auto result = GetVolumePathNameW(path, data->disk_.mount_point_.get(),
-                                     (uint32_t) wcslen(data->disk_.mount_point_.get()) + 1);
+    auto result = GetVolumePathNameW(path, data.disk_.mount_point_.get(),
+                                     (uint32_t) wcslen(data.disk_.mount_point_.get()) + 1);
 
     if (result == FALSE) {
-        wcscpy_s(data->disk_.mount_point_.get(), wcslen(path) + 1, path);
+        wcscpy_s(data.disk_.mount_point_.get(), wcslen(path) + 1, path);
     }
 
     // Make two versions of the MountPoint, one with a trailing backslash and one without
-    wchar_t *p1 = wcschr(data->disk_.mount_point_.get(), 0);
+    wchar_t *p1 = wcschr(data.disk_.mount_point_.get(), 0);
 
-    if (p1 != data->disk_.mount_point_.get()) {
+    if (p1 != data.disk_.mount_point_.get()) {
         p1--;
         if (*p1 == '\\') *p1 = 0;
     }
 
-    size_t length = wcslen(data->disk_.mount_point_.get()) + 2;
-    data->disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
+    size_t length = wcslen(data.disk_.mount_point_.get()) + 2;
+    data.disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
 
-    swprintf_s(data->disk_.mount_point_slash_.get(), length, L"%s\\", data->disk_.mount_point_.get());
+    swprintf_s(data.disk_.mount_point_slash_.get(), length, L"%s\\", data.disk_.mount_point_.get());
 
     // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
-    result = GetVolumeNameForVolumeMountPointW(data->disk_.mount_point_slash_.get(),
-                                               data->disk_.volume_name_slash_, MAX_PATH);
+    result = GetVolumeNameForVolumeMountPointW(data.disk_.mount_point_slash_.get(),
+                                               data.disk_.volume_name_slash_, MAX_PATH);
 
     if (result == FALSE) {
-        if (wcslen(data->disk_.mount_point_slash_.get()) > 52 - 1 - 4) {
+        if (wcslen(data.disk_.mount_point_slash_.get()) > 52 - 1 - 4) {
             // "Cannot find volume name for mountpoint '%s': %s"
             gui->show_debug(DebugLevel::Fatal, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
-                                        data->disk_.mount_point_slash_.get(), system_error_str(GetLastError())));
+                                        data.disk_.mount_point_slash_.get(), system_error_str(GetLastError())));
 
-            data->disk_.mount_point_.reset();
-            data->disk_.mount_point_slash_.reset();
+            data.disk_.mount_point_.reset();
+            data.disk_.mount_point_slash_.reset();
 
             return;
         }
 
-        swprintf_s(data->disk_.volume_name_slash_, 52, L"\\\\.\\%s", data->disk_.mount_point_slash_.get());
+        swprintf_s(data.disk_.volume_name_slash_, 52, L"\\\\.\\%s", data.disk_.mount_point_slash_.get());
     }
 
     // Make a copy of the VolumeName without the trailing backslash
-    wcscpy_s(data->disk_.volume_name_, 51, data->disk_.volume_name_slash_);
+    wcscpy_s(data.disk_.volume_name_, 51, data.disk_.volume_name_slash_);
 
-    p1 = wcschr(data->disk_.volume_name_, 0);
+    p1 = wcschr(data.disk_.volume_name_, 0);
 
-    if (p1 != data->disk_.volume_name_) {
+    if (p1 != data.disk_.volume_name_) {
         p1--;
         if (*p1 == '\\') *p1 = 0;
     }
 
     // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
-    // length = wcslen(data->disk_.mount_point_slash_.get()) + 14;
-    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data->disk_.mount_point_slash_.get());
+    // length = wcslen(data.disk_.mount_point_slash_.get()) + 14;
+    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data.disk_.mount_point_slash_.get());
 
     FILE *fin;
     result = _wfopen_s(&fin, hibernation_path.c_str(), L"rb");
@@ -139,8 +139,8 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
             gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
 
-            data->disk_.mount_point_.reset();
-            data->disk_.mount_point_slash_.reset();
+            data.disk_.mount_point_.reset();
+            data.disk_.mount_point_slash_.reset();
 
             return;
         }
@@ -148,23 +148,23 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
 
     // Show debug message: "Opening volume '%s' at mountpoint '%s'"
     gui->show_debug(DebugLevel::Fatal, nullptr,
-                    std::format(L"Opening volume '{}' at mountpoint '{}'", data->disk_.volume_name_,
-                                data->disk_.mount_point_.get()));
+                    std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
+                                data.disk_.mount_point_.get()));
 
     // Open the VolumeHandle. If error then leave.
-    data->disk_.volume_handle_ = CreateFileW(
-            data->disk_.volume_name_, GENERIC_READ,
+    data.disk_.volume_handle_ = CreateFileW(
+            data.disk_.volume_name_, GENERIC_READ,
             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
             0, nullptr);
 
-    if (data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
+    if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
         gui->show_debug(DebugLevel::Warning, nullptr,
                         std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    data->disk_.volume_name_, data->disk_.mount_point_.get(),
+                                    data.disk_.volume_name_, data.disk_.mount_point_.get(),
                                     system_error_str(GetLastError())));
 
-        data->disk_.mount_point_.reset();
-        data->disk_.mount_point_slash_.reset();
+        data.disk_.mount_point_.reset();
+        data.disk_.mount_point_slash_.reset();
         return;
     }
 
@@ -178,7 +178,7 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     bitmap_param.StartingLcn.QuadPart = 0;
 
     DWORD w;
-    DWORD error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+    DWORD error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                        &bitmap_param, sizeof bitmap_param, &bitmap_data,
                                        sizeof bitmap_data, &w, nullptr);
 
@@ -191,18 +191,18 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
         // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
         gui->show_debug(DebugLevel::Fatal, nullptr,
-                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data->disk_.volume_name_,
-                                    data->disk_.mount_point_.get()));
+                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
+                                    data.disk_.mount_point_.get()));
 
-        CloseHandle(data->disk_.volume_handle_);
+        CloseHandle(data.disk_.volume_handle_);
 
-        data->disk_.mount_point_.reset();
-        data->disk_.mount_point_slash_.reset();
+        data.disk_.mount_point_.reset();
+        data.disk_.mount_point_slash_.reset();
 
         return;
     }
 
-    data->total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
+    data.total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
     /* Determine the number of bytes per cluster.
     Again I have to do this in a roundabout manner. As far as I know there is
@@ -216,14 +216,14 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
                                      (PULARGE_INTEGER) &total_bytes,
                                      (PULARGE_INTEGER) &free_bytes);
 
-    if (error_code != 0) data->bytes_per_cluster_ = total_bytes / data->total_clusters_;
+    if (error_code != 0) data.bytes_per_cluster_ = total_bytes / data.total_clusters_;
 
     // Setup the list of clusters that cannot be used. The Master File Table cannot be moved and cannot be used by
     // files. All this is only necessary for NTFS volumes.
     NTFS_VOLUME_DATA_BUFFER ntfs_data;
 
     DWORD w2;
-    error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_NTFS_VOLUME_DATA,
+    error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_NTFS_VOLUME_DATA,
                                  nullptr, 0, &ntfs_data, sizeof ntfs_data,
                                  &w2, nullptr);
 
@@ -231,16 +231,16 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
         /* Note: NtfsData.TotalClusters.QuadPart should be exactly the same
         as the Data->TotalClusters that was determined in the previous block. */
 
-        data->bytes_per_cluster_ = ntfs_data.BytesPerCluster;
+        data.bytes_per_cluster_ = ntfs_data.BytesPerCluster;
 
-        data->mft_excludes_[0].start_ = ntfs_data.MftStartLcn.QuadPart;
-        data->mft_excludes_[0].end_ = ntfs_data.MftStartLcn.QuadPart +
-                                      ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
-        data->mft_excludes_[1].start_ = ntfs_data.MftZoneStart.QuadPart;
-        data->mft_excludes_[1].end_ = ntfs_data.MftZoneEnd.QuadPart;
-        data->mft_excludes_[2].start_ = ntfs_data.Mft2StartLcn.QuadPart;
-        data->mft_excludes_[2].end_ = ntfs_data.Mft2StartLcn.QuadPart +
-                                      ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
+        data.mft_excludes_[0].start_ = ntfs_data.MftStartLcn.QuadPart;
+        data.mft_excludes_[0].end_ = ntfs_data.MftStartLcn.QuadPart +
+                                     ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
+        data.mft_excludes_[1].start_ = ntfs_data.MftZoneStart.QuadPart;
+        data.mft_excludes_[1].end_ = ntfs_data.MftZoneEnd.QuadPart;
+        data.mft_excludes_[2].start_ = ntfs_data.Mft2StartLcn.QuadPart;
+        data.mft_excludes_[2].end_ = ntfs_data.Mft2StartLcn.QuadPart +
+                                     ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
 
         // Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d"
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
@@ -252,11 +252,11 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
 
         // Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d"
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 0, data->mft_excludes_[0].start_, 0, data->mft_excludes_[0].end_));
+                        std::format(MFT_EXCL_FMT, 0, data.mft_excludes_[0].start_, 0, data.mft_excludes_[0].end_));
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 1, data->mft_excludes_[1].start_, 1, data->mft_excludes_[1].end_));
+                        std::format(MFT_EXCL_FMT, 1, data.mft_excludes_[1].start_, 1, data.mft_excludes_[1].end_));
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 2, data->mft_excludes_[2].start_, 2, data->mft_excludes_[2].end_));
+                        std::format(MFT_EXCL_FMT, 2, data.mft_excludes_[2].start_, 2, data.mft_excludes_[2].end_));
     }
 
     /* Fixup the input mask.
@@ -265,64 +265,64 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     */
     length = wcslen(path) + 3;
 
-    data->include_mask_ = new wchar_t[length];
+    data.include_mask_ = new wchar_t[length];
 
-    if (data->include_mask_ == nullptr) return;
+    if (data.include_mask_ == nullptr) return;
 
-    wcscpy_s(data->include_mask_, length, path);
+    wcscpy_s(data.include_mask_, length, path);
 
     if (wcslen(path) == 2 || wcslen(path) == 3) {
-        swprintf_s(data->include_mask_, length, L"%c:\\*", lower_case(path[0]));
+        swprintf_s(data.include_mask_, length, L"%c:\\*", lower_case(path[0]));
     } else if (wcschr(path, L'*') == nullptr) {
-        swprintf_s(data->include_mask_, length, L"%s*", path);
+        swprintf_s(data.include_mask_, length, L"%s*", path);
     }
 
-    gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"Input mask: {}", data->include_mask_));
+    gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"Input mask: {}", data.include_mask_));
 
     // Defragment and optimize
     gui->show_diskmap(data);
 
-    if (*data->running_ == RunningState::RUNNING) analyze_volume(data);
+    if (*data.running_ == RunningState::RUNNING) analyze_volume(data);
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeFixup) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeFixup) {
         defragment(data);
     }
 
-    if (*data->running_ == RunningState::RUNNING
+    if (*data.running_ == RunningState::RUNNING
         && (opt_mode == OptimizeMode::AnalyzeFixupFastopt
             || opt_mode == OptimizeMode::DeprecatedAnalyzeFixupFull)) {
         defragment(data);
 
-        if (*data->running_ == RunningState::RUNNING) fixup(data);
-        if (*data->running_ == RunningState::RUNNING) optimize_volume(data);
-        if (*data->running_ == RunningState::RUNNING) fixup(data); // Again, in case of new zone startpoint
+        if (*data.running_ == RunningState::RUNNING) fixup(data);
+        if (*data.running_ == RunningState::RUNNING) optimize_volume(data);
+        if (*data.running_ == RunningState::RUNNING) fixup(data); // Again, in case of new zone startpoint
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeGroup) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeGroup) {
         forced_fill(data);
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeMoveToEnd) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeMoveToEnd) {
         optimize_up(data);
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByName) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByName) {
         optimize_sort(data, 0); // Filename
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortBySize) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortBySize) {
         optimize_sort(data, 1); // Filesize
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
         optimize_sort(data, 2); // Last access
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
         optimize_sort(data, 3); // Last change
     }
 
-    if (*data->running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
+    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
         optimize_sort(data, 4); // Creation
     }
     /*
@@ -334,14 +334,14 @@ void DefragLib::defrag_one_path(DefragState *data, const wchar_t *path, Optimize
     call_show_status(data, DefragPhase::Done, Zone::None); // "Finished."
 
     // Close the volume handles
-    if (data->disk_.volume_handle_ != nullptr &&
-        data->disk_.volume_handle_ != INVALID_HANDLE_VALUE) {
-        CloseHandle(data->disk_.volume_handle_);
+    if (data.disk_.volume_handle_ != nullptr &&
+        data.disk_.volume_handle_ != INVALID_HANDLE_VALUE) {
+        CloseHandle(data.disk_.volume_handle_);
     }
 
     // Cleanup
-    Tree::delete_tree(data->item_tree_);
+    Tree::delete_tree(data.item_tree_);
 
-    data->disk_.mount_point_.reset();
-    data->disk_.mount_point_slash_.reset();
+    data.disk_.mount_point_.reset();
+    data.disk_.mount_point_slash_.reset();
 }

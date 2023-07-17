@@ -100,7 +100,7 @@ public:
     // Number of items to do in this Phase
     uint64_t phase_todo_{};
     // Number of items already done in this Phase
-    uint64_t phase_done_{};
+    uint64_t clusters_done_{};
 
     // Variables used to throttle the speed; Speed as a percentage 1..100
     uint64_t speed_{};

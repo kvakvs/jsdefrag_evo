@@ -18,7 +18,7 @@
 #include "precompiled_header.h"
 
 bool ScanNTFS::interpret_mft_record(
-        DefragState *data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
+        DefragState &data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
         const uint64_t inode_number, const uint64_t max_inode,
         PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
         PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
@@ -129,7 +129,7 @@ bool ScanNTFS::interpret_mft_record(
         mft_bitmap_bytes = inode_data.mft_bitmap_bytes_;
     }
 
-    // Create an item in the data->ItemTree for every stream
+    // Create an item in the data.ItemTree for every stream
     StreamStruct *stream = inode_data.streams_;
     do {
         // Create and fill a new item record in memory
@@ -163,30 +163,29 @@ bool ScanNTFS::interpret_mft_record(
         item->is_hog_ = false;
 
         // Increment counters
-        if (item->is_dir_ == true) {
-            data->count_directories_ = data->count_directories_ + 1;
+        if (item->is_dir_) {
+            data.count_directories_ += 1;
         }
 
-        data->count_all_files_ = data->count_all_files_ + 1;
+        data.count_all_files_ += 1;
 
         if (stream != nullptr && stream->stream_type_ == ATTRIBUTE_TYPE::AttributeData) {
-            data->count_all_bytes_ = data->count_all_bytes_ + inode_data.bytes_;
+            data.count_all_bytes_ += inode_data.bytes_;
         }
 
-        if (stream != nullptr) data->count_all_clusters_ = data->count_all_clusters_ + stream->clusters_;
+        if (stream != nullptr) data.count_all_clusters_ += stream->clusters_;
 
         if (DefragLib::get_fragment_count(item.get()) > 1) {
-            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
-            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + inode_data.bytes_;
+            data.count_fragmented_items_ += 1;
+            data.count_fragmented_bytes_ += inode_data.bytes_;
 
             if (stream != nullptr)
-                data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + stream->
-                        clusters_;
+                data.count_fragmented_clusters_ += stream->clusters_;
         }
 
         // Add the item record to the sorted item tree in memory
         auto last_created_item = item.release();
-        Tree::insert(data->item_tree_, data->balance_count_, last_created_item);
+        Tree::insert(data.item_tree_, data.balance_count_, last_created_item);
 
         // Also add the item to the array that is used to construct the full pathnames.
         // Note: if the array already contains an entry, and the new item has a shorter
@@ -236,7 +235,7 @@ array.
 
 */
 
-bool ScanNTFS::fixup_raw_mftdata(DefragState *data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
+bool ScanNTFS::fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
                                  const uint64_t buf_length) const {
     DefragGui *gui = DefragGui::get_instance();
 

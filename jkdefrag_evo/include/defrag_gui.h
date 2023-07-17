@@ -14,19 +14,23 @@ public:
 
     void clear_screen(std::wstring &&text);
 
-    void draw_cluster(const DefragState *data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
+    void draw_cluster(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
 
     void prepare_cells_for_cluster_range(uint64_t cluster_start_square_num, uint64_t cluster_end_square_num);
 
     void show_debug(DebugLevel level, const ItemStruct *item, std::wstring &&text);
 
-    void show_status(const DefragState *data);
+    void show_status(const DefragState &data);
 
-    void show_analyze(const DefragState *data, const ItemStruct *item);
+    void show_analyze(const DefragState &data, const ItemStruct *item);
+
+    void show_analyze_no_state(const ItemStruct *item);
+
+    void show_analyze_update_item_text(const ItemStruct *item);
 
     void show_move(const ItemStruct *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
 
-    void show_diskmap(DefragState *data);
+    void show_diskmap(DefragState &data);
 
     int initialize(HINSTANCE instance, int cmd_show, DefragLog *log, DebugLevel debug_level);
 
@@ -41,7 +45,7 @@ public:
     static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
 
 protected:
-    void write_stats(const DefragState *data);
+    void write_stats(const DefragState &data);
 
     void
     paint_background(Rect &window_size, Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const;

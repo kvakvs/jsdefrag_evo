@@ -196,36 +196,49 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
     repaint_window(dc_);
 }
 
+// Make sure this function does not run more often than 100ms
+static bool show_analyze_update_timer() {
+    static std::chrono::steady_clock::time_point last_time = std::chrono::steady_clock::now();
+    auto current_time = std::chrono::steady_clock::now();
+    auto duration = current_time - last_time;
 
-// Callback: for every file during analysis.
-// This subroutine is called one last time with Item=nullptr when analysis has finished
-void DefragGui::show_analyze(const DefragState *data, const ItemStruct *item) {
-    // Make sure this function does not run more often than 100ms
-    {
-        static std::chrono::steady_clock::time_point last_time = std::chrono::steady_clock::now();
-        auto currentTime = std::chrono::steady_clock::now();
-        auto duration = currentTime - last_time;
-
-        if (duration < std::chrono::milliseconds(100)) {
-            return;
-        }
-
-        last_time = currentTime;
+    if (duration < std::chrono::milliseconds(100)) {
+        return false;
     }
 
-    if (data != nullptr && data->count_all_files_ != 0) {
-        messages_[3] = std::format(L"Files " NUM_FMT ", Directories " NUM_FMT ", Clusters " NUM_FMT,
-                                   data->count_all_files_, data->count_directories_, data->count_all_clusters_);
-    } else {
-        messages_[3] = L"Applying Exclude and SpaceHogs masks....";
-    }
+    last_time = current_time;
+    return true;
+}
 
+void DefragGui::show_analyze_update_item_text(const ItemStruct *item) {
     // Save the name of the file in Messages 4
     if (item != nullptr && item->have_long_path()) {
         messages_[4] = item->get_long_path();
     } else {
         messages_[4].clear();
     }
+}
+
+void DefragGui::show_analyze_no_state(const ItemStruct *item) {
+    if (!show_analyze_update_timer()) return;
+
+    messages_[3] = L"Applying Exclude and SpaceHogs masks....";
+
+    show_analyze_update_item_text(item);
+    repaint_window(dc_);
+}
+
+// Callback: for every file during analysis.
+// This subroutine is called one last time with Item=nullptr when analysis has finished
+void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
+    if (!show_analyze_update_timer()) return;
+
+    if (data.count_all_files_ != 0) {
+        messages_[3] = std::format(L"Files " NUM_FMT ", Directories " NUM_FMT ", Clusters " NUM_FMT,
+                                   data.count_all_files_, data.count_directories_, data.count_all_clusters_);
+    }
+
+    show_analyze_update_item_text(item);
     repaint_window(dc_);
 }
 
@@ -246,20 +259,20 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
 }
 
 // Callback: paint a cluster on the screen in a given palette color
-void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_start, const uint64_t cluster_end,
+void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_start, const uint64_t cluster_end,
                              const DrawColor color) {
     [[maybe_unused]] Rect window_size = client_size_;
 
     // Save the PhaseTodo and PhaseDone counters for later use by the progress counter
-    if (data->phase_todo_ != 0) {
+    if (data.phase_todo_ != 0) {
         progress_time_ = Clock::now();
-        progress_done_ = data->phase_done_;
-        progress_todo_ = data->phase_todo_;
+        progress_done_ = data.clusters_done_;
+        progress_todo_ = data.phase_todo_;
     }
 
 #ifndef _WIN64
     // 32-bit drive is too big check
-    if (data->total_clusters_ > 0x7FFFFFFF) {
+    if (data.total_clusters_ > 0x7FFFFFFF) {
         messages_[3] = L"Drive is too big for the 32-bit version to load";
         paint_image(dc_);
         return;
@@ -267,7 +280,7 @@ void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_sta
 #endif
 
     // Sanity check
-    if (data->total_clusters_ == 0) return;
+    if (data.total_clusters_ == 0) return;
     if (dc_ == nullptr) return;
     if (cluster_start == cluster_end) return;
 
@@ -275,8 +288,8 @@ void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_sta
 
     display_mutex_ = CreateMutex(nullptr, FALSE, DISPLAY_MUTEX);
 
-    if (num_clusters_ != data->total_clusters_ || cluster_info_ == nullptr) {
-        num_clusters_ = data->total_clusters_;
+    if (num_clusters_ != data.total_clusters_ || cluster_info_ == nullptr) {
+        num_clusters_ = data.total_clusters_;
         cluster_info_ = std::make_unique<DrawColor[]>(num_clusters_);
 
         auto ci_mem = cluster_info_.get();
@@ -301,53 +314,53 @@ void DefragGui::draw_cluster(const DefragState *data, const uint64_t cluster_sta
 }
 
 // Callback: just before the defragger starts a new Phase, and when it finishes
-void DefragGui::show_status(const DefragState *data) {
+void DefragGui::show_status(const DefragState &data) {
     // Reset the progress counter
     progress_start_time_ = Clock::now();
     progress_time_ = progress_start_time_;
     progress_done_ = 0;
     progress_todo_ = 0;
 
-    // Reset all the messages.
+    // Reset all the messages
     for (auto &message: messages_) message.clear();
 
     // Update Message 0 and 1
-    if (data != nullptr) {
-        messages_[0] = data->disk_.mount_point_.get();
 
-        switch (data->phase_) {
-            case DefragPhase::Analyze:
-                messages_[1] = L"Phase 1: Analyze";
-                break;
-            case DefragPhase::Defragment:
-                messages_[1] = L"Phase 2: Defragment";
-                break;
-            case DefragPhase::ForcedFill:
-                messages_[1] = L"Phase 3: Forced Fill";
-                break;
-            case DefragPhase::ZoneSort:
-                messages_[1] = std::format(L"Zone {}: Sort", zone_to_str(data->zone_));
-                break;
-            case DefragPhase::ZoneFastOpt:
-                messages_[1] = std::format(L"Zone {}: Fast Optimize", zone_to_str(data->zone_));
-                break;
-            case DefragPhase::MoveUp:
-                messages_[1] = L"Phase 3: Move Up";
-                break;
-            case DefragPhase::Done:
-                messages_[1] = L"Finished.";
-                messages_[4] = std::format(L"Logfile: {}", log_->get_log_filename());
-                break;
-            case DefragPhase::Fixup:
-                messages_[1] = L"Phase 3: Fixup";
-                break;
-        }
+    messages_[0] = data.disk_.mount_point_.get();
 
-        log_->log(messages_[1]);
+    switch (data.phase_) {
+        case DefragPhase::Analyze:
+            messages_[1] = L"Phase 1: Analyze";
+            break;
+        case DefragPhase::Defragment:
+            messages_[1] = L"Phase 2: Defragment";
+            break;
+        case DefragPhase::ForcedFill:
+            messages_[1] = L"Phase 3: Forced Fill";
+            break;
+        case DefragPhase::ZoneSort:
+            messages_[1] = std::format(L"Zone {}: Sort", zone_to_str(data.zone_));
+            break;
+        case DefragPhase::ZoneFastOpt:
+            messages_[1] = std::format(L"Zone {}: Fast Optimize", zone_to_str(data.zone_));
+            break;
+        case DefragPhase::MoveUp:
+            messages_[1] = L"Phase 3: Move Up";
+            break;
+        case DefragPhase::Done:
+            messages_[1] = L"Finished.";
+            messages_[4] = std::format(L"Logfile: {}", log_->get_log_filename());
+            break;
+        case DefragPhase::Fixup:
+            messages_[1] = L"Phase 3: Fixup";
+            break;
     }
 
+    log_->log(messages_[1]);
+
+
     // Write some statistics to the logfile
-    if (data != nullptr && data->phase_ == DefragPhase::Done) {
+    if (data.phase_ == DefragPhase::Done) {
         write_stats(data);
     }
 }
@@ -416,13 +429,13 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 /*
 Show a map on the screen of all the clusters on disk. The map shows
 which clusters are free and which are in use.
-The data->RedrawScreen flag controls redrawing of the screen. It is set
+The data.RedrawScreen flag controls redrawing of the screen. It is set
 to "2" (busy) when the subroutine starts. If another thread changes it to
 "1" (request) while the subroutine is busy then it will immediately exit
 without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no).
 */
-void DefragGui::show_diskmap(DefragState *data) {
+void DefragGui::show_diskmap(DefragState &data) {
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
         uint64_t StartingLcn;
@@ -442,7 +455,7 @@ void DefragGui::show_diskmap(DefragState *data) {
     DWORD w;
 
     // Exit if the library is not processing a disk yet.
-    if (data->disk_.volume_handle_ == nullptr) {
+    if (data.disk_.volume_handle_ == nullptr) {
         return;
     }
 
@@ -455,14 +468,14 @@ void DefragGui::show_diskmap(DefragState *data) {
     prev_in_use = 1;
 
     do {
-        if (*data->running_ != RunningState::RUNNING) break;
-        //		if (*data->RedrawScreen != 2) break;
-        if (data->disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
+        if (*data.running_ != RunningState::RUNNING) break;
+        //		if (*data.RedrawScreen != 2) break;
+        if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data
         bitmap_param.StartingLcn.QuadPart = Lcn;
 
-        error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+        error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                      &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w,
                                      nullptr);
 
@@ -486,7 +499,7 @@ void DefragGui::show_diskmap(DefragState *data) {
 
         if (bitmap_data.BitmapSize / 8 < index_max) index_max = (int) (bitmap_data.BitmapSize / 8);
 
-        while (index < index_max && *data->running_ == RunningState::RUNNING) {
+        while (index < index_max && *data.running_ == RunningState::RUNNING) {
             in_use = bitmap_data.Buffer[index] & mask;
 
             /* If at the beginning of the disk then copy the in_use value as our
@@ -494,12 +507,12 @@ void DefragGui::show_diskmap(DefragState *data) {
             if (Lcn == 0) prev_in_use = in_use;
 
             // At the beginning and end of an Exclude draw the cluster
-            if (Lcn == data->mft_excludes_[0].start_ || Lcn == data->mft_excludes_[0].end_ ||
-                Lcn == data->mft_excludes_[1].start_ || Lcn == data->mft_excludes_[1].end_ ||
-                Lcn == data->mft_excludes_[2].start_ || Lcn == data->mft_excludes_[2].end_) {
-                if (Lcn == data->mft_excludes_[0].end_ ||
-                    Lcn == data->mft_excludes_[1].end_ ||
-                    Lcn == data->mft_excludes_[2].end_) {
+            if (Lcn == data.mft_excludes_[0].start_ || Lcn == data.mft_excludes_[0].end_ ||
+                Lcn == data.mft_excludes_[1].start_ || Lcn == data.mft_excludes_[1].end_ ||
+                Lcn == data.mft_excludes_[2].start_ || Lcn == data.mft_excludes_[2].end_) {
+                if (Lcn == data.mft_excludes_[0].end_ ||
+                    Lcn == data.mft_excludes_[1].end_ ||
+                    Lcn == data.mft_excludes_[2].end_) {
                     draw_cluster(data, cluster_start, Lcn, DrawColor::Unmovable);
                 } else if (prev_in_use == 0) {
                     draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
@@ -548,7 +561,7 @@ void DefragGui::show_diskmap(DefragState *data) {
     }
 
     // Show the MFT zones
-    for (auto &mft_exclude: data->mft_excludes_) {
+    for (auto &mft_exclude: data.mft_excludes_) {
         if (mft_exclude.start_ <= 0) continue;
 
         draw_cluster(data, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
@@ -557,9 +570,9 @@ void DefragGui::show_diskmap(DefragState *data) {
     /* Colorize all the files on the screen.
     Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
     ignore it. */
-    for (auto item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
-        if (*data->running_ != RunningState::RUNNING) break;
-        //		if (*data->RedrawScreen != 2) break;
+    for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        if (*data.running_ != RunningState::RUNNING) break;
+        //		if (*data.RedrawScreen != 2) break;
 
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0))
@@ -569,6 +582,6 @@ void DefragGui::show_diskmap(DefragState *data) {
     }
 
     // Set the flag to "no"
-    //	if (*data->RedrawScreen == 2) *data->RedrawScreen = 0;
+    //	if (*data.RedrawScreen == 2) *data.RedrawScreen = 0;
 }
 

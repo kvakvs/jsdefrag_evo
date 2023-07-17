@@ -18,7 +18,7 @@
 #include "precompiled_header.h"
 
 // Optimize the harddisk by moving the selected items up
-void DefragLib::optimize_up(DefragState *data) {
+void DefragLib::optimize_up(DefragState &data) {
     ItemStruct *item;
 
     uint64_t gap_begin;
@@ -29,20 +29,20 @@ void DefragLib::optimize_up(DefragState *data) {
     call_show_status(data, DefragPhase::MoveUp, Zone::None); // "Phase 3: Move Up"
 
     // Setup the progress counter: the total number of clusters in all files
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
-        data->phase_todo_ = data->phase_todo_ + item->clusters_count_;
+    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        data.phase_todo_ += item->clusters_count_;
     }
 
     // Exit if nothing to do
-    if (data->item_tree_ == nullptr) return;
+    if (data.item_tree_ == nullptr) return;
 
     // Walk through all the gaps
-    gap_end = data->total_clusters_;
+    gap_end = data.total_clusters_;
     int retry = 0;
 
-    while (*data->running_ == RunningState::RUNNING) {
+    while (*data.running_ == RunningState::RUNNING) {
         // Find the previous gap
-        bool result = find_gap(data, data->zones_[1], gap_end, 0, true, true, &gap_begin, &gap_end, FALSE);
+        bool result = find_gap(data, data.zones_[1], gap_end, 0, true, true, &gap_begin, &gap_end, FALSE);
 
         if (!result) break;
 
@@ -50,7 +50,7 @@ void DefragLib::optimize_up(DefragState *data) {
         below the gap. */
         uint64_t phase_temp = 0;
 
-        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
             if (item->get_item_lcn() >= gap_end) break;
@@ -58,7 +58,7 @@ void DefragLib::optimize_up(DefragState *data) {
             phase_temp = phase_temp + item->clusters_count_;
         }
 
-        data->phase_todo_ = data->phase_done_ + phase_temp;
+        data.phase_todo_ += phase_temp;
         if (phase_temp == 0) break;
 
         /* Loop until the gap is filled. First look for combinations of files that perfectly
@@ -67,7 +67,7 @@ void DefragLib::optimize_up(DefragState *data) {
         bool perfect_fit = true;
         if (gap_end - gap_begin > phase_temp) perfect_fit = false;
 
-        while (gap_begin < gap_end && retry < 5 && *data->running_ == RunningState::RUNNING) {
+        while (gap_begin < gap_end && retry < 5 && *data.running_ == RunningState::RUNNING) {
             /* Find the Item that is the best fit for the gap. If nothing found (no files
             fit the gap) then exit the loop. */
             if (perfect_fit) {

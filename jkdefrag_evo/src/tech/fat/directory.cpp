@@ -22,7 +22,7 @@
  * \return Return nullptr if error. Note: the caller owns the returned buffer.
  */
 BYTE *
-ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_info, const uint64_t start_cluster,
+ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_info, const uint64_t start_cluster,
                         uint64_t *out_length) {
     std::unique_ptr<BYTE[]> buffer;
     uint64_t fragment_length;
@@ -44,9 +44,9 @@ ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_i
 
     for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list
-        if (data->disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
-        if (data->disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
-        if (data->disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
+        if (data.disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
 
         // Sanity check, test if the cluster is within the range of valid cluster numbers
         if (cluster < 2) return nullptr;
@@ -56,7 +56,7 @@ ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_i
         buffer_length = buffer_length + disk_info->sectors_per_cluster_ * disk_info->bytes_per_sector_;
 
         // Get next cluster from FAT
-        switch (data->disk_.type_) {
+        switch (data.disk_.type_) {
             case DiskType::FAT12:
                 if ((cluster & 1) == 1) {
                     cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] >> 4;
@@ -101,9 +101,9 @@ ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_i
 
     for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list
-        if (data->disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
-        if (data->disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
-        if (data->disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
+        if (data.disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
 
         // Sanity check, test if the cluster is within the range of valid cluster numbers
         if (cluster < 2) break;
@@ -127,7 +127,7 @@ ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_i
                             std::format(L"Reading directory fragment, " NUM_FMT " bytes at offset=" NUM_FMT,
                                         fragment_length, trans.QuadPart));
 
-            BOOL result = ReadFile(data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
+            BOOL result = ReadFile(data.disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
                                    &bytes_read, &g_overlapped);
 
             if (result == FALSE) {
@@ -143,7 +143,7 @@ ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_i
         last_cluster = cluster;
 
         // Get next cluster from FAT
-        switch (data->disk_.type_) {
+        switch (data.disk_.type_) {
             case DiskType::FAT12:
                 if ((cluster & 1) == 1) {
                     cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] >> 4;
@@ -178,7 +178,7 @@ ScanFAT::load_directory(const DefragState *data, const FatDiskInfoStruct *disk_i
                         std::format(L"reading directory fragment, " NUM_FMT " bytes at offset=" NUM_FMT,
                                     fragment_length, trans.QuadPart));
 
-        BOOL result = ReadFile(data->disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
+        BOOL result = ReadFile(data.disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
                                &bytes_read, &g_overlapped);
 
         if (result == FALSE) {

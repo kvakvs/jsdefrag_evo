@@ -66,7 +66,7 @@ filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const U
 // - A zero-length file has a first cluster number of 0.
 // - The FAT contains either an EOC mark (End Of Clusterchain) or the cluster number of
 // the next cluster of the file.
-void ScanFAT::make_fragment_list(const DefragState *data, const FatDiskInfoStruct *disk_info,
+void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info,
                                  ItemStruct *item, uint64_t cluster) {
     FragmentListStruct *new_fragment;
     FragmentListStruct *last_fragment;
@@ -88,9 +88,9 @@ void ScanFAT::make_fragment_list(const DefragState *data, const FatDiskInfoStruc
 
     for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list
-        if (data->disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
-        if (data->disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
-        if (data->disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
+        if (data.disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
 
         // Sanity check, test if the cluster is within the range of valid cluster numbers
         if (cluster < 2) break;
@@ -122,7 +122,7 @@ void ScanFAT::make_fragment_list(const DefragState *data, const FatDiskInfoStruc
         last_cluster = cluster;
 
         // Get next cluster from FAT
-        switch (data->disk_.type_) {
+        switch (data.disk_.type_) {
             case DiskType::FAT12:
                 if ((cluster & 1) == 1) {
                     cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] >> 4;

@@ -23,7 +23,7 @@
 //    chosen to wrap the MFT around that data. The fragments will be aligned, so
 //    the performance loss is minimal, and still faster than placing the MFT
 //    higher on the disk.
-[[maybe_unused]] void DefragLib::move_mft_to_begin_of_disk(DefragState *data) {
+[[maybe_unused]] void DefragLib::move_mft_to_begin_of_disk(DefragState &data) {
     ItemStruct *item;
 
     uint64_t lcn;
@@ -39,7 +39,7 @@
     gui->show_debug(DebugLevel::Progress, nullptr, L"Moving the MFT to the beginning of the volume.");
 
     // Exit if this is not an NTFS disk
-    if (data->disk_.type_ != DiskType::NTFS) {
+    if (data.disk_.type_ != DiskType::NTFS) {
         gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                         L"Cannot move the MFT because this is not an NTFS disk.");
 
@@ -59,7 +59,7 @@
     }
 
     // Locate the Item for the MFT. If not found then exit
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (match_mask(item->get_long_path(), L"?:\\$MFT")) break;
     }
 
@@ -85,10 +85,10 @@
     lcn = 0;
     gap_begin = 0;
     gap_end = 0;
-    clusters_done = data->disk_.mft_locked_clusters_;
+    clusters_done = data.disk_.mft_locked_clusters_;
 
-    while (*data->running_ == RunningState::RUNNING && clusters_done < item->clusters_count_) {
-        if (clusters_done > data->disk_.mft_locked_clusters_) {
+    while (*data.running_ == RunningState::RUNNING && clusters_done < item->clusters_count_) {
+        if (clusters_done > data.disk_.mft_locked_clusters_) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                             std::format(L"Partially placed, " NUM_FMT " clusters more to do",
                                         item->clusters_count_ - clusters_done));

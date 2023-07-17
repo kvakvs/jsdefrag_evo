@@ -18,14 +18,14 @@
 #include "precompiled_header.h"
 
 // Fill all the gaps at the beginning of the disk with fragments from the files above
-void DefragLib::forced_fill(DefragState *data) {
+void DefragLib::forced_fill(DefragState &data) {
     call_show_status(data, DefragPhase::ForcedFill, Zone::None); // "Phase 3: ForcedFill"
 
     // Walk through all the gaps
     uint64_t gap_begin = 0;
-    uint64_t max_lcn = data->total_clusters_;
+    uint64_t max_lcn = data.total_clusters_;
 
-    while (*data->running_ == RunningState::RUNNING) {
+    while (*data.running_ == RunningState::RUNNING) {
         // Find the next gap. If there are no more gaps then exit
         uint64_t gap_end;
         auto result = find_gap(data, gap_begin, 0, 0, true, false,
@@ -40,7 +40,7 @@ void DefragLib::forced_fill(DefragState *data) {
         uint64_t highest_size = 0;
 
         ItemStruct *item;
-        for (item = Tree::biggest(data->item_tree_); item != nullptr; item = Tree::prev(item)) {
+        for (item = Tree::biggest(data.item_tree_); item != nullptr; item = Tree::prev(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
             if (item->clusters_count_ == 0) continue;

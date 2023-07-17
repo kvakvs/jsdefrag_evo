@@ -23,38 +23,38 @@
 // SortField=2    Date/Time LastAccess
 // SortField=3    Date/Time LastChange
 // SortField=4    Date/Time Creation
-void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
+void DefragLib::optimize_sort(DefragState &data, const int sort_field) {
     uint64_t gap_begin;
     uint64_t gap_end;
 
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
-    if (data->item_tree_ == nullptr) return;
+    if (data.item_tree_ == nullptr) return;
 
     // Process all the zones
     [[maybe_unused]] uint64_t vacated_until = 0;
-    const uint64_t minimum_vacate = data->total_clusters_ / 200;
+    const uint64_t minimum_vacate = data.total_clusters_ / 200;
 
-    for (data->zone_ = Zone::ZoneFirst;
-         data->zone_ < Zone::ZoneAll_MaxValue; data->zone_ = (Zone) ((int) data->zone_ + 1)) {
-        call_show_status(data, DefragPhase::ZoneSort, data->zone_); // "Zone N: Sort"
+    for (data.zone_ = Zone::ZoneFirst;
+         data.zone_ < Zone::ZoneAll_MaxValue; data.zone_ = (Zone) ((int) data.zone_ + 1)) {
+        call_show_status(data, DefragPhase::ZoneSort, data.zone_); // "Zone N: Sort"
 
         /* Start at the begin of the zone and move all the items there, one by one
         in the requested sorting order, making room as we go. */
         ItemStruct *previous_item = nullptr;
 
-        uint64_t lcn = data->zones_[(size_t) data->zone_];
+        uint64_t lcn = data.zones_[(size_t) data.zone_];
 
         gap_begin = 0;
         gap_end = 0;
 
-        while (*data->running_ == RunningState::RUNNING) {
+        while (*data.running_ == RunningState::RUNNING) {
             // Find the next item that we want to place
             ItemStruct *item = nullptr;
             uint64_t phase_temp = 0;
 
-            for (auto temp_item = Tree::smallest(data->item_tree_);
+            for (auto temp_item = Tree::smallest(data.item_tree_);
                  temp_item != nullptr;
                  temp_item = Tree::next(temp_item)) {
                 if (temp_item->is_unmovable_) continue;
@@ -62,7 +62,7 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
                 if (temp_item->clusters_count_ == 0) continue;
 
                 auto preferred_zone = temp_item->get_preferred_zone();
-                if (preferred_zone != data->zone_) continue;
+                if (preferred_zone != data.zone_) continue;
 
                 if (previous_item != nullptr &&
                     compare_items(previous_item, temp_item, sort_field) >= 0) {
@@ -78,13 +78,13 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
 
             if (item == nullptr) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
-                                std::format(L"Finished sorting zone {}.", zone_to_str(data->zone_)));
+                                std::format(L"Finished sorting zone {}.", zone_to_str(data.zone_)));
 
                 break;
             }
 
             previous_item = item;
-            data->phase_todo_ = data->phase_done_ + phase_temp;
+            data.phase_todo_ = data.clusters_done_ + phase_temp;
 
             // If the item is already at the Lcn then skip
             if (item->get_item_lcn() == lcn) {
@@ -97,7 +97,7 @@ void DefragLib::optimize_sort(DefragState *data, const int sort_field) {
             // the file into whatever gaps are available.
             uint64_t clusters_done = 0;
 
-            while (*data->running_ == RunningState::RUNNING &&
+            while (*data.running_ == RunningState::RUNNING &&
                    clusters_done < item->clusters_count_ &&
                    !item->is_unmovable_) {
                 if (clusters_done > 0) {

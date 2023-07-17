@@ -200,25 +200,25 @@ public:
 
     [[nodiscard]] static std::wstring system_error_str(DWORD error_code);
 
-    static void show_hex(struct DefragState *data, const BYTE *buffer, uint64_t count);
+    static void show_hex(struct DefragState &data, const BYTE *buffer, uint64_t count);
 
     static bool match_mask(const wchar_t *string, const wchar_t *mask);
 
     // static wchar_t** add_array_string(wchar_t** array, const wchar_t* new_string);
-    std::wstring get_short_path(const DefragState *data, const ItemStruct *item);
+    std::wstring get_short_path(const DefragState &data, const ItemStruct *item);
 
-    std::wstring get_long_path(const DefragState *data, const ItemStruct *item);
+    std::wstring get_long_path(const DefragState &data, const ItemStruct *item);
 
-    static void slow_down(DefragState *data);
+    static void slow_down(DefragState &data);
 
     static int get_fragment_count(const ItemStruct *item);
 
     static bool is_fragmented(const ItemStruct *item, uint64_t offset, uint64_t size);
 
-    void colorize_disk_item(DefragState *data, const ItemStruct *item,
+    void colorize_disk_item(DefragState &data, const ItemStruct *item,
                             uint64_t busy_offset, uint64_t busy_size, int un_draw) const;
 
-    static void call_show_status(DefragState *data, DefragPhase phase, Zone zone);
+    static void call_show_status(DefragState &data, DefragPhase phase, Zone zone);
 
 private:
     static wchar_t lower_case(wchar_t c);
@@ -229,73 +229,73 @@ private:
 
     static uint64_t find_fragment_begin(const ItemStruct *item, uint64_t lcn);
 
-    [[maybe_unused]] static ItemStruct *find_item_at_lcn(const DefragState *data, uint64_t lcn);
+    [[maybe_unused]] static ItemStruct *find_item_at_lcn(const DefragState &data, uint64_t lcn);
 
-    static HANDLE open_item_handle(const DefragState *data, const ItemStruct *item);
+    static HANDLE open_item_handle(const DefragState &data, const ItemStruct *item);
 
-    static bool get_fragments(const DefragState *data, ItemStruct *item, HANDLE file_handle);
+    static bool get_fragments(const DefragState &data, ItemStruct *item, HANDLE file_handle);
 
     static bool
-    find_gap(const DefragState *data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
+    find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
              const uint64_t minimum_size,
              const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
              const bool ignore_mft_excludes);
 
-    static void calculate_zones(DefragState *data);
+    static void calculate_zones(DefragState &data);
 
     DWORD
-    move_item_whole(DefragState *data, HANDLE file_handle, const ItemStruct *item, uint64_t new_lcn,
+    move_item_whole(DefragState &data, HANDLE file_handle, const ItemStruct *item, uint64_t new_lcn,
                     const uint64_t offset, const uint64_t size) const;
 
     DWORD
-    move_item_in_fragments(DefragState *data, HANDLE file_handle, const ItemStruct *item, uint64_t new_lcn,
+    move_item_in_fragments(DefragState &data, HANDLE file_handle, const ItemStruct *item, uint64_t new_lcn,
                            const uint64_t offset,
                            const uint64_t size) const;
 
-    bool move_item_with_strat(DefragState *data, ItemStruct *item, HANDLE file_handle, uint64_t new_lcn,
+    bool move_item_with_strat(DefragState &data, ItemStruct *item, HANDLE file_handle, uint64_t new_lcn,
                               uint64_t offset, uint64_t size, MoveStrategy strategy) const;
 
-    int move_item_try_strategies(DefragState *data, ItemStruct *item, HANDLE file_handle, uint64_t new_lcn,
+    int move_item_try_strategies(DefragState &data, ItemStruct *item, HANDLE file_handle, uint64_t new_lcn,
                                  uint64_t offset, uint64_t size, MoveDirection direction) const;
 
-    bool move_item(DefragState *data, ItemStruct *item, uint64_t new_lcn, uint64_t offset,
+    bool move_item(DefragState &data, ItemStruct *item, uint64_t new_lcn, uint64_t offset,
                    uint64_t size, MoveDirection direction) const;
 
     static ItemStruct *
-    find_highest_item(const DefragState *data, uint64_t cluster_start, uint64_t cluster_end,
+    find_highest_item(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
                       Tree::Direction direction, Zone zone);
 
     static ItemStruct *
-    find_best_item(const DefragState *data, uint64_t cluster_start, uint64_t cluster_end,
+    find_best_item(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
                    Tree::Direction direction, Zone zone);
 
-    [[maybe_unused]] void compare_items(DefragState *data, const ItemStruct *item) const;
+    [[maybe_unused]] void compare_items(DefragState &data, const ItemStruct *item) const;
 
     int compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field);
 
-    void scan_dir(DefragState *data, const wchar_t *mask, ItemStruct *parent_directory);
+    void scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *parent_directory);
 
-    void analyze_volume(DefragState *data);
+    void analyze_volume(DefragState &data);
 
-    void fixup(DefragState *data);
+    void fixup(DefragState &data);
 
-    void defragment(DefragState *data);
+    void defragment(DefragState &data);
 
-    void forced_fill(DefragState *data);
+    void forced_fill(DefragState &data);
 
-    void vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes);
+    void vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes);
 
-    [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState *data);
+    [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState &data);
 
-    void optimize_volume(DefragState *data);
+    void optimize_volume(DefragState &data);
 
-    void optimize_sort(DefragState *data, int sort_field);
+    void optimize_sort(DefragState &data, int sort_field);
 
-    void optimize_up(DefragState *data);
+    void optimize_up(DefragState &data);
 
-    void defrag_one_path(DefragState *data, const wchar_t *path, OptimizeMode opt_mode);
+    void defrag_one_path(DefragState &data, const wchar_t *path, OptimizeMode opt_mode);
 
-    void defrag_mountpoints(DefragState *data, const wchar_t *mount_point, OptimizeMode opt_mode);
+    void defrag_mountpoints(DefragState &data, const wchar_t *mount_point, OptimizeMode opt_mode);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<DefragLib> instance_;

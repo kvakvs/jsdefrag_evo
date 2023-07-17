@@ -20,7 +20,7 @@
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then
 // skip them. Then move files upward until the gap is bigger than clusters, or when we
 // encounter an unmovable file.
-void DefragLib::vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
+void DefragLib::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
     uint64_t test_gap_begin;
     uint64_t test_gap_end;
     uint64_t move_gap_begin;
@@ -42,7 +42,7 @@ void DefragLib::vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL 
                     std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT, clusters, lcn));
 
     // Sanity check
-    if (lcn >= data->total_clusters_) {
+    if (lcn >= data.total_clusters_) {
         gui->show_debug(DebugLevel::Warning, nullptr, L"Error: trying to vacate an area beyond the end of the disk.");
 
         return;
@@ -53,17 +53,17 @@ void DefragLib::vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL 
     again and again. */
     move_to = lcn + clusters;
 
-    switch (data->zone_) {
+    switch (data.zone_) {
         case Zone::ZoneFirst:
-            move_to = data->zones_[1];
+            move_to = data.zones_[1];
             break;
         case Zone::ZoneCommon:
-            move_to = data->zones_[2];
+            move_to = data.zones_[2];
             break;
         case Zone::ZoneLast:
             // Zone 2: end of disk minus all the free space
-            move_to = data->total_clusters_ - data->count_free_clusters_ +
-                      (uint64_t) (data->total_clusters_ * 2.0 * data->free_space_ / 100.0);
+            move_to = data.total_clusters_ - data.count_free_clusters_ +
+                      (uint64_t) (data.total_clusters_ * 2.0 * data.free_space_ / 100.0);
             break;
         default:
             break;
@@ -78,13 +78,13 @@ void DefragLib::vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL 
     move_gap_end = 0;
     done_until = lcn;
 
-    while (*data->running_ == RunningState::RUNNING) {
+    while (*data.running_ == RunningState::RUNNING) {
         /* Find the first movable data fragment at or above the done_until lcn. If there is nothing
         then return, we have reached the end of the disk. */
         bigger_item = nullptr;
         bigger_begin = 0;
 
-        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
                 continue;
             }
@@ -166,7 +166,7 @@ void DefragLib::vacate(DefragState *data, uint64_t lcn, uint64_t clusters, BOOL 
             result = false;
 
             // First try to find a gap above the move_to point
-            if (move_to < data->total_clusters_ && move_to >= bigger_end) {
+            if (move_to < data.total_clusters_ && move_to >= bigger_end) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                                 std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
 

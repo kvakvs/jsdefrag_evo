@@ -21,10 +21,6 @@
 #include <optional>
 #include <cwctype>
 
-#include "../../include/defrag_state.h"
-#include "../../include/defrag_lib.h"
-
-
 DefragLib::DefragLib() = default;
 
 DefragLib::~DefragLib() = default;
@@ -151,7 +147,7 @@ wchar_t DefragLib::lower_case(const wchar_t c) {
 }
 
 // Dump a block of data to standard output, for debugging purposes
-void DefragLib::show_hex([[maybe_unused]] DefragState *data, const BYTE *buffer,
+void DefragLib::show_hex([[maybe_unused]] DefragState &data, const BYTE *buffer,
                          const uint64_t count) {
     DefragGui *gui = DefragGui::get_instance();
 
@@ -241,19 +237,19 @@ void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path)
 }
 
 // Return a string with the full path of an item, constructed from the short names.
-std::wstring DefragLib::get_short_path(const DefragState *data, const ItemStruct *item) {
+std::wstring DefragLib::get_short_path(const DefragState &data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
 
     // Count the size of all the ShortFilename's
-    size_t length = wcslen(data->disk_.mount_point_.get()) + 1;
+    size_t length = wcslen(data.disk_.mount_point_.get()) + 1;
 
     for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
         length = length + wcslen(temp_item->get_short_fn()) + 1;
     }
 
     // Allocate new string
-    std::wstring path = data->disk_.mount_point_.get();
+    std::wstring path = data.disk_.mount_point_.get();
 
     // Append all the strings
     append_to_short_path(item, path);
@@ -270,18 +266,18 @@ void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) 
 }
 
 // Return a string with the full path of an item, constructed from the long names
-std::wstring DefragLib::get_long_path(const DefragState *data, const ItemStruct *item) {
+std::wstring DefragLib::get_long_path(const DefragState &data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
 
     // Count the size of all the LongFilename's
-    size_t length = wcslen(data->disk_.mount_point_.get()) + 1;
+    size_t length = wcslen(data.disk_.mount_point_.get()) + 1;
 
     for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
         length += wcslen(temp_item->get_long_fn()) + 1;
     }
 
-    std::wstring path = data->disk_.mount_point_.get();
+    std::wstring path = data.disk_.mount_point_.get();
 
     // Append all the strings
     append_to_long_path(item, path);
@@ -289,22 +285,22 @@ std::wstring DefragLib::get_long_path(const DefragState *data, const ItemStruct 
 }
 
 // Slow the program down
-void DefragLib::slow_down(DefragState *data) {
+void DefragLib::slow_down(DefragState &data) {
     // Sanity check
-    if (data->speed_ <= 0 || data->speed_ >= 100) return;
+    if (data.speed_ <= 0 || data.speed_ >= 100) return;
 
     // Calculate the time we have to sleep so that the wall time is 100% and the actual running time is the "-s" parameter percentage
     auto now = Clock::now();
 
-    if (now > data->last_checkpoint_) {
-        data->running_time_ += (now - data->last_checkpoint_);
+    if (now > data.last_checkpoint_) {
+        data.running_time_ += (now - data.last_checkpoint_);
     }
 
-    if (now < data->start_time_) data->start_time_ = now; // Should never happen
+    if (now < data.start_time_) data.start_time_ = now; // Should never happen
 
     // Sleep
-    if (data->running_time_ > Clock::duration::zero()) {
-        Clock::duration delay = data->running_time_ * 100UL / data->speed_ - (now - data->start_time_);
+    if (data.running_time_ > Clock::duration::zero()) {
+        Clock::duration delay = data.running_time_ * 100UL / data.speed_ - (now - data.start_time_);
 
         if (delay > std::chrono::milliseconds(200)) delay = std::chrono::milliseconds(200);
         if (delay > Clock::duration::zero()) {
@@ -314,11 +310,11 @@ void DefragLib::slow_down(DefragState *data) {
     }
 
     // Save the current wall time, so next time we can calculate the time spent in	the program
-    data->last_checkpoint_ = Clock::now();
+    data.last_checkpoint_ = Clock::now();
 }
 
 // Open the item as a file or as a directory. If the item could not be opened then show an error message and return nullptr.
-HANDLE DefragLib::open_item_handle(const DefragState *data, const ItemStruct *item) {
+HANDLE DefragLib::open_item_handle(const DefragState &data, const ItemStruct *item) {
     HANDLE file_handle;
     const size_t length = wcslen(item->get_long_path()) + 5;
     auto path = std::make_unique<wchar_t[]>(length);
@@ -355,7 +351,7 @@ Note: Very small files are stored by Windows in the MFT and have no
 clusters (zero) and no fragments (nullptr).
 
 */
-bool DefragLib::get_fragments(const DefragState *data, ItemStruct *item, HANDLE file_handle) {
+bool DefragLib::get_fragments(const DefragState &data, ItemStruct *item, HANDLE file_handle) {
     STARTING_VCN_INPUT_BUFFER RetrieveParam;
 
     struct {
@@ -592,7 +588,7 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
  * \param busy_size Number of clusters to be highlighted.
  * \param un_draw true to undraw the file from the screen.
  */
-void DefragLib::colorize_disk_item(DefragState *data, const ItemStruct *item, const uint64_t busy_offset,
+void DefragLib::colorize_disk_item(DefragState &data, const ItemStruct *item, const uint64_t busy_offset,
                                    const uint64_t busy_size, const int un_draw) const {
     DefragGui *gui = DefragGui::get_instance();
 
@@ -648,15 +644,15 @@ void DefragLib::colorize_disk_item(DefragState *data, const ItemStruct *item, co
                 color = DrawColor::Empty;
 
                 for (int i = 0; i < 3; i++) {
-                    if (fragment->lcn_ + segment_begin - real_vcn < data->mft_excludes_[i].start_ &&
-                        fragment->lcn_ + segment_end - real_vcn > data->mft_excludes_[i].start_) {
-                        segment_end = real_vcn + data->mft_excludes_[i].start_ - fragment->lcn_;
+                    if (fragment->lcn_ + segment_begin - real_vcn < data.mft_excludes_[i].start_ &&
+                        fragment->lcn_ + segment_end - real_vcn > data.mft_excludes_[i].start_) {
+                        segment_end = real_vcn + data.mft_excludes_[i].start_ - fragment->lcn_;
                     }
 
-                    if (fragment->lcn_ + segment_begin - real_vcn >= data->mft_excludes_[i].start_ &&
-                        fragment->lcn_ + segment_begin - real_vcn < data->mft_excludes_[i].end_) {
-                        if (fragment->lcn_ + segment_end - real_vcn > data->mft_excludes_[i].end_) {
-                            segment_end = real_vcn + data->mft_excludes_[i].end_ - fragment->lcn_;
+                    if (fragment->lcn_ + segment_begin - real_vcn >= data.mft_excludes_[i].start_ &&
+                        fragment->lcn_ + segment_begin - real_vcn < data.mft_excludes_[i].end_) {
+                        if (fragment->lcn_ + segment_end - real_vcn > data.mft_excludes_[i].end_) {
+                            segment_end = real_vcn + data.mft_excludes_[i].end_ - fragment->lcn_;
                         }
 
                         color = DrawColor::Mft;
@@ -692,7 +688,7 @@ to "2" (busy) when the subroutine starts. If another thread changes it to
 without completing the redraw. When redrawing is completely finished the
 flag is set to "0" (no). */
 /*
-void ShowDiskmap2(struct DefragState *Data) {
+void ShowDiskmap2(struct DefragState &Data) {
 	struct ItemStruct *Item;
 	STARTING_LCN_INPUT_BUFFER BitmapParam;
 	struct {
@@ -828,7 +824,7 @@ void ShowDiskmap2(struct DefragState *Data) {
 */
 
 // Update some numbers in the DefragData
-void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, const Zone zone) {
+void DefragLib::call_show_status(DefragState &data, const DefragPhase phase, const Zone zone) {
     ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
 
@@ -844,11 +840,11 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
     DefragGui *gui = DefragGui::get_instance();
 
     // Count the number of free gaps on the disk
-    data->count_gaps_ = 0;
-    data->count_free_clusters_ = 0;
-    data->biggest_gap_ = 0;
-    data->count_gaps_less16_ = 0;
-    data->count_clusters_less16_ = 0;
+    data.count_gaps_ = 0;
+    data.count_free_clusters_ = 0;
+    data.biggest_gap_ = 0;
+    data.count_gaps_less16_ = 0;
+    data.count_clusters_less16_ = 0;
 
     uint64_t lcn = 0;
     uint64_t cluster_start = 0;
@@ -857,7 +853,7 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
     do {
         // Fetch a block of cluster data
         bitmap_param.StartingLcn.QuadPart = lcn;
-        error_code = DeviceIoControl(data->disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+        error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                      &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
 
         if (error_code != 0) {
@@ -878,20 +874,20 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
         while (index < index_max) {
             int in_use = bitmap_data.buffer_[index] & mask;
 
-            if ((lcn >= data->mft_excludes_[0].start_ && lcn < data->mft_excludes_[0].end_) ||
-                (lcn >= data->mft_excludes_[1].start_ && lcn < data->mft_excludes_[1].end_) ||
-                (lcn >= data->mft_excludes_[2].start_ && lcn < data->mft_excludes_[2].end_)) {
+            if ((lcn >= data.mft_excludes_[0].start_ && lcn < data.mft_excludes_[0].end_) ||
+                (lcn >= data.mft_excludes_[1].start_ && lcn < data.mft_excludes_[1].end_) ||
+                (lcn >= data.mft_excludes_[2].start_ && lcn < data.mft_excludes_[2].end_)) {
                 in_use = 1;
             }
 
             if (prev_in_use == 0 && in_use != 0) {
-                data->count_gaps_ = data->count_gaps_ + 1;
-                data->count_free_clusters_ = data->count_free_clusters_ + lcn - cluster_start;
-                if (data->biggest_gap_ < lcn - cluster_start) data->biggest_gap_ = lcn - cluster_start;
+                data.count_gaps_ = data.count_gaps_ + 1;
+                data.count_free_clusters_ = data.count_free_clusters_ + lcn - cluster_start;
+                if (data.biggest_gap_ < lcn - cluster_start) data.biggest_gap_ = lcn - cluster_start;
 
                 if (lcn - cluster_start < 16) {
-                    data->count_gaps_less16_ = data->count_gaps_less16_ + 1;
-                    data->count_clusters_less16_ = data->count_clusters_less16_ + lcn - cluster_start;
+                    data.count_gaps_less16_ = data.count_gaps_less16_ + 1;
+                    data.count_clusters_less16_ = data.count_clusters_less16_ + lcn - cluster_start;
                 }
             }
 
@@ -911,45 +907,45 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
     } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
 
     if (prev_in_use == 0) {
-        data->count_gaps_ = data->count_gaps_ + 1;
-        data->count_free_clusters_ = data->count_free_clusters_ + lcn - cluster_start;
+        data.count_gaps_ += 1;
+        data.count_free_clusters_ += lcn - cluster_start;
 
-        if (data->biggest_gap_ < lcn - cluster_start) data->biggest_gap_ = lcn - cluster_start;
+        if (data.biggest_gap_ < lcn - cluster_start) data.biggest_gap_ = lcn - cluster_start;
 
         if (lcn - cluster_start < 16) {
-            data->count_gaps_less16_ = data->count_gaps_less16_ + 1;
-            data->count_clusters_less16_ = data->count_clusters_less16_ + lcn - cluster_start;
+            data.count_gaps_less16_ += 1;
+            data.count_clusters_less16_ += lcn - cluster_start;
         }
     }
 
     // Walk through all files and update the counters
-    data->count_directories_ = 0;
-    data->count_all_files_ = 0;
-    data->count_fragmented_items_ = 0;
-    data->count_all_bytes_ = 0;
-    data->count_fragmented_bytes_ = 0;
-    data->count_all_clusters_ = 0;
-    data->count_fragmented_clusters_ = 0;
+    data.count_directories_ = 0;
+    data.count_all_files_ = 0;
+    data.count_fragmented_items_ = 0;
+    data.count_all_bytes_ = 0;
+    data.count_fragmented_bytes_ = 0;
+    data.count_all_clusters_ = 0;
+    data.count_fragmented_clusters_ = 0;
 
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
         }
 
-        data->count_all_bytes_ = data->count_all_bytes_ + item->bytes_;
-        data->count_all_clusters_ = data->count_all_clusters_ + item->clusters_count_;
+        data.count_all_bytes_ += item->bytes_;
+        data.count_all_clusters_ += item->clusters_count_;
 
         if (item->is_dir_) {
-            data->count_directories_ = data->count_directories_ + 1;
+            data.count_directories_ += 1;
         } else {
-            data->count_all_files_ = data->count_all_files_ + 1;
+            data.count_all_files_ += 1;
         }
 
         if (get_fragment_count(item) > 1) {
-            data->count_fragmented_items_ = data->count_fragmented_items_ + 1;
-            data->count_fragmented_bytes_ = data->count_fragmented_bytes_ + item->bytes_;
-            data->count_fragmented_clusters_ = data->count_fragmented_clusters_ + item->clusters_count_;
+            data.count_fragmented_items_ += 1;
+            data.count_fragmented_bytes_ += item->bytes_;
+            data.count_fragmented_clusters_ += item->clusters_count_;
         }
     }
 
@@ -986,7 +982,7 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
     */
     int64_t count = 0;
 
-    for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
@@ -1001,7 +997,7 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
         int64_t factor = 1 - count;
         int64_t sum = 0;
 
-        for (item = Tree::smallest(data->item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
             if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
                  _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;
@@ -1013,15 +1009,15 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
             factor += 2;
         }
 
-        data->average_distance_ = sum / (double) (count * (count - 1));
+        data.average_distance_ = sum / (double) (count * (count - 1));
     } else {
-        data->average_distance_ = 0;
+        data.average_distance_ = 0;
     }
 
-    data->phase_ = phase;
-    data->zone_ = zone;
-    data->phase_done_ = 0;
-    data->phase_todo_ = 0;
+    data.phase_ = phase;
+    data.zone_ = zone;
+    data.clusters_done_ = 0;
+    data.phase_todo_ = 0;
 
     gui->show_status(data);
 }
@@ -1029,13 +1025,10 @@ void DefragLib::call_show_status(DefragState *data, const DefragPhase phase, con
 // Run the defragger/optimizer. See the .h file for a full explanation
 void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
                               const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
-    DefragState data{};
-    uint32_t ntfs_disable_last_access_update;
-    DWORD key_disposition;
-    DWORD length;
     DefragGui *gui = DefragGui::get_instance();
 
     // Copy the input values to the data struct
+    DefragState data{};
     data.speed_ = speed;
     data.free_space_ = free_space;
     data.excludes_ = excludes;
@@ -1130,12 +1123,14 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
     if (data.use_default_space_hogs_ == TRUE) {
         LONG result;
         HKEY key;
+        DWORD key_disposition;
         result = RegCreateKeyExW(
                 HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0,
                 nullptr, REG_OPTION_NON_VOLATILE, KEY_READ, nullptr, &key, &key_disposition);
 
         if (result == ERROR_SUCCESS) {
-            length = sizeof ntfs_disable_last_access_update;
+            uint32_t ntfs_disable_last_access_update;
+            DWORD length = sizeof ntfs_disable_last_access_update;
 
             result = RegQueryValueExW(key, L"NtfsDisableLastAccessUpdate", nullptr, nullptr,
                                       (BYTE *) &ntfs_disable_last_access_update, &length);
@@ -1161,7 +1156,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
     /* If a Path is specified then call DefragOnePath() for that path. Otherwise call
     DefragMountpoints() for every disk in the system. */
     if (path != nullptr && *path != 0) {
-        defrag_one_path(&data, path, optimize_mode);
+        defrag_one_path(data, path, optimize_mode);
     } else {
         wchar_t *drives;
         uint32_t drives_size;
@@ -1181,7 +1176,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
                 drive = drives;
 
                 while (*drive != '\0') {
-                    defrag_mountpoints(&data, drive, optimize_mode);
+                    defrag_mountpoints(data, drive, optimize_mode);
                     while (*drive != '\0') drive++;
                     drive++;
                 }
