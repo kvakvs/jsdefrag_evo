@@ -447,8 +447,6 @@ void DefragLib::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *par
 
     std::unique_ptr<ItemStruct> item;
 
-    wchar_t path_buf2[MAX_PATH];
-
     do {
         if (*data.running_ != RunningState::RUNNING) break;
 
@@ -470,9 +468,10 @@ void DefragLib::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *par
 
         length = wcslen(root_path.get()) + wcslen(find_file_data.cAlternateFileName) + 2;
         _ASSERT(MAX_PATH > length);
-        swprintf_s(path_buf2, length, L"%s\\%s", root_path.get(), find_file_data.cAlternateFileName);
+        auto path_buf2 = std::format(L"{}\\{}", root_path.get(), find_file_data.cAlternateFileName);
 
-        item->set_names(path_buf1.c_str(), find_file_data.cFileName, path_buf2, find_file_data.cAlternateFileName);
+        item->set_names(path_buf1.c_str(), find_file_data.cFileName, path_buf2.c_str(),
+                        find_file_data.cAlternateFileName);
 
         item->bytes_ = find_file_data.nFileSizeHigh * ((uint64_t) MAXDWORD + 1) +
                        find_file_data.nFileSizeLow;

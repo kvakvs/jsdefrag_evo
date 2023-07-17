@@ -326,7 +326,7 @@ void DefragGui::show_status(const DefragState &data) {
 
     // Update Message 0 and 1
 
-    messages_[0] = data.disk_.mount_point_.get();
+    messages_[0] = data.disk_.mount_point_;
 
     switch (data.phase_) {
         case DefragPhase::Analyze:

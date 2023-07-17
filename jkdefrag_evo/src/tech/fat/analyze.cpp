@@ -542,7 +542,7 @@ void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_i
 
         // Increment counters
         if (item->is_dir_) {
-            data.count_directories_ + 1;
+            data.count_directories_ += 1;
         }
 
         data.count_all_files_ += 1;

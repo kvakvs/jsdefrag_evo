@@ -63,7 +63,7 @@ WPARAM Defrag::start_program(HINSTANCE instance,
     gui_->initialize(instance, cmd_show, log_.get(), debug_level_);
 
     // Start up the defragmentation and timer threads
-    if (CreateThread(nullptr, 0, &Defrag::defrag_thread, nullptr, 0, nullptr) == nullptr) return 0;
+    std::thread defrag_thread_object(&Defrag::defrag_thread);
 
     const WPARAM w_param = gui_->do_modal();
 
@@ -71,6 +71,9 @@ WPARAM Defrag::start_program(HINSTANCE instance,
     i_am_running_ = RunningState::STOPPED;
 
     DefragLib::stop_jk_defrag(&running_state_, 0);
+
+    // Wait for the defrag thread
+    defrag_thread_object.join();
 
     return w_param;
 }
@@ -272,13 +275,10 @@ LONG __stdcall Defrag::crash_report(EXCEPTION_POINTERS *exception_info) {
 
 #endif
 
-/*
-
-The main thread that performs all the work. Interpret the commandline
-parameters and call the defragger library.
-
-*/
-DWORD WINAPI Defrag::defrag_thread(LPVOID) {
+// The main thread that performs all the work. Interpret the commandline
+// parameters and call the defragger library.
+//DWORD WINAPI Defrag::defrag_thread(LPVOID) {
+void Defrag::defrag_thread() {
     OptimizeMode optimize_mode = {}; // 1...11
     LPWSTR *argv;
     int argc;
@@ -655,7 +655,7 @@ DWORD WINAPI Defrag::defrag_thread(LPVOID) {
     if (quit_on_finish) exit(EXIT_SUCCESS);
 
     // End of this thread
-    return 0;
+    // return 0;
 }
 
 /*

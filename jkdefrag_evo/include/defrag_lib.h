@@ -55,11 +55,11 @@ struct DiskStruct {
     HANDLE volume_handle_;
 
     // Example: "c:"; TODO: use std::wstring
-    std::unique_ptr<wchar_t[]> mount_point_;
+    std::wstring mount_point_;
     // Example: "c:\"; TODO: use std::wstring
-    std::unique_ptr<wchar_t[]> mount_point_slash_;
-    wchar_t volume_name_[52]; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}"
-    wchar_t volume_name_slash_[52]; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\"
+    std::wstring mount_point_slash_;
+    std::wstring volume_name_; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}"
+    std::wstring volume_name_slash_; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\"
 
     DiskType type_;
 

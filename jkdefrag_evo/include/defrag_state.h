@@ -22,11 +22,11 @@ public:
     // If bigger than 20 then do not move dirs
     int cannot_move_dirs_{};
 
-    wchar_t *include_mask_; // Example: "c:\t1\*"
+    std::wstring include_mask_; // Example: "c:\t1\*"
     DiskStruct disk_ = {
             .volume_handle_ = nullptr,
-            .mount_point_ = nullptr,
-            .mount_point_slash_ = nullptr,
+            .mount_point_ = {},
+            .mount_point_slash_ = {},
             .volume_name_ = {},
             .volume_name_slash_ = {},
             .type_ = DiskType::UnknownType,

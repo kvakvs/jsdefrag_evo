@@ -144,13 +144,8 @@ void DefragLib::defrag_mountpoints(DefragState &data, const wchar_t *mount_point
     if (find_mountpoint_handle == INVALID_HANDLE_VALUE) return;
 
     do {
-        auto length = wcslen(mount_point) + wcslen(root_path) + 1;
-        auto full_root_path = std::make_unique<wchar_t[]>(length);
-
-        if (full_root_path != nullptr) {
-            swprintf_s(full_root_path.get(), length, L"%s%s", mount_point, root_path);
-            defrag_mountpoints(data, full_root_path.get(), opt_mode);
-        }
+        auto full_root = std::format(L"{}{}", mount_point, root_path);
+        defrag_mountpoints(data, full_root.c_str(), opt_mode);
     } while (FindNextVolumeMountPointW(find_mountpoint_handle, root_path, MAX_PATH + BUFSIZ) != 0);
 
     FindVolumeMountPointClose(find_mountpoint_handle);

@@ -74,61 +74,70 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
     /* Try finding the MountPoint by treating the input path as a path to
     something on the disk. If this does not succeed then use the Path as
     a literal MountPoint name. */
-    data.disk_.mount_point_.reset(_wcsdup(path));
+    data.disk_.mount_point_ = path;
 
-    auto result = GetVolumePathNameW(path, data.disk_.mount_point_.get(),
-                                     (uint32_t) wcslen(data.disk_.mount_point_.get()) + 1);
+    // Will write into mount_point_
+    auto result = GetVolumePathNameW(path, data.disk_.mount_point_.data(),
+                                     (uint32_t) data.disk_.mount_point_.length() + 1);
 
     if (result == FALSE) {
-        wcscpy_s(data.disk_.mount_point_.get(), wcslen(path) + 1, path);
+        data.disk_.mount_point_ = path;
     }
 
     // Make two versions of the MountPoint, one with a trailing backslash and one without
-    wchar_t *p1 = wcschr(data.disk_.mount_point_.get(), 0);
-
-    if (p1 != data.disk_.mount_point_.get()) {
-        p1--;
-        if (*p1 == '\\') *p1 = 0;
+    // wchar_t *p1 = wcschr(data.disk_.mount_point_.get(), 0);
+//    if (p1 != data.disk_.mount_point_.get()) {
+//        p1--;
+//        if (*p1 == '\\') *p1 = 0;
+//    }
+    // Kill the trailing backslash
+    if (!data.disk_.mount_point_.empty() && data.disk_.mount_point_.back() == L'\\') {
+        data.disk_.mount_point_.pop_back();
     }
 
-    size_t length = wcslen(data.disk_.mount_point_.get()) + 2;
-    data.disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
-
-    swprintf_s(data.disk_.mount_point_slash_.get(), length, L"%s\\", data.disk_.mount_point_.get());
+    //size_t length = wcslen(data.disk_.mount_point_.get()) + 2;
+    //data.disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
+    // swprintf_s(data.disk_.mount_point_slash_.get(), length, L"%s\\", data.disk_.mount_point_.get());
+    data.disk_.mount_point_slash_ = std::format(L"{}\\", data.disk_.mount_point_);
 
     // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
-    result = GetVolumeNameForVolumeMountPointW(data.disk_.mount_point_slash_.get(),
-                                               data.disk_.volume_name_slash_, MAX_PATH);
+    wchar_t vname[MAX_PATH];
+    result = GetVolumeNameForVolumeMountPointW(data.disk_.mount_point_slash_.c_str(), vname, MAX_PATH);
+    data.disk_.volume_name_slash_ = vname;
 
     if (result == FALSE) {
-        if (wcslen(data.disk_.mount_point_slash_.get()) > 52 - 1 - 4) {
+        // API puts a limit of 52 on length, but wstring has no length limit
+        if (data.disk_.mount_point_slash_.length() > 52 - 1 - 4) {
             // "Cannot find volume name for mountpoint '%s': %s"
             gui->show_debug(DebugLevel::Fatal, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
-                                        data.disk_.mount_point_slash_.get(), system_error_str(GetLastError())));
+                                        data.disk_.mount_point_slash_, system_error_str(GetLastError())));
 
-            data.disk_.mount_point_.reset();
-            data.disk_.mount_point_slash_.reset();
+            data.disk_.mount_point_.clear();
+            data.disk_.mount_point_slash_.clear();
 
             return;
         }
 
-        swprintf_s(data.disk_.volume_name_slash_, 52, L"\\\\.\\%s", data.disk_.mount_point_slash_.get());
+        data.disk_.volume_name_slash_ = std::format(L"\\\\.\\{}", data.disk_.mount_point_slash_);
     }
 
     // Make a copy of the VolumeName without the trailing backslash
-    wcscpy_s(data.disk_.volume_name_, 51, data.disk_.volume_name_slash_);
+    data.disk_.volume_name_ = data.disk_.volume_name_slash_;
 
-    p1 = wcschr(data.disk_.volume_name_, 0);
-
-    if (p1 != data.disk_.volume_name_) {
-        p1--;
-        if (*p1 == '\\') *p1 = 0;
+//    p1 = wcschr(data.disk_.volume_name_, 0);
+//    if (p1 != data.disk_.volume_name_) {
+//        p1--;
+//        if (*p1 == '\\') *p1 = 0;
+//    }
+    // Kill the trailing backslash
+    if (!data.disk_.volume_name_.empty() && data.disk_.volume_name_.back() == L'\\') {
+        data.disk_.volume_name_.pop_back();
     }
 
     // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
     // length = wcslen(data.disk_.mount_point_slash_.get()) + 14;
-    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data.disk_.mount_point_slash_.get());
+    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data.disk_.mount_point_slash_);
 
     FILE *fin;
     result = _wfopen_s(&fin, hibernation_path.c_str(), L"rb");
@@ -139,8 +148,8 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
             gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
 
-            data.disk_.mount_point_.reset();
-            data.disk_.mount_point_slash_.reset();
+            data.disk_.mount_point_.clear();
+            data.disk_.mount_point_slash_.clear();
 
             return;
         }
@@ -149,22 +158,21 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
     // Show debug message: "Opening volume '%s' at mountpoint '%s'"
     gui->show_debug(DebugLevel::Fatal, nullptr,
                     std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
-                                data.disk_.mount_point_.get()));
+                                data.disk_.mount_point_));
 
     // Open the VolumeHandle. If error then leave.
-    data.disk_.volume_handle_ = CreateFileW(
-            data.disk_.volume_name_, GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
-            0, nullptr);
+    data.disk_.volume_handle_ = CreateFileW(data.disk_.volume_name_.c_str(), GENERIC_READ,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                            OPEN_EXISTING, 0, nullptr);
 
     if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
         gui->show_debug(DebugLevel::Warning, nullptr,
                         std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    data.disk_.volume_name_, data.disk_.mount_point_.get(),
+                                    data.disk_.volume_name_, data.disk_.mount_point_,
                                     system_error_str(GetLastError())));
 
-        data.disk_.mount_point_.reset();
-        data.disk_.mount_point_slash_.reset();
+        data.disk_.mount_point_.clear();
+        data.disk_.mount_point_slash_.clear();
         return;
     }
 
@@ -192,12 +200,12 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
         // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
         gui->show_debug(DebugLevel::Fatal, nullptr,
                         std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
-                                    data.disk_.mount_point_.get()));
+                                    data.disk_.mount_point_));
 
         CloseHandle(data.disk_.volume_handle_);
 
-        data.disk_.mount_point_.reset();
-        data.disk_.mount_point_slash_.reset();
+        data.disk_.mount_point_.clear();
+        data.disk_.mount_point_slash_.clear();
 
         return;
     }
@@ -263,18 +271,14 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
     - If the length is 2 or 3 characters then rewrite into "c:\*".
     - If it does not contain a wildcard then append '*'.
     */
-    length = wcslen(path) + 3;
+    data.include_mask_ = path;
 
-    data.include_mask_ = new wchar_t[length];
+    const size_t path_len = wcslen(path);
 
-    if (data.include_mask_ == nullptr) return;
-
-    wcscpy_s(data.include_mask_, length, path);
-
-    if (wcslen(path) == 2 || wcslen(path) == 3) {
-        swprintf_s(data.include_mask_, length, L"%c:\\*", lower_case(path[0]));
+    if (path_len == 2 || path_len == 3) {
+        data.include_mask_ = std::format(L"{:c}:\\*", lower_case(path[0]));
     } else if (wcschr(path, L'*') == nullptr) {
-        swprintf_s(data.include_mask_, length, L"%s*", path);
+        data.include_mask_ = std::format(L"{}*", path);
     }
 
     gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"Input mask: {}", data.include_mask_));
@@ -342,6 +346,6 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
     // Cleanup
     Tree::delete_tree(data.item_tree_);
 
-    data.disk_.mount_point_.reset();
-    data.disk_.mount_point_slash_.reset();
+    data.disk_.mount_point_.clear();
+    data.disk_.mount_point_slash_.clear();
 }

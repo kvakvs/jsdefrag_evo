@@ -55,7 +55,7 @@ void DefragLib::analyze_volume(DefragState &data) {
         }
 
         // Scan all the files
-        scan_dir(data, data.include_mask_, nullptr);
+        scan_dir(data, data.include_mask_.c_str(), nullptr);
     }
 
     // Update the diskmap with the colors
@@ -86,8 +86,8 @@ void DefragLib::analyze_volume(DefragState &data) {
         if (!item->have_short_path()) item->set_short_path(get_short_path(data, item).c_str());
 
         // Apply the Mask and set the Exclude flag of all items that do not match
-        if (!match_mask(item->get_long_path(), data.include_mask_) &&
-            !match_mask(item->get_short_path(), data.include_mask_)) {
+        if (!match_mask(item->get_long_path(), data.include_mask_.c_str()) &&
+            !match_mask(item->get_short_path(), data.include_mask_.c_str())) {
             item->is_excluded_ = true;
             colorize_disk_item(data, item, 0, 0, false);
         }

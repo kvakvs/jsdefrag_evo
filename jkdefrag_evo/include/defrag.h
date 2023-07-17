@@ -18,7 +18,8 @@ public:
 
     WPARAM start_program(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show);
 
-    static DWORD WINAPI defrag_thread(LPVOID);
+//    static DWORD WINAPI defrag_thread(LPVOID);
+    static void defrag_thread();
 
 #ifdef _DEBUG
 

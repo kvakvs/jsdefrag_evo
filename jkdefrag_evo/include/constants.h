@@ -125,6 +125,7 @@ enum class MoveDirection {
 
 // Format string to use for numbers formatting with thousands separators
 #define NUM_FMT L"{:L}"
+#define NUM4_FMT L"{:4L}"
 // Format floating point with 0 decimals
 #define FLT0_FMT L"{:.0f}"
 // Format floating point with 4 decimals

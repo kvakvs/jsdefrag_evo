@@ -154,37 +154,35 @@ void DefragLib::show_hex([[maybe_unused]] DefragState &data, const BYTE *buffer,
     int j;
 
     for (int i = 0; i < count; i = i + 16) {
-        wchar_t s2[BUFSIZ];
-        wchar_t s1[BUFSIZ];
-        swprintf_s(s1, BUFSIZ, L"%4u %4X   ", i, i);
+        std::wstring s1;
+        s1.reserve(BUFSIZ);
+        s1 += std::format(NUM4_FMT L" {:4x}   ", i, i);
 
         for (j = 0; j < 16; j++) {
-            if (j == 8) wcscat_s(s1, BUFSIZ, L" ");
+            if (j == 8) s1 += L" ";
 
             if (j + i >= count) {
-                wcscat_s(s1, BUFSIZ, L"   ");
+                s1 += L"   ";
             } else {
-                swprintf_s(s2, BUFSIZ, L"%02X ", buffer[i + j]);
-                wcscat_s(s1, BUFSIZ, s2);
+                s1 += std::format(L"{:x} ", buffer[i + j]);
             }
         }
 
-        wcscat_s(s1, BUFSIZ, L" ");
+        s1 += L" ";
 
         for (j = 0; j < 16; j++) {
             if (j + i >= count) {
-                wcscat_s(s1, BUFSIZ, L" ");
+                s1 += L" ";
             } else {
                 if (buffer[i + j] < 32) {
-                    wcscat_s(s1, BUFSIZ, L".");
+                    s1 += L".";
                 } else {
-                    swprintf_s(s2, BUFSIZ, L"%c", buffer[i + j]);
-                    wcscat_s(s1, BUFSIZ, s2);
+                    s1 += L"{:c}", buffer[i + j];
                 }
             }
         }
 
-        gui->show_debug(DebugLevel::Progress, nullptr, s1);
+        gui->show_debug(DebugLevel::Progress, nullptr, std::move(s1));
     }
 }
 
@@ -242,16 +240,14 @@ std::wstring DefragLib::get_short_path(const DefragState &data, const ItemStruct
     if (item == nullptr) return {};
 
     // Count the size of all the ShortFilename's
-    size_t length = wcslen(data.disk_.mount_point_.get()) + 1;
-
-    for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
-        length = length + wcslen(temp_item->get_short_fn()) + 1;
-    }
-
-    // Allocate new string
-    std::wstring path = data.disk_.mount_point_.get();
+//    size_t length = wcslen(data.disk_.mount_point_.get()) + 1;
+//    for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
+//        length = length + wcslen(temp_item->get_short_fn()) + 1;
+//    }
 
     // Append all the strings
+    std::wstring path = data.disk_.mount_point_;
+
     append_to_short_path(item, path);
 
     return path;
@@ -271,16 +267,17 @@ std::wstring DefragLib::get_long_path(const DefragState &data, const ItemStruct 
     if (item == nullptr) return {};
 
     // Count the size of all the LongFilename's
-    size_t length = wcslen(data.disk_.mount_point_.get()) + 1;
-
-    for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
-        length += wcslen(temp_item->get_long_fn()) + 1;
-    }
-
-    std::wstring path = data.disk_.mount_point_.get();
+//    size_t length = wcslen(data.disk_.mount_point_.get()) + 1;
+//
+//    for (auto temp_item = item; temp_item != nullptr; temp_item = temp_item->parent_directory_) {
+//        length += wcslen(temp_item->get_long_fn()) + 1;
+//    }
 
     // Append all the strings
+    std::wstring path = data.disk_.mount_point_;
+
     append_to_long_path(item, path);
+
     return path;
 }
 
@@ -316,17 +313,14 @@ void DefragLib::slow_down(DefragState &data) {
 // Open the item as a file or as a directory. If the item could not be opened then show an error message and return nullptr.
 HANDLE DefragLib::open_item_handle(const DefragState &data, const ItemStruct *item) {
     HANDLE file_handle;
-    const size_t length = wcslen(item->get_long_path()) + 5;
-    auto path = std::make_unique<wchar_t[]>(length);
-
-    swprintf_s(path.get(), length, L"\\\\?\\%s", item->get_long_path());
+    auto path = std::format(L"\\\\?\\{}", item->get_long_path());
 
     if (item->is_dir_) {
-        file_handle = CreateFileW(path.get(), GENERIC_READ,
+        file_handle = CreateFileW(path.c_str(), GENERIC_READ,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     } else {
-        file_handle = CreateFileW(path.get(), FILE_READ_ATTRIBUTES,
+        file_handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr);
     }
