@@ -20,7 +20,7 @@
 // Subfunction for DefragAllDisks(). It will ignore removable disks, and
 // will iterate for disks that are mounted on a subdirectory of another
 // disk (instead of being mounted on a drive).
-void DefragLib::defrag_mountpoints(DefragState &data, const wchar_t *mount_point, const OptimizeMode opt_mode) {
+void DefragRunner::defrag_mountpoints(DefragState &data, const wchar_t *mount_point, const OptimizeMode opt_mode) {
     DefragGui *gui = DefragGui::get_instance();
 
     if (*data.running_ != RunningState::RUNNING) return;
@@ -74,7 +74,7 @@ void DefragLib::defrag_mountpoints(DefragState &data, const wchar_t *mount_point
             // "Cannot find volume name for mountpoint: %s"
             gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}", mount_point,
-                                        system_error_str(error_code)));
+                                        Str::system_error(error_code)));
         }
         return;
     }
@@ -112,7 +112,7 @@ void DefragLib::defrag_mountpoints(DefragState &data, const wchar_t *mount_point
     if (volume_handle == INVALID_HANDLE_VALUE) {
         gui->show_debug(DebugLevel::Warning, nullptr,
                         std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    volume_name, mount_point, system_error_str(GetLastError())));
+                                    volume_name, mount_point, Str::system_error(GetLastError())));
         return;
     }
 

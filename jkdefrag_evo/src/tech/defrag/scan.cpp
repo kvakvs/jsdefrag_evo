@@ -26,7 +26,7 @@
 //
 // Note: the program only knows if a file is unmovable after it has tried to move a file. So we have to recalculate the
 // beginning of the zones every time we encounter an unmovable file.
-void DefragLib::calculate_zones(DefragState &data) {
+void DefragRunner::calculate_zones(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
 
     // Calculate the number of clusters in movable items for every zone
@@ -140,7 +140,7 @@ Note: Reparse points will usually be flagged as different. A reparse point is
 a symbolic link. The CreateFile call will resolve the symbolic link and retrieve
 the info from the real item, but the MFT contains the info from the symbolic
 link. */
-[[maybe_unused]] void DefragLib::compare_items([[maybe_unused]] DefragState &data, const ItemStruct *item) const {
+[[maybe_unused]] void DefragRunner::compare_items([[maybe_unused]] DefragState &data, const ItemStruct *item) const {
     HANDLE file_handle;
     uint64_t clusters; // Total number of clusters
     STARTING_VCN_INPUT_BUFFER retrieve_param;
@@ -181,7 +181,7 @@ link. */
 
     if (file_handle == INVALID_HANDLE_VALUE) {
         gui->show_debug(DebugLevel::AlwaysLog, nullptr,
-                        std::format(L"  Could not open: {}", system_error_str(GetLastError())));
+                        std::format(L"  Could not open: {}", Str::system_error(GetLastError())));
         return;
     }
 
@@ -314,7 +314,7 @@ link. */
     // If there was an error while reading the clustermap then return false
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
         gui->show_debug(DebugLevel::AlwaysLog, item,
-                        std::format(L"  Error while processing clustermap: {}", system_error_str(error_code)));
+                        std::format(L"  Error while processing clustermap: {}", Str::system_error(error_code)));
         return;
     }
 
@@ -340,7 +340,7 @@ Return values:
 0    Equal
 1    item_1 is bigger than item_2
 */
-int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field) {
+int DefragRunner::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field) {
     int result;
 
     // If one of the items is nullptr then the other item is bigger
@@ -405,7 +405,7 @@ int DefragLib::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_fi
 
 // Scan all files in a directory and all it's subdirectories (recursive)
 // and store the information in a tree in memory for later use by the optimizer
-void DefragLib::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *parent_directory) {
+void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *parent_directory) {
     DefragGui *gui = DefragGui::get_instance();
 
     /* Slow the program down to the percentage that was specified on the

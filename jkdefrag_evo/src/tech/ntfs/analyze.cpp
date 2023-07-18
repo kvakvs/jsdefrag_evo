@@ -37,7 +37,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
 
     if (result == 0 || bytes_read != 512) {
         gui->show_debug(DebugLevel::Progress, nullptr,
-                        std::format(L"Error while reading bootblock: {}", DefragLib::system_error_str(GetLastError())));
+                        std::format(L"Error while reading bootblock: {}",
+                                    Str::system_error(GetLastError())));
         return false;
     }
 
@@ -117,7 +118,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     if (result == 0 || bytes_read != disk_info.bytes_per_mft_record_) {
         gui->show_debug(DebugLevel::Progress, nullptr,
                         std::format(L"Error while reading first MFT record: {}",
-                                    DefragLib::system_error_str(GetLastError())));
+                                    Str::system_error(GetLastError())));
         return false;
     }
 
@@ -207,7 +208,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
             if (result == 0 || bytes_read != (fragment->next_vcn_ - vcn) * disk_info.bytes_per_sector_ * disk_info.
                     sectors_per_cluster_) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
-                                std::format(L"  {}", DefragLib::system_error_str(GetLastError())));
+                                std::format(L"  {}", Str::system_error(GetLastError())));
                 Tree::delete_tree(data.item_tree_);
                 data.item_tree_ = nullptr;
                 return false;
@@ -270,7 +271,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
         // Read a block of inode's into memory
         if (inode_number >= block_end) {
             // Slow the program down to the percentage that was specified on the command line
-            DefragLib::slow_down(data);
+            DefragRunner::slow_down(data);
 
             block_start = inode_number;
             block_end = block_start + MFT_BUFFER_SIZE / disk_info.bytes_per_mft_record_;
@@ -326,7 +327,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
             if (result == 0 || bytes_read != (block_end - block_start) * disk_info.bytes_per_mft_record_) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
                                 std::format(L"Error while reading Inodes " NUM_FMT " to " NUM_FMT ": reason {}",
-                                            inode_number, block_end - 1, DefragLib::system_error_str(GetLastError())));
+                                            inode_number, block_end - 1,
+                                            Str::system_error(GetLastError())));
 
                 Tree::delete_tree(data.item_tree_);
                 data.item_tree_ = nullptr;

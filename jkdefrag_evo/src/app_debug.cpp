@@ -30,13 +30,13 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
     uint32_t image_type;
     char s1[BUFSIZ];
 
-    const DefragLib *defrag_lib = instance_->defrag_lib_;
+    const DefragRunner *defrag_lib = instance_->defrag_lib_;
 
     // Exit if we're running inside a debugger
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
 
-    Log::log_always( L"I have crashed!");
-    Log::log_always( std::format(L"  Command line: {}", GetCommandLineW()).c_str());
+    Log::log_always(L"I have crashed!");
+    Log::log_always(std::format(L"  Command line: {}", GetCommandLineW()).c_str());
 
     // Show the type of exception
     switch (exception_info->ExceptionRecord->ExceptionCode) {
@@ -130,15 +130,15 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
             strcpy_s(s1, BUFSIZ, "(unknown exception)");
     }
 
-    Log::log_always( std::format(L"  Exception: {}", Str::from_char(s1)));
+    Log::log_always(std::format(L"  Exception: {}", Str::from_char(s1)));
 
     // Try to show the linenumber of the sourcefile
     SymSetOptions(SymGetOptions() || SYMOPT_LOAD_LINES);
     BOOL result = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
 
     if (result == FALSE) {
-        Log::log_always( std::format(L"  Failed to initialize SymInitialize(): {}",
-                                      DefragLib::system_error_str(GetLastError())));
+        Log::log_always(std::format(L"  Failed to initialize SymInitialize(): {}",
+                                    Str::system_error(GetLastError())));
         return EXCEPTION_EXECUTE_HANDLER;
     }
 

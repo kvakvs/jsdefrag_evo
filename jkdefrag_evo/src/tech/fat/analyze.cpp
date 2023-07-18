@@ -74,7 +74,8 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
 
     if (result == 0 || bytes_read != 512) {
         gui->show_debug(DebugLevel::Progress, nullptr,
-                        std::format(L"Error while reading bootblock: {}", DefragLib::system_error_str(GetLastError())));
+                        std::format(L"Error while reading bootblock: {}",
+                                    Str::system_error(GetLastError())));
 
         return false;
     }
@@ -245,7 +246,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
 
     if (result == 0) {
         gui->show_debug(DebugLevel::Progress, nullptr,
-                        std::format(L"Error: {}", DefragLib::system_error_str(GetLastError())));
+                        std::format(L"Error: {}", Str::system_error(GetLastError())));
         return false;
     }
 
@@ -310,7 +311,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
 
         if (result == 0) {
             gui->show_debug(DebugLevel::Progress, nullptr,
-                            std::format(L"Error: {}", DefragLib::system_error_str(GetLastError())));
+                            std::format(L"Error: {}", Str::system_error(GetLastError())));
 
             delete disk_info.fat_data_.fat12;
             delete root_directory;
@@ -344,7 +345,7 @@ void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_i
     if (buffer == nullptr || length == 0) return;
 
     // Slow the program down to the percentage that was specified on the command line
-    DefragLib::slow_down(data);
+    DefragRunner::slow_down(data);
 
     //ShowHex(data,buffer,256);
 
@@ -546,7 +547,7 @@ void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_i
         data.count_all_bytes_ += item->bytes_;
         data.count_all_clusters_ += item->clusters_count_;
 
-        if (DefragLib::get_fragment_count(item) > 1) {
+        if (DefragRunner::get_fragment_count(item) > 1) {
             data.count_fragmented_items_ += 1;
             data.count_fragmented_bytes_ += item->bytes_;
             data.count_fragmented_clusters_ += item->clusters_count_;

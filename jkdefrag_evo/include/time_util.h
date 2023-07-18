@@ -2,6 +2,9 @@
 
 #include <chrono>
 
+using Clock = std::chrono::steady_clock;
+using SystemClock = std::chrono::system_clock;
+
 // 10-millionths of a second, 100ns resolution
 using filetime64_t = std::chrono::duration<uint64_t, std::ratio_multiply<std::ratio<100>, std::nano>>;
 

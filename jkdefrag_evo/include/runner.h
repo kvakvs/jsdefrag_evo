@@ -74,23 +74,23 @@ struct ExcludesStruct {
     uint64_t end_;
 };
 
-class DefragLib {
+class DefragRunner {
 public:
-    DefragLib();
+    DefragRunner();
 
-    ~DefragLib();
+    ~DefragRunner();
 
     // cppguidelines require these defined or =delete'd
-    DefragLib(const DefragLib &other) = default;
+    DefragRunner(const DefragRunner &other) = default;
 
-    DefragLib(DefragLib &&other) noexcept = default;
+    DefragRunner(DefragRunner &&other) noexcept = default;
 
-    DefragLib &operator=(const DefragLib &other) = default;
+    DefragRunner &operator=(const DefragRunner &other) = default;
 
-    DefragLib &operator=(DefragLib &&other) noexcept = default;
+    DefragRunner &operator=(DefragRunner &&other) noexcept = default;
 
     // Get a non-ownint pointer to unique instance
-    static DefragLib *get_instance();
+    static DefragRunner *get_instance();
 
     /// \brief Run the defragger/optimizer.
     /// \param path The name of a disk, mountpoint, directory, or file. It may contain wildcards '*' and '?'. If
@@ -111,15 +111,11 @@ public:
     // Stop the defragger. Wait for a maximum of time_out milliseconds for the defragger to stop. If time_out is zero
     // then wait indefinitely. If time_out is negative then immediately return without waiting.
     // Note: The "Running" variable must be the same as what was given to the start_defrag_sync() subroutine.
-    static void stop_defrag_sync(RunningState *run_state, int time_out);
+    static void stop_defrag_sync(RunningState *run_state, SystemClock::duration time_out);
 
     static const wchar_t *stristr_w(const wchar_t *haystack, const wchar_t *needle);
 
-    [[nodiscard]] static std::wstring system_error_str(DWORD error_code);
-
     static void show_hex(struct DefragState &data, const BYTE *buffer, uint64_t count);
-
-    static bool match_mask(const wchar_t *string, const wchar_t *mask);
 
     // static wchar_t** add_array_string(wchar_t** array, const wchar_t* new_string);
     std::wstring get_short_path(const DefragState &data, const ItemStruct *item);
@@ -138,7 +134,7 @@ public:
     static void call_show_status(DefragState &data, DefragPhase phase, Zone zone);
 
 private:
-    static wchar_t lower_case(wchar_t c);
+    void defrag_all_drives_sync(DefragState &data, OptimizeMode mode);
 
     void append_to_short_path(const ItemStruct *item, std::wstring &path);
 
@@ -217,5 +213,5 @@ private:
     void defrag_mountpoints(DefragState &data, const wchar_t *mount_point, OptimizeMode opt_mode);
 
     // static member that is an instance of itself
-    inline static std::unique_ptr<DefragLib> instance_;
+    inline static std::unique_ptr<DefragRunner> instance_;
 };

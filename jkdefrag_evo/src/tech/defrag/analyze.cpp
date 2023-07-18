@@ -17,7 +17,7 @@
 
 #include "precompiled_header.h"
 
-void DefragLib::analyze_volume_read_fs(DefragState &data) {
+void DefragRunner::analyze_volume_read_fs(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
     ScanNTFS *scan_ntfs = ScanNTFS::get_instance();
 
@@ -54,7 +54,7 @@ void DefragLib::analyze_volume_read_fs(DefragState &data) {
 
 // Scan all files in a volume and store the information in a tree in
 // memory for later use by the optimizer.
-void DefragLib::analyze_volume(DefragState &data) {
+void DefragRunner::analyze_volume(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->log_detailed_progress(L"Analyzing volume: Started...");
@@ -101,8 +101,8 @@ void DefragLib::analyze_volume(DefragState &data) {
         if (!item->have_short_path()) item->set_short_path(get_short_path(data, item).c_str());
 
         // Apply the Mask and set the Exclude flag of all items that do not match
-        if (!match_mask(item->get_long_path(), data.include_mask_.c_str()) &&
-            !match_mask(item->get_short_path(), data.include_mask_.c_str())) {
+        if (!Str::match_mask(item->get_long_path(), data.include_mask_.c_str()) &&
+            !Str::match_mask(item->get_short_path(), data.include_mask_.c_str())) {
             item->is_excluded_ = true;
             colorize_disk_item(data, item, 0, 0, false);
         }
@@ -110,8 +110,8 @@ void DefragLib::analyze_volume(DefragState &data) {
         // Determine if the item is to be excluded by comparing its name with the Exclude masks.
         if (!item->is_excluded_) {
             for (auto &s: data.excludes_) {
-                if (match_mask(item->get_long_path(), s.c_str()) ||
-                    match_mask(item->get_short_path(), s.c_str())) {
+                if (Str::match_mask(item->get_long_path(), s.c_str()) ||
+                    Str::match_mask(item->get_short_path(), s.c_str())) {
                     item->is_excluded_ = true;
 
                     colorize_disk_item(data, item, 0, 0, false);
@@ -142,8 +142,8 @@ void DefragLib::analyze_volume(DefragState &data) {
                 item->is_hog_ = true;
             } else {
                 for (const auto &s: data.space_hogs_) {
-                    if (match_mask(item->get_long_path(), s.c_str()) ||
-                        match_mask(item->get_short_path(), s.c_str())) {
+                    if (Str::match_mask(item->get_long_path(), s.c_str()) ||
+                        Str::match_mask(item->get_short_path(), s.c_str())) {
                         item->is_hog_ = true;
                         break;
                     }
@@ -154,17 +154,17 @@ void DefragLib::analyze_volume(DefragState &data) {
         }
 
         // Special exception for "http://www.safeboot.com/"
-        if (match_mask(item->get_long_path(), L"*\\safeboot.fs")) item->is_unmovable_ = true;
+        if (Str::match_mask(item->get_long_path(), L"*\\safeboot.fs")) item->is_unmovable_ = true;
 
         // Special exception for Acronis OS Selector
-        if (match_mask(item->get_long_path(), L"?:\\bootwiz.sys")) item->is_unmovable_ = true;
-        if (match_mask(item->get_long_path(), L"*\\BOOTWIZ\\*")) item->is_unmovable_ = true;
+        if (Str::match_mask(item->get_long_path(), L"?:\\bootwiz.sys")) item->is_unmovable_ = true;
+        if (Str::match_mask(item->get_long_path(), L"*\\BOOTWIZ\\*")) item->is_unmovable_ = true;
 
         // Special exception for DriveCrypt by "http://www.securstar.com/"
-        if (match_mask(item->get_long_path(), L"?:\\BootAuth?.sys")) item->is_unmovable_ = true;
+        if (Str::match_mask(item->get_long_path(), L"?:\\BootAuth?.sys")) item->is_unmovable_ = true;
 
         // Special exception for Symantec GoBack
-        if (match_mask(item->get_long_path(), L"*\\Gobackio.bin")) item->is_unmovable_ = true;
+        if (Str::match_mask(item->get_long_path(), L"*\\Gobackio.bin")) item->is_unmovable_ = true;
 
         // The $BadClus file maps the entire disk and is always unmovable
         if (item->get_long_fn() != nullptr &&

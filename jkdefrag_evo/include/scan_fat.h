@@ -139,5 +139,5 @@ private:
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanFAT> instance_;
 
-    DefragLib *defrag_lib_;
+    DefragRunner *defrag_lib_;
 };

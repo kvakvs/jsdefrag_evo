@@ -152,7 +152,7 @@ private:
     std::unique_ptr<Bitmap> bmp_;
 
     // Non-owning pointer to library
-    DefragLib *defrag_lib_;
+    DefragRunner *defrag_lib_;
 
     // static member that is an instance of itself
     static DefragGui *instance_;

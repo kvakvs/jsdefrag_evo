@@ -23,7 +23,7 @@
 DefragGui *DefragGui::instance_ = nullptr;
 
 DefragGui::DefragGui() : color_map_(), diskmap_pos_() {
-    defrag_lib_ = DefragLib::get_instance();
+    defrag_lib_ = DefragRunner::get_instance();
     defrag_struct_ = std::make_unique<DefragStruct>();
 
     square_size_ = 6;

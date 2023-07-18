@@ -132,7 +132,7 @@ ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_i
 
             if (result == FALSE) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
-                                std::format(L"Error: {}", DefragLib::system_error_str(GetLastError())));
+                                std::format(L"Error: {}", Str::system_error(GetLastError())));
                 return nullptr;
             }
 
@@ -183,7 +183,7 @@ ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_i
 
         if (result == FALSE) {
             gui->show_debug(DebugLevel::Progress, nullptr,
-                            std::format(L"Error: {}", DefragLib::system_error_str(GetLastError())));
+                            std::format(L"Error: {}", Str::system_error(GetLastError())));
             return nullptr;
         }
     }

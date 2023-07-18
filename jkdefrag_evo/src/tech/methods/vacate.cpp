@@ -20,7 +20,7 @@
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then
 // skip them. Then move files upward until the gap is bigger than clusters, or when we
 // encounter an unmovable file.
-void DefragLib::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
+void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
     uint64_t test_gap_begin;
     uint64_t test_gap_end;
     uint64_t move_gap_begin;

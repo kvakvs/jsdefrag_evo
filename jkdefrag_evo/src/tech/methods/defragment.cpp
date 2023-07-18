@@ -18,7 +18,7 @@
 #include "precompiled_header.h"
 
 // Defragment all the fragmented files
-void DefragLib::defragment(DefragState &data) {
+void DefragRunner::defragment(DefragState &data) {
     ItemStruct *item;
     ItemStruct *next_item;
     uint64_t gap_begin;

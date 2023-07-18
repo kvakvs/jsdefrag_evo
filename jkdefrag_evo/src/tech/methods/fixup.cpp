@@ -23,7 +23,7 @@
 - Move SpaceHogs out of the directory- and regular zones.
 - Move items out of the MFT reserved zones
 */
-void DefragLib::fixup(DefragState &data) {
+void DefragRunner::fixup(DefragState &data) {
     WIN32_FILE_ATTRIBUTE_DATA attributes;
     DefragGui *gui = DefragGui::get_instance();
 
@@ -91,7 +91,8 @@ void DefragLib::fixup(DefragState &data) {
             ((item_lcn >= data.mft_excludes_[0].start_ && item_lcn < data.mft_excludes_[0].end_) ||
              (item_lcn >= data.mft_excludes_[1].start_ && item_lcn < data.mft_excludes_[1].end_) ||
              (item_lcn >= data.mft_excludes_[2].start_ && item_lcn < data.mft_excludes_[2].end_))
-            && (data.disk_.type_ != DiskType::NTFS || !match_mask(item->get_long_path(), L"?:\\$MFT"))) {
+            && (data.disk_.type_ != DiskType::NTFS
+                || !Str::match_mask(item->get_long_path(), L"?:\\$MFT"))) {
             // "I am in MFT reserved space."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am in MFT reserved space.");
             move_me = true;

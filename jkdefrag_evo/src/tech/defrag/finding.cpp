@@ -31,10 +31,10 @@
  * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
  *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
  */
-bool DefragLib::find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
-                         const uint64_t minimum_size,
-                         const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
-                         const bool ignore_mft_excludes) {
+bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
+                            const uint64_t minimum_size,
+                            const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
+                            const bool ignore_mft_excludes) {
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
         uint64_t starting_lcn_;
@@ -72,7 +72,7 @@ bool DefragLib::find_gap(const DefragState &data, const uint64_t minimum_lcn, ui
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
             // Show debug message: "ERROR: could not get volume bitmap: %s"
-            auto error_string = system_error_str(GetLastError());
+            auto error_string = Str::system_error(GetLastError());
             gui->show_debug(DebugLevel::Warning, nullptr,
                             std::format(L"ERROR: could not get volume bitmap: {}", error_string));
 
@@ -202,8 +202,9 @@ bool DefragLib::find_gap(const DefragState &data, const uint64_t minimum_lcn, ui
  * \param zone 0=only directories, 1=only regular files, 2=only space hogs, 3=all
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
-ItemStruct *DefragLib::find_highest_item(const DefragState &data, const uint64_t cluster_start,
-                                         const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
+ItemStruct *DefragRunner::find_highest_item(const DefragState &data, const uint64_t cluster_start,
+                                            const uint64_t cluster_end, const Tree::Direction direction,
+                                            const Zone zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     // "Looking for highest-fit %I64d[%I64d]"
@@ -260,8 +261,8 @@ Zone=2           Only search the SpaceHogs.
 Zone=3           Search all items.
 
 */
-ItemStruct *DefragLib::find_best_item(const DefragState &data, const uint64_t cluster_start,
-                                      const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
+ItemStruct *DefragRunner::find_best_item(const DefragState &data, const uint64_t cluster_start,
+                                         const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
 
@@ -363,7 +364,7 @@ ItemStruct *DefragLib::find_best_item(const DefragState &data, const uint64_t cl
 Return the LCN of the fragment that contains a cluster at the LCN. If the
 item has no fragment that occupies the LCN then return zero.
 */
-uint64_t DefragLib::find_fragment_begin(const ItemStruct *item, const uint64_t lcn) {
+uint64_t DefragRunner::find_fragment_begin(const ItemStruct *item, const uint64_t lcn) {
     // Sanity check
     if (item == nullptr || lcn == 0) return 0;
 
@@ -391,7 +392,7 @@ Search the list for the item that occupies the cluster at the LCN. Return a
 pointer to the item. If not found then return nullptr.
 
 */
-[[maybe_unused]] ItemStruct *DefragLib::find_item_at_lcn(const DefragState &data, const uint64_t lcn) {
+[[maybe_unused]] ItemStruct *DefragRunner::find_item_at_lcn(const DefragState &data, const uint64_t lcn) {
     /* Locate the item by descending the sorted tree in memory. If found then
     return the item. */
     ItemStruct *item = data.item_tree_;

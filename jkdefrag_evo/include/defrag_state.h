@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "defrag_lib.h"
+#include "runner.h"
 
 // The big data struct that holds all the defragger's variables for a single thread
 class DefragState {

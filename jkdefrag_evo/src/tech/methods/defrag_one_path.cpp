@@ -19,7 +19,7 @@
 
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
-void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, OptimizeMode opt_mode) {
+void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, OptimizeMode opt_mode) {
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
@@ -30,8 +30,10 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
 
     // Compare the item with the Exclude masks. If a mask matches then return, ignoring the item.
     for (const auto &s: data.excludes_) {
-        if (DefragLib::match_mask(path, s.c_str())) break;
-        if (wcschr(s.c_str(), L'*') == nullptr && s.length() <= 3 && lower_case(path[0]) == lower_case(s[0])) {
+        if (Str::match_mask(path, s.c_str())) break;
+        if (wcschr(s.c_str(), L'*') == nullptr
+            && s.length() <= 3
+            && std::towlower(path[0]) == std::towlower(s[0])) {
             break;
         }
     }
@@ -111,7 +113,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
             // "Cannot find volume name for mountpoint '%s': %s"
             gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
-                                        data.disk_.mount_point_slash_, system_error_str(GetLastError())));
+                                        data.disk_.mount_point_slash_, Str::system_error(GetLastError())));
 
             data.disk_.mount_point_.clear();
             data.disk_.mount_point_slash_.clear();
@@ -169,7 +171,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
         gui->show_debug(DebugLevel::Warning, nullptr,
                         std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
                                     data.disk_.volume_name_, data.disk_.mount_point_,
-                                    system_error_str(GetLastError())));
+                                    Str::system_error(GetLastError())));
 
         data.disk_.mount_point_.clear();
         data.disk_.mount_point_slash_.clear();
@@ -275,7 +277,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
     const size_t path_len = wcslen(path);
 
     if (path_len == 2 || path_len == 3) {
-        data.include_mask_ = std::format(L"{:c}:\\*", lower_case(path[0]));
+        data.include_mask_ = std::format(L"{:c}:\\*", std::towlower(path[0]));
     } else if (wcschr(path, L'*') == nullptr) {
         data.include_mask_ = std::format(L"{}*", path);
     }

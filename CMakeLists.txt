@@ -18,14 +18,14 @@ set(HEADER_FILES
         ${INCL}/colormap.h
         ${INCL}/constants.h
         ${INCL}/defrag_gui.h
-        ${INCL}/defrag_lib.h
+        ${INCL}/runner.h
         ${INCL}/defrag_log.h
         ${INCL}/defrag_state.h
         ${INCL}/defrag_struct.h
         ${INCL}/itemstruct.h
         ${INCL}/mem_util.h
         ${INCL}/precompiled_header.h
-        ${INCL}/printing.h
+        ${INCL}/str_util.h
         ${INCL}/scan_fat.h
         ${INCL}/scan_ntfs.h
         ${INCL}/time_util.h
@@ -42,14 +42,14 @@ set(SOURCE_FILES
         ${SRC}/gui/stats.cpp
         ${SRC}/main.cpp
         ${SRC}/precompiled_header.cpp
-        ${SRC}/printing.cpp
+        ${SRC}/str_util.cpp
         ${SRC}/tech/defrag/analyze.cpp
         ${SRC}/tech/defrag/defrag_state.cpp
         ${SRC}/tech/defrag/finding.cpp
         ${SRC}/tech/defrag/move_mft.cpp
         ${SRC}/tech/defrag/moving.cpp
         ${SRC}/tech/defrag/scan.cpp
-        ${SRC}/tech/defrag_lib.cpp
+        ${SRC}/tech/runner.cpp
         ${SRC}/tech/defrag_struct.cpp
         ${SRC}/tech/fat/analyze.cpp
         ${SRC}/tech/fat/directory.cpp

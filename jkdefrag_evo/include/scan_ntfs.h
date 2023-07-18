@@ -396,5 +396,5 @@ private:
     inline static std::unique_ptr<ScanNTFS> instance_;
 
     // Non-owning
-    DefragLib *defrag_lib_{};
+    DefragRunner *defrag_lib_{};
 };

@@ -177,7 +177,8 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragState &data, const NtfsDiskIn
         if (const errno_t result = ReadFile(data.disk_.volume_handle_, &buffer[extent_vcn - offset],
                                             (uint32_t) extent_length, &bytes_read, &g_overlapped); result == 0) {
             gui->show_debug(DebugLevel::Progress, nullptr,
-                            std::format(L"Error while reading disk: {}", DefragLib::system_error_str(GetLastError())));
+                            std::format(L"Error while reading disk: {}",
+                                        Str::system_error(GetLastError())));
             return nullptr;
         }
     }

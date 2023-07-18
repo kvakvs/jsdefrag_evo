@@ -132,7 +132,7 @@ ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_inf
         if (result == 0 || bytes_read != disk_info->bytes_per_mft_record_) {
             gui->show_debug(DebugLevel::Progress, nullptr,
                             std::format(L"      Error while reading Inode " NUM_FMT ": reason {}", ref_inode,
-                                        DefragLib::system_error_str(GetLastError())));
+                                        Str::system_error(GetLastError())));
             return;
         }
 
@@ -217,7 +217,7 @@ bool ScanNTFS::process_attributes(DefragState &data, NtfsDiskInfoStruct *disk_in
                     std::format(L"  buf_length=" NUM_FMT ", attribute_offset=" NUM_FMT ", AttributeLength={}({:x})",
                                 buf_length, attribute_offset, attribute->length_, attribute->length_));
 
-            DefragLib::show_hex(data, buffer, buf_length);
+            DefragRunner::show_hex(data, buffer, buf_length);
 
             return FALSE;
         }

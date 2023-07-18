@@ -36,10 +36,10 @@ DefragLog::DefragLog() {
     // Determine default path to logfile
     log_file_ = my_name_;
 
-    const wchar_t *p1 = DefragLib::stristr_w(log_file_.c_str(), L".exe");
+    const wchar_t *p1 = DefragRunner::stristr_w(log_file_.c_str(), L".exe");
 
     if (p1 == nullptr) {
-        p1 = DefragLib::stristr_w(log_file_.c_str(), L".scr");
+        p1 = DefragRunner::stristr_w(log_file_.c_str(), L".scr");
         log_file_.clear();
     } else {
 //        *p1 = '\0';
@@ -110,7 +110,7 @@ errno_t DefragLog::open_log_append(FILE *&fout) const {
 
 void DefragLog::write_timestamp(FILE *fout) {
     // Write the string to the logfile
-    auto now = std::chrono::current_zone()->to_local(std::chrono::system_clock::now());
+    auto now = std::chrono::current_zone()->to_local(SystemClock::now());
     // Calculate fractional seconds with millisecond precision
     auto sse = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     auto time_str = std::format(L"{:%FT%H:%M}.{:%S}", now, sse);

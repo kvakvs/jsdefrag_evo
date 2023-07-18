@@ -16,18 +16,19 @@
  */
 
 #include "precompiled_header.h"
+#include "defrag_state.h"
 
 #include <memory>
 #include <optional>
 #include <cwctype>
 
-DefragLib::DefragLib() = default;
+DefragRunner::DefragRunner() = default;
 
-DefragLib::~DefragLib() = default;
+DefragRunner::~DefragRunner() = default;
 
-DefragLib *DefragLib::get_instance() {
+DefragRunner *DefragRunner::get_instance() {
     if (instance_ == nullptr) {
-        instance_ = std::make_unique<DefragLib>();
+        instance_ = std::make_unique<DefragRunner>();
     }
 
     return instance_.get();
@@ -104,7 +105,7 @@ DefragLib *DefragLib::get_instance() {
 //        };
 
 // Search case-insensitive for a substring
-const wchar_t *DefragLib::stristr_w(const wchar_t *haystack, const wchar_t *needle) {
+const wchar_t *DefragRunner::stristr_w(const wchar_t *haystack, const wchar_t *needle) {
     if (haystack == nullptr || needle == nullptr) return nullptr;
 
     const wchar_t *p1 = haystack;
@@ -119,36 +120,9 @@ const wchar_t *DefragLib::stristr_w(const wchar_t *haystack, const wchar_t *need
     return nullptr;
 }
 
-// Return a string with the error message for GetLastError()
-std::wstring DefragLib::system_error_str(const DWORD error_code) {
-    wchar_t buffer[BUFSIZ];
-
-    FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
-                   nullptr, error_code, 0, buffer, BUFSIZ, nullptr);
-
-    // Strip trailing whitespace
-    wchar_t *p1 = wcschr(buffer, '\0');
-
-    while (p1 != buffer) {
-        p1--;
-        if (!std::iswspace(*p1)) break;
-        *p1 = '\0';
-    }
-
-    // Add error number.
-    return std::format(L"[code {}] {}", error_code, buffer);
-}
-
-// Translate character to lowercase
-wchar_t DefragLib::lower_case(const wchar_t c) {
-    if (std::iswupper(c)) return c - 'A' + 'a';
-
-    return c;
-}
-
 // Dump a block of data to standard output, for debugging purposes
-void DefragLib::show_hex([[maybe_unused]] DefragState &data, const BYTE *buffer,
-                         const uint64_t count) {
+void DefragRunner::show_hex([[maybe_unused]] DefragState &data, const BYTE *buffer,
+                            const uint64_t count) {
     DefragGui *gui = DefragGui::get_instance();
 
     int j;
@@ -186,48 +160,8 @@ void DefragLib::show_hex([[maybe_unused]] DefragState &data, const BYTE *buffer,
     }
 }
 
-
-// Compare a string with a mask, case-insensitive. If it matches then return
-// true, otherwise false. The mask may contain wildcard characters '?' (any
-// character) '*' (any characters).
-bool DefragLib::match_mask(const wchar_t *string, const wchar_t *mask) {
-    if (string == nullptr) return false; // Just to speed up things
-    if (mask == nullptr) return false;
-    if (wcscmp(mask, L"*") == 0) return true;
-
-    auto m = mask;
-    auto s = string;
-
-    while (*m != L'\0' && *s != L'\0') {
-        if (lower_case(*m) != lower_case(*s) && *m != '?') {
-            if (*m != L'*') return false;
-
-            m++;
-
-            if (*m == L'\0') return true;
-
-            while (*s != L'\0') {
-                if (match_mask(s, m)) return true;
-                s++;
-            }
-
-            return false;
-        }
-
-        m++;
-        s++;
-    }
-
-    while (*m == L'*') m++;
-
-    if (*s == L'\0' && *m == L'\0') return true;
-
-    return false;
-}
-
-
 // Subfunction of GetShortPath()
-void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path) {
+void DefragRunner::append_to_short_path(const ItemStruct *item, std::wstring &path) {
     if (item->parent_directory_ != nullptr) append_to_short_path(item->parent_directory_, path);
 
     path += L"\\";
@@ -235,7 +169,7 @@ void DefragLib::append_to_short_path(const ItemStruct *item, std::wstring &path)
 }
 
 // Return a string with the full path of an item, constructed from the short names.
-std::wstring DefragLib::get_short_path(const DefragState &data, const ItemStruct *item) {
+std::wstring DefragRunner::get_short_path(const DefragState &data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
 
@@ -254,7 +188,7 @@ std::wstring DefragLib::get_short_path(const DefragState &data, const ItemStruct
 }
 
 // Subfunction of GetLongPath()
-void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) {
+void DefragRunner::append_to_long_path(const ItemStruct *item, std::wstring &path) {
     if (item->parent_directory_ != nullptr) append_to_long_path(item->parent_directory_, path);
 
     path += L"\\";
@@ -262,7 +196,7 @@ void DefragLib::append_to_long_path(const ItemStruct *item, std::wstring &path) 
 }
 
 // Return a string with the full path of an item, constructed from the long names
-std::wstring DefragLib::get_long_path(const DefragState &data, const ItemStruct *item) {
+std::wstring DefragRunner::get_long_path(const DefragState &data, const ItemStruct *item) {
     // Sanity check
     if (item == nullptr) return {};
 
@@ -282,7 +216,7 @@ std::wstring DefragLib::get_long_path(const DefragState &data, const ItemStruct 
 }
 
 // Slow the program down
-void DefragLib::slow_down(DefragState &data) {
+void DefragRunner::slow_down(DefragState &data) {
     // Sanity check
     if (data.speed_ <= 0 || data.speed_ >= 100) return;
 
@@ -311,7 +245,7 @@ void DefragLib::slow_down(DefragState &data) {
 }
 
 // Open the item as a file or as a directory. If the item could not be opened then show an error message and return nullptr.
-HANDLE DefragLib::open_item_handle(const DefragState &data, const ItemStruct *item) {
+HANDLE DefragRunner::open_item_handle(const DefragState &data, const ItemStruct *item) {
     HANDLE file_handle;
     auto path = std::format(L"\\\\?\\{}", item->get_long_path());
 
@@ -328,7 +262,7 @@ HANDLE DefragLib::open_item_handle(const DefragState &data, const ItemStruct *it
     if (file_handle != INVALID_HANDLE_VALUE) return file_handle;
 
     // Show error message: "Could not open '%s': %s"
-    auto error_string = system_error_str(GetLastError());
+    auto error_string = Str::system_error(GetLastError());
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedFileInfo, nullptr,
@@ -345,7 +279,7 @@ Note: Very small files are stored by Windows in the MFT and have no
 clusters (zero) and no fragments (nullptr).
 
 */
-bool DefragLib::get_fragments(const DefragState &data, ItemStruct *item, HANDLE file_handle) {
+bool DefragRunner::get_fragments(const DefragState &data, ItemStruct *item, HANDLE file_handle) {
     STARTING_VCN_INPUT_BUFFER RetrieveParam;
 
     struct {
@@ -478,7 +412,7 @@ bool DefragLib::get_fragments(const DefragState &data, ItemStruct *item, HANDLE 
         gui->show_debug(
                 DebugLevel::DetailedProgress, nullptr,
                 std::format(L"Cannot process clustermap of '{}': {}", item->get_long_path(),
-                            system_error_str(error_code)));
+                            Str::system_error(error_code)));
 
         return false;
     }
@@ -487,7 +421,7 @@ bool DefragLib::get_fragments(const DefragState &data, ItemStruct *item, HANDLE 
 }
 
 // Return the number of fragments in the item
-int DefragLib::get_fragment_count(const ItemStruct *item) {
+int DefragRunner::get_fragment_count(const ItemStruct *item) {
     int fragments = 0;
     uint64_t vcn = 0;
     uint64_t next_lcn = 0;
@@ -515,7 +449,7 @@ Note: this function does not ask Windows for a fresh list of fragments,
 it only looks at cached information in memory.
 
 */
-bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, const uint64_t size) {
+bool DefragRunner::is_fragmented(const ItemStruct *item, const uint64_t offset, const uint64_t size) {
     /* Walk through all fragments. If a fragment is found where either the
     begin or the end of the fragment is inside the block then the file is
     fragmented and return true. */
@@ -582,8 +516,8 @@ bool DefragLib::is_fragmented(const ItemStruct *item, const uint64_t offset, con
  * \param busy_size Number of clusters to be highlighted.
  * \param un_draw true to undraw the file from the screen.
  */
-void DefragLib::colorize_disk_item(DefragState &data, const ItemStruct *item, const uint64_t busy_offset,
-                                   const uint64_t busy_size, const int un_draw) const {
+void DefragRunner::colorize_disk_item(DefragState &data, const ItemStruct *item, const uint64_t busy_offset,
+                                      const uint64_t busy_size, const int un_draw) const {
     DefragGui *gui = DefragGui::get_instance();
 
     // Determine if the item is fragmented.
@@ -818,7 +752,7 @@ void ShowDiskmap2(struct DefragState &Data) {
 */
 
 // Update some numbers in the DefragData
-void DefragLib::call_show_status(DefragState &data, const DefragPhase phase, const Zone zone) {
+void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, const Zone zone) {
     ItemStruct *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
 
@@ -1016,9 +950,39 @@ void DefragLib::call_show_status(DefragState &data, const DefragPhase phase, con
     gui->show_status(data);
 }
 
+void DefragRunner::defrag_all_drives_sync(DefragState &data, OptimizeMode mode) {
+// Enumerate all drives, and defrag each
+    uint32_t drives_size;
+    drives_size = GetLogicalDriveStringsW(0, nullptr);
+
+    auto drives = std::make_unique<wchar_t[]>(drives_size + 1);
+
+    drives_size = GetLogicalDriveStringsW(drives_size, drives.get());
+
+    if (drives_size == 0) {
+        // "Could not get list of volumes: %s"
+        DefragGui *gui = DefragGui::get_instance();
+        gui->show_debug(DebugLevel::Warning, nullptr,
+                        std::format(L"Could not get list of volumes: {}",
+                                    Str::system_error(GetLastError())));
+    } else {
+        wchar_t *drive = drives.get();
+
+        while (*drive != '\0') {
+            // Long running call, in a loop
+            DefragRunner::defrag_mountpoints(data, drive, mode);
+            while (*drive != '\0') {
+                drive++;
+            }
+            drive++;
+        }
+
+    }
+}
+
 // Run the defragger/optimizer. See the .h file for a full explanation
-void DefragLib::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
-                                  const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
+void DefragRunner::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
+                                     const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->log_detailed_progress(L"Defrag starting…");
@@ -1078,31 +1042,7 @@ void DefragLib::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mod
         // Long running call
         defrag_one_path(data, path, optimize_mode);
     } else {
-        // Enumerate all drives, and defrag each
-        uint32_t drives_size;
-        drives_size = GetLogicalDriveStringsW(0, nullptr);
-
-        auto drives = std::make_unique<wchar_t[]>(drives_size + 1);
-
-        drives_size = GetLogicalDriveStringsW(drives_size, drives.get());
-
-        if (drives_size == 0) {
-            // "Could not get list of volumes: %s"
-            gui->show_debug(DebugLevel::Warning, nullptr,
-                            std::format(L"Could not get list of volumes: {}",
-                                        system_error_str(GetLastError())));
-        } else {
-            wchar_t *drive = drives.get();
-
-            while (*drive != '\0') {
-                // Long running call, in a loop
-                defrag_mountpoints(data, drive, optimize_mode);
-                while (*drive != '\0') {
-                    drive++;
-                }
-                drive++;
-            }
-        }
+        defrag_all_drives_sync(data, optimize_mode);
 
         gui->log_detailed_progress(L"Defrag run finished");
     }
@@ -1114,7 +1054,7 @@ void DefragLib::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mod
 // Stop the defragger. The "Running" variable must be the same as what was given to the RunJkDefrag() subroutine. Wait
 // for a maximum of time_out milliseconds for the defragger to stop. If time_out is zero then wait indefinitely. If
 // time_out is negative then immediately return without waiting.
-void DefragLib::stop_defrag_sync(RunningState *run_state, int time_out) {
+void DefragRunner::stop_defrag_sync(RunningState *run_state, SystemClock::duration time_out) {
     // Sanity check
     if (run_state == nullptr) return;
 
@@ -1126,13 +1066,18 @@ void DefragLib::stop_defrag_sync(RunningState *run_state, int time_out) {
 
     // Wait for a maximum of time_out milliseconds for the defragger to stop.
     // If time_out is zero then wait indefinitely. If time_out is negative then immediately return without waiting
-    int time_waited = 0;
+    SystemClock::duration time_waited{};
+    const auto WAIT_MS = 100;
 
     while (time_waited <= time_out) {
-        if (*run_state == RunningState::STOPPED) break;
+        if (*run_state == RunningState::STOPPED) {
+            break;
+        }
 
-        Sleep(100);
+        Sleep(WAIT_MS);
 
-        if (time_out > 0) time_waited = time_waited + 100;
+        if (time_out > SystemClock::duration::zero()) {
+            time_waited = time_waited + std::chrono::milliseconds(WAIT_MS);
+        }
     }
 }

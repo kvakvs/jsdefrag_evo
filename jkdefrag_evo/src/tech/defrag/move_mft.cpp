@@ -23,7 +23,7 @@
 //    chosen to wrap the MFT around that data. The fragments will be aligned, so
 //    the performance loss is minimal, and still faster than placing the MFT
 //    higher on the disk.
-[[maybe_unused]] void DefragLib::move_mft_to_begin_of_disk(DefragState &data) {
+[[maybe_unused]] void DefragRunner::move_mft_to_begin_of_disk(DefragState &data) {
     ItemStruct *item;
 
     uint64_t lcn;
@@ -60,7 +60,7 @@
 
     // Locate the Item for the MFT. If not found then exit
     for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
-        if (match_mask(item->get_long_path(), L"?:\\$MFT")) break;
+        if (Str::match_mask(item->get_long_path(), L"?:\\$MFT")) break;
     }
 
     if (item == nullptr) {

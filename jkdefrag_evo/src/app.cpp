@@ -28,8 +28,7 @@ DefragApp::DefragApp()
           i_am_running_(RunningState::STOPPED),
           debug_level_(DebugLevel::Warning) {
     gui_ = DefragGui::get_instance();
-    defrag_lib_ = DefragLib::get_instance();
-    defrag_log_ = DefragLog::get_instance();
+    defrag_lib_ = DefragRunner::get_instance();
     defrag_struct_ = std::make_unique<DefragStruct>();
 }
 
@@ -73,7 +72,7 @@ WPARAM DefragApp::start_program(HINSTANCE instance,
     // If the defragger is still running then ask & wait for it to stop
     i_am_running_ = RunningState::STOPPED;
 
-    DefragLib::stop_defrag_sync(&running_state_, 0);
+    DefragRunner::stop_defrag_sync(&running_state_, SystemClock::duration::zero());
 
     // Wait for the defrag thread
     defrag_thread_object.join();
@@ -114,7 +113,7 @@ static void log_windows_version() {
         } else {
             Log::log_always(
                     std::format(L"Failed to verify Windows version information. Error code: {}",
-                                DefragLib::system_error_str(GetLastError())));
+                                Str::system_error(GetLastError())));
         }
     }
 }
@@ -146,7 +145,7 @@ void DefragApp::defrag_thread() {
 
     DefragStruct *defrag_struct = instance_->defrag_struct_.get();
     DefragGui *gui = instance_->gui_;
-    DefragLib *defrag_lib = instance_->defrag_lib_;
+    DefragRunner *defrag_lib = instance_->defrag_lib_;
 
     // Setup the defaults
     OptimizeMode optimize_mode = OptimizeMode::AnalyzeFixupFastopt;
@@ -176,7 +175,7 @@ void DefragApp::defrag_thread() {
     // Show some standard information in the logfile
     Log::log_always(defrag_struct->versiontext_.c_str());
 
-    auto now = std::chrono::current_zone()->to_local(std::chrono::system_clock::now());
+    auto now = std::chrono::current_zone()->to_local(SystemClock::now());
 
     Log::log_always(std::format(L"Date: {:%Y-%m-%d %X}", now));
 
@@ -360,7 +359,7 @@ bool DefragApp::is_already_running() const {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (snapshot == INVALID_HANDLE_VALUE) {
-        auto err = std::format(L"Cannot get process snapshot: {}", DefragLib::system_error_str(GetLastError()));
+        auto err = std::format(L"Cannot get process snapshot: {}", Str::system_error(GetLastError()));
         gui_->log_fatal(std::move(err));
         return true;
     }

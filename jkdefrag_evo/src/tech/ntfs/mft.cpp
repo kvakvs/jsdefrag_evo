@@ -175,7 +175,7 @@ bool ScanNTFS::interpret_mft_record(
 
         if (stream != nullptr) data.count_all_clusters_ += stream->clusters_;
 
-        if (DefragLib::get_fragment_count(item.get()) > 1) {
+        if (DefragRunner::get_fragment_count(item.get()) > 1) {
             data.count_fragmented_items_ += 1;
             data.count_fragmented_bytes_ += inode_data.bytes_;
 
@@ -249,7 +249,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *di
                 DebugLevel::Progress, nullptr,
                 L"This is not a valid MFT record, it does not begin with FILE (maybe trying to read past the end?).");
 
-        DefragLib::show_hex(data, buffer, buf_length);
+        DefragRunner::show_hex(data, buffer, buf_length);
 
         return false;
     }

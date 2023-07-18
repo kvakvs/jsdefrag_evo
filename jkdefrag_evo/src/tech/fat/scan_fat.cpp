@@ -21,7 +21,7 @@
 #include <memory>
 
 ScanFAT::ScanFAT() {
-    defrag_lib_ = DefragLib::get_instance();
+    defrag_lib_ = DefragRunner::get_instance();
 }
 
 ScanFAT::~ScanFAT() = default;
