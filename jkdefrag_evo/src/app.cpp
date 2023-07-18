@@ -81,36 +81,40 @@ WPARAM DefragApp::start_program(HINSTANCE instance,
 }
 
 static void log_windows_version() {
-//    OSVERSIONINFO os_version;
-//    ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
-//    os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+    OSVERSIONINFO os_version;
+    ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
+    os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 
-//    if (GetVersionEx(&os_version) != 0) {
-//        log->log(std::format(L"Windows version: v{}.{} build {} {}", os_version.dwMajorVersion,
-//                             os_version.dwMinorVersion, os_version.dwBuildNumber,
-//                             Str::from_char(os_version.szCSDVersion)));
-//    }
-    OSVERSIONINFOEX ver_info{
-            .dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX)
-    };
-    DWORDLONG condition_mask = 0;
-    VER_SET_CONDITION(condition_mask, VER_MAJORVERSION, VER_EQUAL);
-    VER_SET_CONDITION(condition_mask, VER_MINORVERSION, VER_EQUAL);
-    VER_SET_CONDITION(condition_mask, VER_BUILDNUMBER, VER_EQUAL);
+    if (GetVersionEx(&os_version) != 0) {
+        Log::log(DebugLevel::AlwaysLog, std::format(
+                L"Windows version: v{}.{} build {} {}", os_version.dwMajorVersion,
+                os_version.dwMinorVersion, os_version.dwBuildNumber,
+                Str::from_char(os_version.szCSDVersion)));
+    }
 
-    // we're not picky about the modern version as long as its NTFS
-    ver_info.dwMajorVersion = HIBYTE(_WIN32_WINNT_WINXP);
-    ver_info.dwMinorVersion = LOBYTE(_WIN32_WINNT_WINXP);
-    ver_info.dwBuildNumber = 0;
+    if (false) {
+        OSVERSIONINFOEX ver_info{
+                .dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX)
+        };
+        DWORDLONG condition_mask = 0;
+        VER_SET_CONDITION(condition_mask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+        VER_SET_CONDITION(condition_mask, VER_MINORVERSION, VER_GREATER_EQUAL);
+        // VER_SET_CONDITION(condition_mask, VER_BUILDNUMBER, VER_EQUAL);
 
-    if (VerifyVersionInfo(&ver_info, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, condition_mask)) {
-        Log::log(DebugLevel::AlwaysLog, static_cast<const std::wstring>(std::format(
-                L"Windows version {}.{} build {}", ver_info.dwMajorVersion, ver_info.dwMinorVersion,
-                ver_info.dwBuildNumber)));
-    } else {
-        DWORD error = GetLastError();
-        Log::log(DebugLevel::AlwaysLog,
-                 std::format(L"Failed to retrieve Windows version information. Error code: {}", error));
+        // we're not picky about the modern version as long as its NTFS
+        ver_info.dwMajorVersion = HIBYTE(_WIN32_WINNT_WIN7);
+        ver_info.dwMinorVersion = LOBYTE(_WIN32_WINNT_WIN7);
+        ver_info.dwBuildNumber = 0;
+
+        if (VerifyVersionInfo(&ver_info, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, condition_mask)) {
+            Log::log(DebugLevel::AlwaysLog, static_cast<const std::wstring>(std::format(
+                    L"Windows version {}.{} build {}", ver_info.dwMajorVersion, ver_info.dwMinorVersion,
+                    ver_info.dwBuildNumber)));
+        } else {
+            Log::log(DebugLevel::AlwaysLog,
+                     std::format(L"Failed to verify Windows version information. Error code: {}",
+                                 DefragLib::system_error_str(GetLastError())));
+        }
     }
 }
 
