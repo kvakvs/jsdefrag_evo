@@ -19,12 +19,12 @@
 
 #include <memory>
 #include <format>
+#include <app.h>
 
 DefragGui *DefragGui::instance_ = nullptr;
 
 DefragGui::DefragGui() : color_map_(), diskmap_pos_() {
     defrag_lib_ = DefragRunner::get_instance();
-    defrag_struct_ = std::make_unique<DefragStruct>();
 
     square_size_ = 6;
     drawing_area_offset_ = {.x=8, .y=8};
@@ -69,17 +69,17 @@ int DefragGui::initialize(HINSTANCE instance, const int cmd_show, const DebugLev
     LoadString(instance, 2, version_str, 99);
 
     if (RegisterClassEx(&wnd_class_) == 0) {
-        MessageBoxW(nullptr, L"Cannot register class", defrag_struct_->versiontext_.c_str(),
+        MessageBoxW(nullptr, L"Cannot register class", DefragApp::versiontext_,
                     MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
 
     const wchar_t *defrag_window_class = APP_NAME_W L"Class";
-    wnd_ = CreateWindowW(defrag_window_class, defrag_struct_->versiontext_.c_str(), WS_TILEDWINDOW,
+    wnd_ = CreateWindowW(defrag_window_class, DefragApp::versiontext_, WS_TILEDWINDOW,
                          CW_USEDEFAULT, 0, 1024, 768, nullptr, nullptr, instance, nullptr);
 
     if (wnd_ == nullptr) {
-        MessageBoxW(nullptr, L"Cannot create window", defrag_struct_->versiontext_.c_str(),
+        MessageBoxW(nullptr, L"Cannot create window", DefragApp::versiontext_,
                     MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
@@ -155,7 +155,7 @@ void DefragGui::clear_screen(std::wstring &&text) {
 }
 
 // Callback: whenever an item (file, directory) is moved on disk.
-void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const uint64_t from_lcn,
+void DefragGui::show_move(const FileNode *item, const uint64_t clusters, const uint64_t from_lcn,
                           const uint64_t to_lcn, const uint64_t from_vcn) {
     // Save the message in Messages 3
     if (clusters == 1) {
@@ -211,7 +211,7 @@ static bool show_analyze_throttle_timer() {
     return true;
 }
 
-void DefragGui::show_analyze_update_item_text(const ItemStruct *item) {
+void DefragGui::show_analyze_update_item_text(const FileNode *item) {
     // Save the name of the file in Messages 4
     if (item != nullptr && item->have_long_path()) {
         messages_[4] = item->get_long_path();
@@ -220,7 +220,7 @@ void DefragGui::show_analyze_update_item_text(const ItemStruct *item) {
     }
 }
 
-void DefragGui::show_analyze_no_state(const ItemStruct *item) {
+void DefragGui::show_analyze_no_state(const FileNode *item) {
     if (!show_analyze_throttle_timer()) return;
 
     messages_[3] = L"Applying Exclude and SpaceHogs masks....";
@@ -234,7 +234,7 @@ void DefragGui::show_analyze_no_state(const ItemStruct *item) {
 
 // Callback: for every file during analysis.
 // This subroutine is called one last time with Item=nullptr when analysis has finished
-void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
+void DefragGui::show_analyze(const DefragState &data, const FileNode *item) {
     if (!show_analyze_throttle_timer()) return;
 
     if (data.count_all_files_ != 0) {
@@ -249,7 +249,7 @@ void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
 }
 
 // Callback: show filename in the slot 4, show the message in the debug slot 5 + log the message
-void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::wstring &&text) {
+void DefragGui::show_debug(const DebugLevel level, const FileNode *item, std::wstring &&text) {
     // Avoid extra data motions below log level
     if (level <= DefragLog::debug_level_) {
         // Save the name of the file in messages[4]

@@ -202,9 +202,9 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
  * \param zone 0=only directories, 1=only regular files, 2=only space hogs, 3=all
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
-ItemStruct *DefragRunner::find_highest_item(const DefragState &data, const uint64_t cluster_start,
-                                            const uint64_t cluster_end, const Tree::Direction direction,
-                                            const Zone zone) {
+FileNode *DefragRunner::find_highest_item(const DefragState &data, const uint64_t cluster_start,
+                                          const uint64_t cluster_end, const Tree::Direction direction,
+                                          const Zone zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     // "Looking for highest-fit %I64d[%I64d]"
@@ -261,8 +261,8 @@ Zone=2           Only search the SpaceHogs.
 Zone=3           Search all items.
 
 */
-ItemStruct *DefragRunner::find_best_item(const DefragState &data, const uint64_t cluster_start,
-                                         const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
+FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t cluster_start,
+                                       const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
 
@@ -274,7 +274,7 @@ ItemStruct *DefragRunner::find_best_item(const DefragState &data, const uint64_t
     // fits inside the free block, and combined with other items will fill the gap
     // perfectly. If we find an exact match then immediately return it.
     const Clock::time_point max_time = Clock::now() + std::chrono::milliseconds(500);
-    ItemStruct *first_item = nullptr;
+    FileNode *first_item = nullptr;
     uint64_t gap_size = cluster_end - cluster_start;
     uint64_t total_items_size = 0;
 
@@ -364,7 +364,7 @@ ItemStruct *DefragRunner::find_best_item(const DefragState &data, const uint64_t
 Return the LCN of the fragment that contains a cluster at the LCN. If the
 item has no fragment that occupies the LCN then return zero.
 */
-uint64_t DefragRunner::find_fragment_begin(const ItemStruct *item, const uint64_t lcn) {
+uint64_t DefragRunner::find_fragment_begin(const FileNode *item, const uint64_t lcn) {
     // Sanity check
     if (item == nullptr || lcn == 0) return 0;
 
@@ -392,10 +392,10 @@ Search the list for the item that occupies the cluster at the LCN. Return a
 pointer to the item. If not found then return nullptr.
 
 */
-[[maybe_unused]] ItemStruct *DefragRunner::find_item_at_lcn(const DefragState &data, const uint64_t lcn) {
+[[maybe_unused]] FileNode *DefragRunner::find_item_at_lcn(const DefragState &data, const uint64_t lcn) {
     /* Locate the item by descending the sorted tree in memory. If found then
     return the item. */
-    ItemStruct *item = data.item_tree_;
+    FileNode *item = data.item_tree_;
 
     while (item != nullptr) {
         const auto item_lcn = item->get_item_lcn();

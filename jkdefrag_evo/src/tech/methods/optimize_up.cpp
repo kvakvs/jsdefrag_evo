@@ -19,7 +19,7 @@
 
 // Optimize the harddisk by moving the selected items up
 void DefragRunner::optimize_up(DefragState &data) {
-    ItemStruct *item;
+    FileNode *item;
 
     uint64_t gap_begin;
     uint64_t gap_end;

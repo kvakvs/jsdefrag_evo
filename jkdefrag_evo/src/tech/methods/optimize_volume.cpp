@@ -19,7 +19,7 @@
 
 // Optimize the harddisk by filling gaps with files from above
 void DefragRunner::optimize_volume(DefragState &data) {
-    ItemStruct *item;
+    FileNode *item;
 
     uint64_t gap_begin;
     uint64_t gap_end;

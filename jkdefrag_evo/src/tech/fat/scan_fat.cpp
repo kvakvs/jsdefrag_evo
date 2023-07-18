@@ -67,7 +67,7 @@ filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const U
 // - The FAT contains either an EOC mark (End Of Clusterchain) or the cluster number of
 // the next cluster of the file.
 void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info,
-                                 ItemStruct *item, uint64_t cluster) {
+                                 FileNode *item, uint64_t cluster) {
     FragmentListStruct *new_fragment;
     FragmentListStruct *last_fragment;
 

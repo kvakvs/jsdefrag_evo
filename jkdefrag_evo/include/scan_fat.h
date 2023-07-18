@@ -126,7 +126,7 @@ private:
 
     static filetime64_t convert_time(const USHORT date, const USHORT time, const USHORT time10);
 
-    static void make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info, ItemStruct *item,
+    static void make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info, FileNode *item,
                                    uint64_t cluster);
 
     static BYTE *load_directory(
@@ -134,7 +134,7 @@ private:
             uint64_t *out_length);
 
     void analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_info, BYTE *buffer, uint64_t length,
-                               ItemStruct *parent_directory);
+                               FileNode *parent_directory);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanFAT> instance_;

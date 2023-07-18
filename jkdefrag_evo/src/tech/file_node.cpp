@@ -16,11 +16,11 @@
  */
 
 #include "precompiled_header.h"
-#include "itemstruct.h"
+#include "file_node.h"
 
 /// short_path can be null
-void ItemStruct::set_names(const wchar_t *long_path, const wchar_t *long_filename,
-                           const wchar_t *short_path, const wchar_t *short_filename) {
+void FileNode::set_names(const wchar_t *long_path, const wchar_t *long_filename,
+                         const wchar_t *short_path, const wchar_t *short_filename) {
     this->long_path_ = long_path;
     this->long_filename_ = long_filename;
 
@@ -37,7 +37,7 @@ void ItemStruct::set_names(const wchar_t *long_path, const wchar_t *long_filenam
     }
 }
 
-ItemStruct::~ItemStruct() {
+FileNode::~FileNode() {
     while (fragments_ != nullptr) {
         FragmentListStruct *fragment = fragments_->next_;
         delete fragments_;

@@ -18,12 +18,12 @@
 #include "precompiled_header.h"
 
 void DefragGui::write_stats(const DefragState &data) {
-    ItemStruct *largest_items[25];
+    FileNode *largest_items[25];
     uint64_t total_clusters;
     uint64_t total_bytes;
     uint64_t total_fragments;
     int fragments;
-    ItemStruct *item;
+    FileNode *item;
     Log::log_always(
             std::format(L"- Total disk space: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
                         data.bytes_per_cluster_ * data.total_clusters_,

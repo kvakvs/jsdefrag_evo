@@ -34,12 +34,12 @@ void DefragRunner::forced_fill(DefragState &data) {
         if (!result) break;
 
         // Find the item with the highest fragment on disk
-        ItemStruct *highest_item = nullptr;
+        FileNode *highest_item = nullptr;
         uint64_t highest_lcn = 0;
         uint64_t highest_vcn = 0;
         uint64_t highest_size = 0;
 
-        ItemStruct *item;
+        FileNode *item;
         for (item = Tree::biggest(data.item_tree_); item != nullptr; item = Tree::prev(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;

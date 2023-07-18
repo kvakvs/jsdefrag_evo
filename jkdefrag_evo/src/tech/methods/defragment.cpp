@@ -19,8 +19,8 @@
 
 // Defragment all the fragmented files
 void DefragRunner::defragment(DefragState &data) {
-    ItemStruct *item;
-    ItemStruct *next_item;
+    FileNode *item;
+    FileNode *next_item;
     uint64_t gap_begin;
     uint64_t gap_end;
     uint64_t clusters_done;

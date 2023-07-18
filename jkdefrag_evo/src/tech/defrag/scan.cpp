@@ -140,7 +140,7 @@ Note: Reparse points will usually be flagged as different. A reparse point is
 a symbolic link. The CreateFile call will resolve the symbolic link and retrieve
 the info from the real item, but the MFT contains the info from the symbolic
 link. */
-[[maybe_unused]] void DefragRunner::compare_items([[maybe_unused]] DefragState &data, const ItemStruct *item) const {
+[[maybe_unused]] void DefragRunner::compare_items([[maybe_unused]] DefragState &data, const FileNode *item) const {
     HANDLE file_handle;
     uint64_t clusters; // Total number of clusters
     STARTING_VCN_INPUT_BUFFER retrieve_param;
@@ -340,7 +340,7 @@ Return values:
 0    Equal
 1    item_1 is bigger than item_2
 */
-int DefragRunner::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort_field) {
+int DefragRunner::compare_items(FileNode *item_1, FileNode *item_2, int sort_field) {
     int result;
 
     // If one of the items is nullptr then the other item is bigger
@@ -405,7 +405,7 @@ int DefragRunner::compare_items(ItemStruct *item_1, ItemStruct *item_2, int sort
 
 // Scan all files in a directory and all it's subdirectories (recursive)
 // and store the information in a tree in memory for later use by the optimizer
-void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *parent_directory) {
+void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, FileNode *parent_directory) {
     DefragGui *gui = DefragGui::get_instance();
 
     /* Slow the program down to the percentage that was specified on the
@@ -445,7 +445,7 @@ void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *
         return;
     }
 
-    std::unique_ptr<ItemStruct> item;
+    std::unique_ptr<FileNode> item;
 
     do {
         if (*data.running_ != RunningState::RUNNING) break;
@@ -460,7 +460,7 @@ void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *
         }
 
         // Create new item
-        item = std::make_unique<ItemStruct>();
+        item = std::make_unique<FileNode>();
 
         size_t length = wcslen(root_path.get()) + wcslen(find_file_data.cFileName) + 2;
         _ASSERT(MAX_PATH > length);

@@ -29,7 +29,6 @@ DefragApp::DefragApp()
           debug_level_(DebugLevel::Warning) {
     gui_ = DefragGui::get_instance();
     defrag_lib_ = DefragRunner::get_instance();
-    defrag_struct_ = std::make_unique<DefragStruct>();
 }
 
 DefragApp::~DefragApp() = default;
@@ -143,7 +142,6 @@ bool match_argument_with_space(
 void DefragApp::defrag_thread() {
     int i;
 
-    DefragStruct *defrag_struct = instance_->defrag_struct_.get();
     DefragGui *gui = instance_->gui_;
     DefragRunner *defrag_lib = instance_->defrag_lib_;
 
@@ -173,7 +171,7 @@ void DefragApp::defrag_thread() {
     }
 
     // Show some standard information in the logfile
-    Log::log_always(defrag_struct->versiontext_.c_str());
+    Log::log_always(DefragApp::versiontext_);
 
     auto now = std::chrono::current_zone()->to_local(SystemClock::now());
 

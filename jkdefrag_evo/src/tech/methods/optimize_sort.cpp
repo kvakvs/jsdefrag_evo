@@ -42,7 +42,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
 
         /* Start at the begin of the zone and move all the items there, one by one
         in the requested sorting order, making room as we go. */
-        ItemStruct *previous_item = nullptr;
+        FileNode *previous_item = nullptr;
 
         uint64_t lcn = data.zones_[(size_t) data.zone_];
 
@@ -51,7 +51,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
 
         while (*data.running_ == RunningState::RUNNING) {
             // Find the next item that we want to place
-            ItemStruct *item = nullptr;
+            FileNode *item = nullptr;
             uint64_t phase_temp = 0;
 
             for (auto temp_item = Tree::smallest(data.item_tree_);

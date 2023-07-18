@@ -3,8 +3,7 @@
 #include "constants.h"
 #include "defrag_state.h"
 #include "defrag_log.h"
-#include "itemstruct.h"
-#include "defrag_struct.h"
+#include "file_node.h"
 
 class DefragGui {
 public:
@@ -22,7 +21,7 @@ public:
 
     void prepare_cells_for_cluster_range(uint64_t cluster_start_square_num, uint64_t cluster_end_square_num);
 
-    void show_debug(DebugLevel level, const ItemStruct *item, std::wstring &&text);
+    void show_debug(DebugLevel level, const FileNode *item, std::wstring &&text);
 
     void log_fatal(std::wstring &&text) {
         show_debug(DebugLevel::AlwaysLog, nullptr, std::move(text));
@@ -34,13 +33,13 @@ public:
 
     void show_status(const DefragState &data);
 
-    void show_analyze(const DefragState &data, const ItemStruct *item);
+    void show_analyze(const DefragState &data, const FileNode *item);
 
-    void show_analyze_no_state(const ItemStruct *item);
+    void show_analyze_no_state(const FileNode *item);
 
-    void show_analyze_update_item_text(const ItemStruct *item);
+    void show_analyze_update_item_text(const FileNode *item);
 
-    void show_move(const ItemStruct *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
+    void show_move(const FileNode *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
 
     void show_diskmap(DefragState &data);
 
@@ -105,9 +104,6 @@ private:
     uint64_t progress_todo_{};
     // Number of clusters already done
     uint64_t progress_done_{};
-
-    // Owning pointer
-    std::unique_ptr<DefragStruct> defrag_struct_;
 
     //
     // graphics data

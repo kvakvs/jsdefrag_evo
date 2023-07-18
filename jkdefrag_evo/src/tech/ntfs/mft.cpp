@@ -18,7 +18,7 @@
 #include "precompiled_header.h"
 
 bool ScanNTFS::interpret_mft_record(
-        DefragState &data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array,
+        DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array,
         const uint64_t inode_number, const uint64_t max_inode,
         PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
         PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
@@ -133,7 +133,7 @@ bool ScanNTFS::interpret_mft_record(
     StreamStruct *stream = inode_data.streams_;
     do {
         // Create and fill a new item record in memory
-        auto item = std::make_unique<ItemStruct>();
+        auto item = std::make_unique<FileNode>();
         auto long_fn_constructed = construct_stream_name(inode_data.long_filename_.get(),
                                                          inode_data.short_filename_.get(), stream);
         auto short_fn_constructed = construct_stream_name(inode_data.short_filename_.get(),

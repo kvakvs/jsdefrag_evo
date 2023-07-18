@@ -25,11 +25,11 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
     uint64_t test_gap_end;
     uint64_t move_gap_begin;
     uint64_t move_gap_end;
-    ItemStruct *item;
+    FileNode *item;
     FragmentListStruct *fragment;
     uint64_t vcn;
     uint64_t real_vcn;
-    ItemStruct *bigger_item;
+    FileNode *bigger_item;
     uint64_t bigger_begin;
     uint64_t bigger_end;
     uint64_t bigger_real_vcn;

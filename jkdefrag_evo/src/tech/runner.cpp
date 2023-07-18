@@ -161,7 +161,7 @@ void DefragRunner::show_hex([[maybe_unused]] DefragState &data, const BYTE *buff
 }
 
 // Subfunction of GetShortPath()
-void DefragRunner::append_to_short_path(const ItemStruct *item, std::wstring &path) {
+void DefragRunner::append_to_short_path(const FileNode *item, std::wstring &path) {
     if (item->parent_directory_ != nullptr) append_to_short_path(item->parent_directory_, path);
 
     path += L"\\";
@@ -169,7 +169,7 @@ void DefragRunner::append_to_short_path(const ItemStruct *item, std::wstring &pa
 }
 
 // Return a string with the full path of an item, constructed from the short names.
-std::wstring DefragRunner::get_short_path(const DefragState &data, const ItemStruct *item) {
+std::wstring DefragRunner::get_short_path(const DefragState &data, const FileNode *item) {
     // Sanity check
     if (item == nullptr) return {};
 
@@ -188,7 +188,7 @@ std::wstring DefragRunner::get_short_path(const DefragState &data, const ItemStr
 }
 
 // Subfunction of GetLongPath()
-void DefragRunner::append_to_long_path(const ItemStruct *item, std::wstring &path) {
+void DefragRunner::append_to_long_path(const FileNode *item, std::wstring &path) {
     if (item->parent_directory_ != nullptr) append_to_long_path(item->parent_directory_, path);
 
     path += L"\\";
@@ -196,7 +196,7 @@ void DefragRunner::append_to_long_path(const ItemStruct *item, std::wstring &pat
 }
 
 // Return a string with the full path of an item, constructed from the long names
-std::wstring DefragRunner::get_long_path(const DefragState &data, const ItemStruct *item) {
+std::wstring DefragRunner::get_long_path(const DefragState &data, const FileNode *item) {
     // Sanity check
     if (item == nullptr) return {};
 
@@ -245,7 +245,7 @@ void DefragRunner::slow_down(DefragState &data) {
 }
 
 // Open the item as a file or as a directory. If the item could not be opened then show an error message and return nullptr.
-HANDLE DefragRunner::open_item_handle(const DefragState &data, const ItemStruct *item) {
+HANDLE DefragRunner::open_item_handle(const DefragState &data, const FileNode *item) {
     HANDLE file_handle;
     auto path = std::format(L"\\\\?\\{}", item->get_long_path());
 
@@ -279,7 +279,7 @@ Note: Very small files are stored by Windows in the MFT and have no
 clusters (zero) and no fragments (nullptr).
 
 */
-bool DefragRunner::get_fragments(const DefragState &data, ItemStruct *item, HANDLE file_handle) {
+bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE file_handle) {
     STARTING_VCN_INPUT_BUFFER RetrieveParam;
 
     struct {
@@ -421,7 +421,7 @@ bool DefragRunner::get_fragments(const DefragState &data, ItemStruct *item, HAND
 }
 
 // Return the number of fragments in the item
-int DefragRunner::get_fragment_count(const ItemStruct *item) {
+int DefragRunner::get_fragment_count(const FileNode *item) {
     int fragments = 0;
     uint64_t vcn = 0;
     uint64_t next_lcn = 0;
@@ -449,7 +449,7 @@ Note: this function does not ask Windows for a fresh list of fragments,
 it only looks at cached information in memory.
 
 */
-bool DefragRunner::is_fragmented(const ItemStruct *item, const uint64_t offset, const uint64_t size) {
+bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, const uint64_t size) {
     /* Walk through all fragments. If a fragment is found where either the
     begin or the end of the fragment is inside the block then the file is
     fragmented and return true. */
@@ -516,7 +516,7 @@ bool DefragRunner::is_fragmented(const ItemStruct *item, const uint64_t offset, 
  * \param busy_size Number of clusters to be highlighted.
  * \param un_draw true to undraw the file from the screen.
  */
-void DefragRunner::colorize_disk_item(DefragState &data, const ItemStruct *item, const uint64_t busy_offset,
+void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const uint64_t busy_offset,
                                       const uint64_t busy_size, const int un_draw) const {
     DefragGui *gui = DefragGui::get_instance();
 
@@ -753,7 +753,7 @@ void ShowDiskmap2(struct DefragState &Data) {
 
 // Update some numbers in the DefragData
 void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, const Zone zone) {
-    ItemStruct *item;
+    FileNode *item;
     STARTING_LCN_INPUT_BUFFER bitmap_param;
 
     struct {
@@ -1039,9 +1039,10 @@ void DefragRunner::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_
     // If a Path is specified then call DefragOnePath() for that path. Otherwise call DefragMountpoints() for every disk
     // in the system
     if (path != nullptr && *path != 0) {
-        // Long running call
+        // Long-running call
         defrag_one_path(data, path, optimize_mode);
     } else {
+        // Long-running call, in a loop
         defrag_all_drives_sync(data, optimize_mode);
 
         gui->log_detailed_progress(L"Defrag run finished");

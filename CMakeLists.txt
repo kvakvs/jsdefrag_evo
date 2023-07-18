@@ -21,8 +21,7 @@ set(HEADER_FILES
         ${INCL}/runner.h
         ${INCL}/defrag_log.h
         ${INCL}/defrag_state.h
-        ${INCL}/defrag_struct.h
-        ${INCL}/itemstruct.h
+        ${INCL}/file_node.h
         ${INCL}/mem_util.h
         ${INCL}/precompiled_header.h
         ${INCL}/str_util.h
@@ -36,25 +35,30 @@ set(SOURCE_FILES
         ${SRC}/app.cpp
         ${SRC}/app_debug.cpp
         ${SRC}/defrag_log.cpp
+        ${SRC}/main.cpp
+        ${SRC}/precompiled_header.cpp
+        ${SRC}/str_util.cpp
+        ${SRC}/time_util.cpp
+
         ${SRC}/gui/colormap.cpp
         ${SRC}/gui/defrag_gui.cpp
         ${SRC}/gui/paint.cpp
         ${SRC}/gui/stats.cpp
-        ${SRC}/main.cpp
-        ${SRC}/precompiled_header.cpp
-        ${SRC}/str_util.cpp
+
+        ${SRC}/tech/file_node.cpp
+        ${SRC}/tech/runner.cpp
+
         ${SRC}/tech/defrag/analyze.cpp
         ${SRC}/tech/defrag/defrag_state.cpp
         ${SRC}/tech/defrag/finding.cpp
         ${SRC}/tech/defrag/move_mft.cpp
         ${SRC}/tech/defrag/moving.cpp
         ${SRC}/tech/defrag/scan.cpp
-        ${SRC}/tech/runner.cpp
-        ${SRC}/tech/defrag_struct.cpp
+
         ${SRC}/tech/fat/analyze.cpp
         ${SRC}/tech/fat/directory.cpp
         ${SRC}/tech/fat/scan_fat.cpp
-        ${SRC}/tech/itemstruct.cpp
+
         ${SRC}/tech/methods/defrag_mountpoints.cpp
         ${SRC}/tech/methods/defrag_one_path.cpp
         ${SRC}/tech/methods/defragment.cpp
@@ -64,12 +68,12 @@ set(SOURCE_FILES
         ${SRC}/tech/methods/optimize_up.cpp
         ${SRC}/tech/methods/optimize_volume.cpp
         ${SRC}/tech/methods/vacate.cpp
+
         ${SRC}/tech/ntfs/analyze.cpp
         ${SRC}/tech/ntfs/attributes.cpp
         ${SRC}/tech/ntfs/mft.cpp
         ${SRC}/tech/ntfs/scan_ntfs.cpp
         ${SRC}/tech/ntfs/stream.cpp
-        ${SRC}/time_util.cpp
         )
 
 add_executable(${APP_NAME} ${OPTIONS} ${HEADER_FILES} ${SOURCE_FILES})

@@ -29,6 +29,9 @@ public:
 
     [[nodiscard]] bool is_already_running(void) const;
 
+public:
+    inline static const wchar_t *versiontext_ = L"JkDefrag Evolution";
+
 private:
     // If not RUNNING then stop defragging.
     RunningState running_state_;
@@ -38,9 +41,6 @@ private:
     // Non-owning
     DefragGui *gui_;
     DefragRunner *defrag_lib_;
-
-    // Owning
-    std::unique_ptr<DefragStruct> defrag_struct_;
 
     // Owning; singleton instance
     inline static std::unique_ptr<DefragApp> instance_;

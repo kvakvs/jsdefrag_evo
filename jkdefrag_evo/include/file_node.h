@@ -15,14 +15,14 @@ struct FragmentListStruct {
 
 
 // List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
-struct ItemStruct {
+struct FileNode {
 public:
     void set_names(const wchar_t *long_path, const wchar_t *long_filename, const wchar_t *short_path,
                    const wchar_t *short_filename);
 
-    ItemStruct() = default;
+    FileNode() = default;
 
-    virtual ~ItemStruct();
+    virtual ~FileNode();
 
     // Tree node location type
     using TreeLcn = uint64_t;
@@ -50,11 +50,11 @@ public:
     }
 
 public:
-    ItemStruct *parent_;
+    FileNode *parent_;
     // Next smaller item
-    ItemStruct *smaller_;
+    FileNode *smaller_;
     // Next bigger item
-    ItemStruct *bigger_;
+    FileNode *bigger_;
 
     uint64_t bytes_;
     uint64_t clusters_count_;
@@ -69,7 +69,7 @@ public:
     // The Inode number of the parent directory
     uint64_t parent_inode_;
 
-    ItemStruct *parent_directory_;
+    FileNode *parent_directory_;
 
     bool is_dir_;
     bool is_unmovable_;

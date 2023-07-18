@@ -332,7 +332,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
 
 // Analyze a directory and add all the items to the item tree
 void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_info, BYTE *buffer,
-                                    const uint64_t length, ItemStruct *parent_directory) {
+                                    const uint64_t length, FileNode *parent_directory) {
     wchar_t short_name[13];
     wchar_t long_name[820];
     UCHAR long_name_checksum;
@@ -486,7 +486,7 @@ void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_i
         }
 
         // Create and fill a new item record in memory
-        const auto item = new ItemStruct();
+        const auto item = new FileNode();
 
         if (wcscmp(short_name, L".") == 0) {
             item->clear_short_fn();

@@ -37,7 +37,7 @@ public:
     double free_space_; // Percentage of total disk size 0..100
 
     // Tree in memory with information about all the files. 
-    ItemStruct *item_tree_{};
+    FileNode *item_tree_{};
     int balance_count_{};
 
     // Array with exclude masks

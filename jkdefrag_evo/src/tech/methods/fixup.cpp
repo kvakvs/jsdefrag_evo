@@ -33,7 +33,7 @@ void DefragRunner::fixup(DefragState &data) {
     filetime64_t system_time = from_system_time();
 
     // Initialize the width of the progress bar: the total number of clusters of all the items
-    ItemStruct *item;
+    FileNode *item;
     for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;

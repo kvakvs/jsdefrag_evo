@@ -49,7 +49,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     // Clear the screen and show "Processing '%s'" message
     gui->clear_screen(std::format(L"Processing {}", path));
 
-    // Try to change our permissions so we can access special files and directories
+    // Try to change our permissions, so we can access special files and directories
     // such as "C:\System Volume Information". If this does not succeed then quietly
     // continue, we'll just have to do with whatever permissions we have.
     // SE_BACKUP_NAME = Backup and Restore Privileges.
@@ -73,9 +73,8 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
         gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
     }
 
-    /* Try finding the MountPoint by treating the input path as a path to
-    something on the disk. If this does not succeed then use the Path as
-    a literal MountPoint name. */
+    // Try finding the MountPoint by treating the input path as a path to something on the disk.
+    // If this does not succeed, then use the Path as a literal MountPoint name.
     data.disk_.mount_point_ = path;
 
     // Will write into mount_point_
@@ -127,11 +126,6 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     // Make a copy of the VolumeName without the trailing backslash
     data.disk_.volume_name_ = data.disk_.volume_name_slash_;
 
-//    p1 = wcschr(data.disk_.volume_name_, 0);
-//    if (p1 != data.disk_.volume_name_) {
-//        p1--;
-//        if (*p1 == '\\') *p1 = 0;
-//    }
     // Kill the trailing backslash
     if (!data.disk_.volume_name_.empty() && data.disk_.volume_name_.back() == L'\\') {
         data.disk_.volume_name_.pop_back();
@@ -157,7 +151,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
         }
     }
 
-    // Show debug message: "Opening volume '%s' at mountpoint '%s'"
+    // Show a debug message: "Opening volume '%s' at mountpoint '%s'"
     gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                     std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
                                 data.disk_.mount_point_));
@@ -214,11 +208,10 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
 
     data.total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
-    /* Determine the number of bytes per cluster.
-    Again I have to do this in a roundabout manner. As far as I know there is
-    no system call that returns the number of bytes per cluster, so first I have
-    to get the total size of the disk and then divide by the number of clusters.
-    */
+    // Determine the number of bytes per cluster.
+    // Again I have to do this in a roundabout manner. As far as I know, there is no system call that returns the number
+    // of bytes per cluster, so first I have to get the total size of the disk and then divide by the number of
+    // clusters.
     uint64_t free_bytes_to_caller;
     uint64_t total_bytes;
     uint64_t free_bytes;
@@ -228,8 +221,8 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
 
     if (error_code != 0) data.bytes_per_cluster_ = total_bytes / data.total_clusters_;
 
-    // Setup the list of clusters that cannot be used. The Master File Table cannot be moved and cannot be used by
-    // files. All this is only necessary for NTFS volumes.
+    // Set up the list of clusters that cannot be used.
+    // The Master File Table cannot be moved and cannot be used by files. All this is only necessary for NTFS volumes.
     NTFS_VOLUME_DATA_BUFFER ntfs_data;
 
     DWORD w2;
@@ -238,8 +231,8 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
                                  &w2, nullptr);
 
     if (error_code != 0) {
-        /* Note: NtfsData.TotalClusters.QuadPart should be exactly the same
-        as the Data->TotalClusters that was determined in the previous block. */
+        // Note: NtfsData.TotalClusters.QuadPart should be exactly the same
+        // as the Data->TotalClusters that was determined in the previous block.
 
         data.bytes_per_cluster_ = ntfs_data.BytesPerCluster;
 
@@ -332,11 +325,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
         optimize_sort(data, 4); // Creation
     }
-    /*
-    if ((*Data->Running == RUNNING) && (Mode == 11)) {
-    MoveMftToBeginOfDisk(Data);
-    }
-    */
+    // if ((*Data->Running == RUNNING) && (Mode == 11)) { MoveMftToBeginOfDisk(Data); }
 
     call_show_status(data, DefragPhase::Done, Zone::None); // "Finished."
 

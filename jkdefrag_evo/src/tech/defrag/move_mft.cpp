@@ -24,7 +24,7 @@
 //    the performance loss is minimal, and still faster than placing the MFT
 //    higher on the disk.
 [[maybe_unused]] void DefragRunner::move_mft_to_begin_of_disk(DefragState &data) {
-    ItemStruct *item;
+    FileNode *item;
 
     uint64_t lcn;
     uint64_t gap_begin;

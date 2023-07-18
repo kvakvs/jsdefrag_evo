@@ -386,7 +386,7 @@ private:
             uint64_t buf_length, int depth);
 
     bool interpret_mft_record(
-            DefragState &data, NtfsDiskInfoStruct *disk_info, ItemStruct **inode_array, uint64_t inode_number,
+            DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array, uint64_t inode_number,
             uint64_t max_inode, PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
             PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
             BYTE *buffer, uint64_t buf_length

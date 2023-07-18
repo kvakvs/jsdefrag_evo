@@ -229,7 +229,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
         max_inode = mft_data_bytes / disk_info.bytes_per_mft_record_;
     }
 
-    auto inode_array = std::make_unique<ItemStruct *[]>(max_inode);
+    auto inode_array = std::make_unique<FileNode *[]>(max_inode);
     inode_array[0] = data.item_tree_;
     std::fill(inode_array.get() + 1, inode_array.get() + max_inode, nullptr);
 
