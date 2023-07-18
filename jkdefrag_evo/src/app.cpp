@@ -408,7 +408,7 @@ void DefragApp::defrag_thread() {
             if (wcscmp(argv[i], L"-q") == 0) {
                 quit_on_finish = true;
 
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"Commandline argument '-q' accepted, quitonfinish = yes");
+                gui->log_fatal(L"Commandline argument '-q' accepted, quitonfinish = yes");
 
                 continue;
             }
@@ -474,7 +474,7 @@ bool DefragApp::is_already_running(void) const {
 
     if (snapshot == INVALID_HANDLE_VALUE) {
         auto err = std::format(L"Cannot get process snapshot: {}", DefragLib::system_error_str(GetLastError()));
-        gui_->show_debug(DebugLevel::Fatal, nullptr, std::move(err));
+        gui_->log_fatal(std::move(err));
         return true;
     }
 
@@ -499,7 +499,7 @@ bool DefragApp::is_already_running(void) const {
     if (*my_name == '\0') {
         // "Cannot find my own name in the process list: %s"
         auto s1 = std::format(L"Cannot find my own name in the process list: {}", Str::from_char(my_name));
-        gui_->show_debug(DebugLevel::Fatal, nullptr, std::move(s1));
+        gui_->log_fatal(std::move(s1));
         return true;
     }
 
@@ -517,7 +517,7 @@ bool DefragApp::is_already_running(void) const {
 
             auto s1 = std::format(L"I am already running: {}", Str::from_char(pe32.szExeFile));
 
-            gui_->show_debug(DebugLevel::Fatal, nullptr, std::move(s1));
+            gui_->log_fatal(std::move(s1));
             return true;
         }
     } while (Process32Next(snapshot, &pe32));

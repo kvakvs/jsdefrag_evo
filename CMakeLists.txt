@@ -41,6 +41,7 @@ set(SOURCE_FILES
         ${SRC}/gui/defrag_gui.cpp
         ${SRC}/gui/colormap.cpp
         ${SRC}/gui/paint.cpp
+        ${SRC}/gui/stats.cpp
 
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/tech/defrag_struct.cpp

@@ -20,6 +20,10 @@ public:
 
     void show_debug(DebugLevel level, const ItemStruct *item, std::wstring &&text);
 
+    void log_fatal(std::wstring &&text) {
+        show_debug(DebugLevel::Fatal, nullptr, std::move(text));
+    }
+
     void show_status(const DefragState &data);
 
     void show_analyze(const DefragState &data, const ItemStruct *item);
@@ -38,7 +42,7 @@ public:
 
     WPARAM windows_event_loop();
 
-    void on_paint(HDC dc) const;
+    void on_paint(HDC dc, const PAINTSTRUCT &ps) const;
 
     void repaint_window(HDC dc);
 
@@ -62,6 +66,13 @@ protected:
     void paint_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen) const;
 
     static void paint_set_gradient_colors(COLORREF col, Color &c1, Color &c2);
+
+    // Marks top panel area for redraw
+    void invalidate_top_area() const;
+
+    // Re-render strings in the top area into bitmap; Do not update the window yet. Combine this with
+    // invalidate_top_area() to update the window.
+    void repaint_top_area() const;
 
 private:
     HWND wnd_{};
@@ -93,6 +104,8 @@ private:
     // Height of the top status area
     int top_area_height_{};
     int square_size_;
+    // Used for invalidating; Updated when drawing/redrawing
+    RECT top_area_rect_{};
 
     // Offsets of drawing area of disk
     POINT drawing_area_offset_;

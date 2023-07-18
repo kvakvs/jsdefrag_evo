@@ -146,7 +146,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
         DWORD w = 0;
 
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
-            gui->show_debug(DebugLevel::Fatal, nullptr, L"Will not process this disk, it contains hybernated data.");
+            gui->log_fatal(L"Will not process this disk, it contains hybernated data.");
 
             data.disk_.mount_point_.clear();
             data.disk_.mount_point_slash_.clear();
@@ -267,10 +267,9 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
                         std::format(MFT_EXCL_FMT, 2, data.mft_excludes_[2].start_, 2, data.mft_excludes_[2].end_));
     }
 
-    /* Fixup the input mask.
-    - If the length is 2 or 3 characters then rewrite into "c:\*".
-    - If it does not contain a wildcard then append '*'.
-    */
+    // Fixup the input mask.
+    // - If the length is 2 or 3 characters then rewrite into "<DRIVE>:\*".
+    // - If it does not contain a wildcard then append '*'.
     data.include_mask_ = path;
 
     const size_t path_len = wcslen(path);
@@ -281,12 +280,14 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
         data.include_mask_ = std::format(L"{}*", path);
     }
 
-    gui->show_debug(DebugLevel::Fatal, nullptr, std::format(L"Input mask: {}", data.include_mask_));
+    gui->log_fatal(std::format(L"Input mask: {}", data.include_mask_));
 
     // Defragment and optimize
     gui->show_diskmap(data);
 
-    if (*data.running_ == RunningState::RUNNING) analyze_volume(data);
+    if (*data.running_ == RunningState::RUNNING) {
+        analyze_volume(data);
+    }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeFixup) {
         defragment(data);

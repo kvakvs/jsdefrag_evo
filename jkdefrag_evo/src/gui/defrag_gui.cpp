@@ -41,7 +41,6 @@ DefragGui *DefragGui::get_instance() {
 
 int DefragGui::initialize(HINSTANCE instance, const int cmd_show, DefragLog *log, const DebugLevel debug_level) {
     ULONG_PTR gdiplus_token;
-
     const GdiplusStartupInput gdiplus_startup_input;
 
     GdiplusStartup(&gdiplus_token, &gdiplus_startup_input, nullptr);
@@ -222,7 +221,10 @@ void DefragGui::show_analyze_no_state(const ItemStruct *item) {
     messages_[3] = L"Applying Exclude and SpaceHogs masks....";
 
     show_analyze_update_item_text(item);
-    repaint_window(dc_);
+
+    repaint_top_area();
+    invalidate_top_area();
+//    repaint_window(dc_);
 }
 
 // Callback: for every file during analysis.
@@ -236,7 +238,9 @@ void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
     }
 
     show_analyze_update_item_text(item);
-    repaint_window(dc_);
+    repaint_top_area();
+    invalidate_top_area();
+//    repaint_window(dc_);
 }
 
 // Callback: show a debug message
@@ -252,7 +256,9 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
     messages_[5] = std::move(text);
     log_->log(messages_[5].c_str());
 
-    repaint_window(dc_);
+    // repaint_window(dc_);
+    repaint_top_area();
+    invalidate_top_area();
 }
 
 // Callback: paint a cluster on the screen in a given palette color
@@ -359,9 +365,16 @@ void DefragGui::show_status(const DefragState &data) {
     }
 }
 
-void DefragGui::on_paint(HDC dc) const {
+void DefragGui::on_paint(HDC dc, const PAINTSTRUCT &ps) const {
     Graphics graphics(dc);
-    graphics.DrawImage(bmp_.get(), 0, 0);
+    RECT invalidated_rc = ps.rcPaint;
+    RectF invalidated_rf(invalidated_rc.left, invalidated_rc.top,
+                         invalidated_rc.right - invalidated_rc.left,
+                         invalidated_rc.bottom - invalidated_rc.top);
+
+    // graphics.DrawImage(bmp_.get(), 0, 0);
+    graphics.DrawImage(bmp_.get(), invalidated_rf, invalidated_rf.X, invalidated_rf.Y, invalidated_rf.Width,
+                       invalidated_rf.Height, UnitPixel);
 }
 
 // Message handler
@@ -383,7 +396,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             PAINTSTRUCT ps{};
 
             instance_->dc_ = BeginPaint(wnd, &ps);
-            instance_->on_paint(instance_->dc_);
+            instance_->on_paint(instance_->dc_, ps);
             EndPaint(wnd, &ps);
         }
 
@@ -416,33 +429,16 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
     return DefWindowProc(wnd, message, w_param, l_param);
 }
 
-/*
-Show a map on the screen of all the clusters on disk. The map shows
-which clusters are free and which are in use.
-The data.RedrawScreen flag controls redrawing of the screen. It is set
-to "2" (busy) when the subroutine starts. If another thread changes it to
-"1" (request) while the subroutine is busy then it will immediately exit
-without completing the redraw. When redrawing is completely finished the
-flag is set to "0" (no).
-*/
+// Show a map on the screen of all the clusters on disk. The map shows which clusters are free and which are in use.
+// The data.RedrawScreen flag controls redrawing of the screen. It is set to "2" (busy) when the subroutine starts. If
+// another thread changes it to "1" (request) while the subroutine is busy then it will immediately exit without
+// completing the redraw. When redrawing is completely finished the flag is set to "0" (no).
 void DefragGui::show_diskmap(DefragState &data) {
-    STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
-        uint64_t StartingLcn;
-        uint64_t BitmapSize;
-
-        BYTE Buffer[65536]; // Most efficient if binary multiple
+        uint64_t starting_lcn_;
+        uint64_t bitmap_size_;
+        BYTE buffer_[65536]; // Most efficient if binary multiple
     } bitmap_data{};
-
-    uint64_t Lcn;
-    uint64_t cluster_start;
-    uint32_t error_code;
-    int index;
-    int index_max;
-    BYTE mask;
-    int in_use;
-    int prev_in_use;
-    DWORD w;
 
     // Exit if the library is not processing a disk yet.
     if (data.disk_.volume_handle_ == nullptr) {
@@ -453,9 +449,11 @@ void DefragGui::show_diskmap(DefragState &data) {
     clear_screen({});
 
     // Show the map of all the clusters in use
-    Lcn = 0;
-    cluster_start = 0;
-    prev_in_use = 1;
+    uint64_t lcn = 0;
+    uint64_t cluster_start = 0;
+    int prev_in_use = 1;
+
+    BOOL error_code;
 
     do {
         if (*data.running_ != RunningState::RUNNING) break;
@@ -463,11 +461,12 @@ void DefragGui::show_diskmap(DefragState &data) {
         if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data
-        bitmap_param.StartingLcn.QuadPart = Lcn;
+        STARTING_LCN_INPUT_BUFFER bitmap_param = {.StartingLcn = {.QuadPart = (LONGLONG) lcn}};
 
+        DWORD w;
         error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w,
-                                     nullptr);
+                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
+                                     sizeof bitmap_data, &w, nullptr);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -478,53 +477,52 @@ void DefragGui::show_diskmap(DefragState &data) {
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
         // Sanity check
-        if (Lcn >= bitmap_data.StartingLcn + bitmap_data.BitmapSize) break;
+        if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) break;
 
         // Analyze the clusterdata. We resume where the previous block left off
-        Lcn = bitmap_data.StartingLcn;
-        index = 0;
-        mask = 1;
+        lcn = bitmap_data.starting_lcn_;
+        int index = 0;
+        uint8_t mask = 1;
 
-        index_max = sizeof bitmap_data.Buffer;
+        int index_max = sizeof bitmap_data.buffer_;
 
-        if (bitmap_data.BitmapSize / 8 < index_max) index_max = (int) (bitmap_data.BitmapSize / 8);
+        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
 
         while (index < index_max && *data.running_ == RunningState::RUNNING) {
-            in_use = bitmap_data.Buffer[index] & mask;
+            auto in_use = bitmap_data.buffer_[index] & mask;
 
-            /* If at the beginning of the disk then copy the in_use value as our
-            starting value. */
-            if (Lcn == 0) prev_in_use = in_use;
+            // If at the beginning of the disk then copy the in_use value as our starting value
+            if (lcn == 0) prev_in_use = in_use;
 
             // At the beginning and end of an Exclude draw the cluster
-            if (Lcn == data.mft_excludes_[0].start_ || Lcn == data.mft_excludes_[0].end_ ||
-                Lcn == data.mft_excludes_[1].start_ || Lcn == data.mft_excludes_[1].end_ ||
-                Lcn == data.mft_excludes_[2].start_ || Lcn == data.mft_excludes_[2].end_) {
-                if (Lcn == data.mft_excludes_[0].end_ ||
-                    Lcn == data.mft_excludes_[1].end_ ||
-                    Lcn == data.mft_excludes_[2].end_) {
-                    draw_cluster(data, cluster_start, Lcn, DrawColor::Unmovable);
+            if (lcn == data.mft_excludes_[0].start_ || lcn == data.mft_excludes_[0].end_ ||
+                lcn == data.mft_excludes_[1].start_ || lcn == data.mft_excludes_[1].end_ ||
+                lcn == data.mft_excludes_[2].start_ || lcn == data.mft_excludes_[2].end_) {
+                if (lcn == data.mft_excludes_[0].end_ ||
+                    lcn == data.mft_excludes_[1].end_ ||
+                    lcn == data.mft_excludes_[2].end_) {
+                    draw_cluster(data, cluster_start, lcn, DrawColor::Unmovable);
                 } else if (prev_in_use == 0) {
-                    draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
+                    draw_cluster(data, cluster_start, lcn, DrawColor::Empty);
                 } else {
-                    draw_cluster(data, cluster_start, Lcn, DrawColor::Allocated);
+                    draw_cluster(data, cluster_start, lcn, DrawColor::Allocated);
                 }
 
                 in_use = 1;
                 prev_in_use = 1;
-                cluster_start = Lcn;
+                cluster_start = lcn;
             }
 
             // Free
             if (prev_in_use == 0 && in_use != 0) {
-                draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
-                cluster_start = Lcn;
+                draw_cluster(data, cluster_start, lcn, DrawColor::Empty);
+                cluster_start = lcn;
             }
 
             // In use
             if (prev_in_use != 0 && in_use == 0) {
-                draw_cluster(data, cluster_start, Lcn, DrawColor::Allocated);
-                cluster_start = Lcn;
+                draw_cluster(data, cluster_start, lcn, DrawColor::Allocated);
+                cluster_start = lcn;
             }
 
             prev_in_use = in_use;
@@ -536,17 +534,17 @@ void DefragGui::show_diskmap(DefragState &data) {
                 mask = mask << 1;
             }
 
-            Lcn = Lcn + 1;
+            lcn = lcn + 1;
         }
-    } while (error_code == ERROR_MORE_DATA && Lcn < bitmap_data.StartingLcn + bitmap_data.BitmapSize);
+    } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
 
-    if (Lcn > 0) {
+    if (lcn > 0) {
         if (prev_in_use == 0) {
             // Free
-            draw_cluster(data, cluster_start, Lcn, DrawColor::Empty);
+            draw_cluster(data, cluster_start, lcn, DrawColor::Empty);
         } else {
             // in use
-            draw_cluster(data, cluster_start, Lcn, DrawColor::Allocated);
+            draw_cluster(data, cluster_start, lcn, DrawColor::Allocated);
         }
     }
 

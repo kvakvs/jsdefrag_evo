@@ -77,7 +77,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
         data.total_clusters_ = disk_info.total_sectors_ / disk_info.sectors_per_cluster_;
     }
 
-    gui->show_debug(DebugLevel::Fatal, nullptr, std::format(
+    gui->log_fatal(std::format(
             L"This is an NTFS disk."
             L"\n  Disk cookie: {:x}"
             L"\n  BytesPerSector: " NUM_FMT

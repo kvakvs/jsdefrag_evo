@@ -240,7 +240,7 @@ link. */
         iterations. This means the defragger cannot handle files with more
         than 100000 fragments, though. */
         if (max_loop <= 0) {
-            gui->show_debug(DebugLevel::Fatal, nullptr, L"  FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
+            gui->log_fatal(L"  FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
 
             return;
         }
@@ -287,7 +287,7 @@ link. */
 
             // Compare the fragment
             if (fragment == nullptr) {
-                gui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
+                gui->log_fatal(L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             } else {
                 if (fragment->lcn_ != extent_data.extents_[i].lcn_) {
                     gui->show_debug(DebugLevel::Fatal, nullptr,
@@ -319,7 +319,7 @@ link. */
     }
 
     if (fragment != nullptr) {
-        gui->show_debug(DebugLevel::Fatal, nullptr, L"  Extra fragment from MFT");
+        gui->log_fatal(L"  Extra fragment from MFT");
     }
 
     if (item->clusters_count_ != clusters) {
