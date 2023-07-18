@@ -24,6 +24,10 @@ public:
         show_debug(DebugLevel::Fatal, nullptr, std::move(text));
     }
 
+    void log_detailed_progress(std::wstring &&text) {
+        show_debug(DebugLevel::DetailedProgress, nullptr, std::move(text));
+    }
+
     void show_status(const DefragState &data);
 
     void show_analyze(const DefragState &data, const ItemStruct *item);

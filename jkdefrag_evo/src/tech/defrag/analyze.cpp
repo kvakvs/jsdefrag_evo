@@ -22,7 +22,7 @@
 void DefragLib::analyze_volume(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
 
-    gui->log_fatal(L"Processing: Analyzing volume...");
+    gui->log_detailed_progress(L"Analyzing volume: Started...");
 
     ScanFAT *scan_fat = ScanFAT::get_instance();
     ScanNTFS *scan_ntfs = ScanNTFS::get_instance();
@@ -42,13 +42,17 @@ void DefragLib::analyze_volume(DefragState &data) {
 
     // Scan NTFS disks
     bool result = scan_ntfs->analyze_ntfs_volume(data);
+    gui->log_detailed_progress(L"Analyzing volume: Done analyzing NTFS volume");
 
     // Scan FAT disks
-    if (result == FALSE && *data.running_ == RunningState::RUNNING) result = scan_fat->analyze_fat_volume(data);
+    if (result == FALSE && *data.running_ == RunningState::RUNNING) {
+        result = scan_fat->analyze_fat_volume(data);
+        gui->log_detailed_progress(L"Analyzing volume: Done analyzing FAT volume");
+    }
 
     // Scan all other filesystems
     if (result == FALSE && *data.running_ == RunningState::RUNNING) {
-        gui->log_fatal(L"This is not a FAT or NTFS disk, using the slow scanner.");
+        gui->log_detailed_progress(L"This is not a FAT or NTFS disk, using the slow scanner.");
 
         // Setup the width of the progress bar
         data.phase_todo_ = data.total_clusters_ - data.count_free_clusters_;
@@ -59,6 +63,7 @@ void DefragLib::analyze_volume(DefragState &data) {
 
         // Scan all the files
         scan_dir(data, data.include_mask_.c_str(), nullptr);
+        gui->log_detailed_progress(L"Analyzing volume: Done scanning dir");
     }
 
     // Update the diskmap with the colors
@@ -76,6 +81,8 @@ void DefragLib::analyze_volume(DefragState &data) {
     gui->show_analyze(data, nullptr);
 
     // Walk through all the items one by one
+    const auto update_every_n_clusters = std::max<uint64_t>(10000UL, data.total_clusters_ / 100000UL);
+
     for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (*data.running_ != RunningState::RUNNING) break;
 
@@ -160,8 +167,11 @@ void DefragLib::analyze_volume(DefragState &data) {
         // Update the progress percentage
         data.clusters_done_ += 1;
 
-        if (data.clusters_done_ % 10000 == 0) gui->draw_cluster(data, 0, 0, DrawColor::Empty);
+        if (data.clusters_done_ % update_every_n_clusters == 0) {
+            gui->draw_cluster(data, 0, 0, DrawColor::Empty);
+        }
     }
+    gui->log_detailed_progress(L"Analyzing volume: Done iterating the tree");
 
     // Force the percentage to 100%
     data.clusters_done_ = data.phase_todo_;
@@ -169,8 +179,9 @@ void DefragLib::analyze_volume(DefragState &data) {
 
     // Calculate the begin of the zone's
     calculate_zones(data);
+    gui->log_detailed_progress(L"Analyzing volume: Done calculating zones");
 
     // Call the ShowAnalyze() callback one last time
     gui->show_analyze(data, nullptr);
-    gui->log_fatal(L"Processing: Analyzing volume...");
+    gui->log_detailed_progress(L"Analyzing volume: finished");
 }

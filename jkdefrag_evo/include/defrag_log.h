@@ -22,7 +22,7 @@ private:
 
     errno_t open_log_append(FILE *&fout) const;
 
-    static int write_timestamp(FILE *fout);
+    static void write_timestamp(FILE *fout);
 
     static void flush_close_log(FILE *fout);
 };

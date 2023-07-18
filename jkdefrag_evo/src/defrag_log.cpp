@@ -87,7 +87,7 @@ void DefragLog::log(const wchar_t *line) const {
     int result = open_log_append(fout);
     if (result != 0 || fout == nullptr) return;
 
-    result = write_timestamp(fout);
+    write_timestamp(fout);
 
     // Write to logfile
     fwprintf_s(fout, L"%s\n", line);
@@ -106,11 +106,11 @@ errno_t DefragLog::open_log_append(FILE *&fout) const {
     return _wfopen_s(&fout, log_file_.c_str(), L"a, ccs=UTF-8");
 }
 
-int DefragLog::write_timestamp(FILE *fout) {
-    // Write the string to the logfile.
-    std::time_t now = std::time(nullptr);
-    std::tm now_tm{};
-    auto result = localtime_s(&now_tm, &now);
-    fwprintf_s(fout, L"%02lu:%02lu:%02lu ", now_tm.tm_hour, now_tm.tm_min, now_tm.tm_sec);
-    return result;
+void DefragLog::write_timestamp(FILE *fout) {
+    // Write the string to the logfile
+    auto now = std::chrono::current_zone()->to_local(std::chrono::system_clock::now());
+    // Calculate fractional seconds with millisecond precision
+    auto sse = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
+    auto time_str = std::format(L"{:%FT%H:%M}.{:%S}", now, sse);
+    fwprintf_s(fout, L"%s ", time_str.c_str());
 }
