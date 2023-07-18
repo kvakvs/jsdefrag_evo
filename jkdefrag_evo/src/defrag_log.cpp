@@ -79,7 +79,7 @@ const wchar_t *DefragLog::get_log_filename() {
 //}
 
 /// \brief Write a pre-formatted line to the logfile, prefixed by timestamp
-void DefragLog::log(const wchar_t *line) const {
+void DefragLog::log_always(const wchar_t *line) const {
 
     // If there is no logfile then return
     if (log_file_.empty()) return;

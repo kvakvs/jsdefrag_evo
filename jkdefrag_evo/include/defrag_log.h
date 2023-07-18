@@ -24,11 +24,14 @@ public:
 
     static DefragLog *get_instance();
 
-    void log(std::wstring &&text) const { log(text.c_str()); }
+    // Log without checking debug level
+    void log_always(std::wstring &&text) const { log_always(text.c_str()); }
 
-    void log(std::wstring &text) const { log(text.c_str()); }
+    // Log without checking debug level
+    void log_always(std::wstring &text) const { log_always(text.c_str()); }
 
-    void log(const wchar_t *line) const;
+    // Log without checking debug level
+    void log_always(const wchar_t *line) const;
 
     void set_log_filename(const wchar_t *file_name);
 
@@ -57,19 +60,19 @@ private:
 namespace Log {
     inline void log(const DebugLevel level, std::wstring &&text) {
         if (level <= DefragLog::debug_level_) {
-            DefragLog().log(std::move(text));
+            DefragLog::get_instance()->log_always(std::move(text));
         }
     }
 
     inline void log(const DebugLevel level, const std::wstring &text) {
         if (level <= DefragLog::debug_level_) {
-            DefragLog().log(text.c_str());
+            DefragLog::get_instance()->log_always(text.c_str());
         }
     }
 
     inline void log(const DebugLevel level, const wchar_t *text) {
         if (level <= DefragLog::debug_level_) {
-            DefragLog().log(text);
+            DefragLog::get_instance()->log_always(text);
         }
     }
 }

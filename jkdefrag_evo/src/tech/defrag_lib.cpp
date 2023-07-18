@@ -1020,6 +1020,7 @@ void DefragLib::call_show_status(DefragState &data, const DefragPhase phase, con
 void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
                               const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
     DefragGui *gui = DefragGui::get_instance();
+    gui->log_detailed_progress(L"Defrag starting…");
 
     // Copy the input values to the data struct
     DefragState data{};
@@ -1110,11 +1111,11 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
         data.space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis Video 
     }
 
-    /* If the NtfsDisableLastAccessUpdate setting in the registry is 1, then disable
-    the LastAccessTime check for the spacehogs. */
-    data.use_last_access_time_ = TRUE;
+    // If the NtfsDisableLastAccessUpdate setting in the registry is 1, then disable the LastAccessTime check
+    // for the spacehogs.
+    data.use_last_access_time_ = true;
 
-    if (data.use_default_space_hogs_ == TRUE) {
+    if (data.use_default_space_hogs_) {
         LONG result;
         HKEY key;
         DWORD key_disposition;
@@ -1130,13 +1131,13 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
                                       (BYTE *) &ntfs_disable_last_access_update, &length);
 
             if (result == ERROR_SUCCESS && ntfs_disable_last_access_update == 1) {
-                data.use_last_access_time_ = FALSE;
+                data.use_last_access_time_ = false;
             }
 
             RegCloseKey(key);
         }
 
-        if (data.use_last_access_time_ == TRUE) {
+        if (data.use_last_access_time_) {
             gui->show_debug(
                     DebugLevel::Warning, nullptr,
                     L"NtfsDisableLastAccessUpdate is inactive, using LastAccessTime for SpaceHogs.");
@@ -1147,51 +1148,45 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
         }
     }
 
-    /* If a Path is specified then call DefragOnePath() for that path. Otherwise call
-    DefragMountpoints() for every disk in the system. */
+    // If a Path is specified then call DefragOnePath() for that path. Otherwise call
+    // DefragMountpoints() for every disk in the system
     if (path != nullptr && *path != 0) {
         defrag_one_path(data, path, optimize_mode);
     } else {
-        wchar_t *drives;
         uint32_t drives_size;
         drives_size = GetLogicalDriveStringsW(0, nullptr);
 
-        drives = new wchar_t[drives_size + 1];
+        auto drives = std::make_unique<wchar_t[]>(drives_size + 1);
 
-        if (drives != nullptr) {
-            drives_size = GetLogicalDriveStringsW(drives_size, drives);
+        drives_size = GetLogicalDriveStringsW(drives_size, drives.get());
 
-            if (drives_size == 0) {
-                // "Could not get list of volumes: %s"
-                gui->show_debug(DebugLevel::Warning, nullptr,
-                                std::format(L"Could not get list of volumes: {}", system_error_str(GetLastError())));
-            } else {
-                wchar_t *drive;
-                drive = drives;
+        if (drives_size == 0) {
+            // "Could not get list of volumes: %s"
+            gui->show_debug(DebugLevel::Warning, nullptr,
+                            std::format(L"Could not get list of volumes: {}",
+                                        system_error_str(GetLastError())));
+        } else {
+            wchar_t *drive = drives.get();
 
+            while (*drive != '\0') {
+                defrag_mountpoints(data, drive, optimize_mode);
                 while (*drive != '\0') {
-                    defrag_mountpoints(data, drive, optimize_mode);
-                    while (*drive != '\0') drive++;
                     drive++;
                 }
+                drive++;
             }
-
-            delete drives;
         }
 
-        gui->clear_screen(L"Finished.");
+        gui->log_detailed_progress(L"Defrag run finished");
     }
 
     // Cleanup
     *data.running_ = RunningState::STOPPED;
 }
 
-/*
-Stop the defragger. The "Running" variable must be the same as what was given to
-the RunJkDefrag() subroutine. Wait for a maximum of time_out milliseconds for the
-defragger to stop. If time_out is zero then wait indefinitely. If time_out is
-negative then immediately return without waiting.
-*/
+// Stop the defragger. The "Running" variable must be the same as what was given to the RunJkDefrag() subroutine. Wait
+// for a maximum of time_out milliseconds for the defragger to stop. If time_out is zero then wait indefinitely. If
+// time_out is negative then immediately return without waiting.
 void DefragLib::stop_jk_defrag(RunningState *run_state, int time_out) {
     // Sanity check
     if (run_state == nullptr) return;

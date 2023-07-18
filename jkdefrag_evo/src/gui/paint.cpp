@@ -149,10 +149,20 @@ void DefragGui::full_redraw_window(HDC dc) {
             .y = diskmap_org.y + (int) color_map_.get_height() * square_size_ + 2
     };
 
-    paint_background(window_size, graphics.get(), diskmap_org, diskmap_end);
-    paint_strings(graphics.get());
-    paint_diskmap_outline(graphics.get(), diskmap_org, diskmap_end);
-    paint_diskmap(graphics.get());
+    if (redraw_top_area_ || redraw_disk_map_) {
+        paint_background(window_size, graphics.get(), diskmap_org, diskmap_end);
+    }
+    if (redraw_top_area_) {
+        paint_strings(graphics.get());
+
+        redraw_top_area_ = false;
+    }
+    if (redraw_disk_map_) {
+        paint_diskmap_outline(graphics.get(), diskmap_org, diskmap_end);
+        paint_diskmap(graphics.get());
+
+        redraw_disk_map_ = false;
+    }
 }
 
 void DefragGui::repaint_top_area() const {
@@ -330,6 +340,13 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
     }
 }
 
-void DefragGui::invalidate_top_area() const {
+void DefragGui::request_redraw() {
+    redraw_top_area_ = true;
+    redraw_disk_map_ = true;
+    InvalidateRect(wnd_, nullptr, FALSE);
+}
+
+void DefragGui::request_redraw_top_area() {
+    redraw_top_area_ = true;
     InvalidateRect(wnd_, &top_area_rect_, FALSE);
 }

@@ -162,11 +162,11 @@ void DefragApp::defrag_thread() {
     }
 
     // Show some standard information in the logfile
-    log->log(defrag_struct->versiontext_.c_str());
-//    time(&now);
-//    localtime_s(&now_tm, &now);
+    Log::log(DebugLevel::AlwaysLog, defrag_struct->versiontext_.c_str());
+
     auto now = std::chrono::current_zone()->to_local(std::chrono::system_clock::now());
-    log->log(std::format(L"Date: {:%Y-%m-%d %X}", now));
+
+    Log::log(DebugLevel::AlwaysLog, std::format(L"Date: {:%Y-%m-%d %X}", now));
 
     log_windows_version();
 

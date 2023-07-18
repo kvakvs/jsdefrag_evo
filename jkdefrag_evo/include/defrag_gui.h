@@ -76,7 +76,9 @@ protected:
     static void paint_set_gradient_colors(COLORREF col, Color &c1, Color &c2);
 
     // Marks top panel area for redraw
-    void invalidate_top_area() const;
+    void request_redraw_top_area();
+
+    void request_redraw();
 
     // Re-render strings in the top area into bitmap; Do not update the window yet. Combine this with
     // invalidate_top_area() to update the window.
@@ -86,6 +88,8 @@ private:
     HWND wnd_{};
     WNDCLASSEX wnd_class_{};
     MSG message_{};
+    bool redraw_top_area_{};
+    bool redraw_disk_map_{};
 
     // The texts displayed on the screen
     // Messages[5] is the debug row, only displayed if LogLevel is > Warning
@@ -140,7 +144,7 @@ private:
     // Mutex to make the display single-threaded.
     std::mutex display_mutex_{};
 
-    // Handle to graphics device context
+    // Handle to graphics device context; TODO: Do not store it here, store in local variable
     HDC dc_{};
 
     // Bitmap used for double buffering

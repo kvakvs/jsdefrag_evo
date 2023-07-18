@@ -49,18 +49,20 @@ int DefragGui::initialize(HINSTANCE instance, const int cmd_show, const DebugLev
 
     static const auto window_class_name = APP_NAME "Class";
 
-    wnd_class_.cbClsExtra = 0;
-    wnd_class_.cbWndExtra = 0;
-    wnd_class_.hbrBackground = (HBRUSH) GetStockObject(BLACK_BRUSH);
-    wnd_class_.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wnd_class_.hIcon = LoadIcon(nullptr, MAKEINTRESOURCE(1));
-    wnd_class_.hInstance = instance;
-    wnd_class_.lpfnWndProc = (WNDPROC) DefragGui::process_messagefn;
-    wnd_class_.lpszClassName = window_class_name;
-    wnd_class_.lpszMenuName = nullptr;
-    wnd_class_.style = CS_HREDRAW | CS_VREDRAW;
-    wnd_class_.cbSize = sizeof(WNDCLASSEX);
-    wnd_class_.hIconSm = LoadIcon(instance, MAKEINTRESOURCE(1));
+    wnd_class_ = {
+            .cbSize = sizeof(WNDCLASSEX),
+            .style = CS_HREDRAW | CS_VREDRAW,
+            .lpfnWndProc = (WNDPROC) DefragGui::process_messagefn,
+            .cbClsExtra = 0,
+            .cbWndExtra = 0,
+            .hInstance = instance,
+            .hIcon = LoadIcon(nullptr, MAKEINTRESOURCE(1)),
+            .hCursor = LoadCursor(nullptr, IDC_ARROW),
+            .hbrBackground = (HBRUSH) GetStockObject(BLACK_BRUSH),
+            .lpszMenuName = nullptr,
+            .lpszClassName = window_class_name,
+            .hIconSm = LoadIcon(instance, MAKEINTRESOURCE(1)),
+    };
 
     CHAR version_str[100];
 
@@ -146,10 +148,10 @@ void DefragGui::clear_screen(std::wstring &&text) {
         messages_[i].clear();
     }
 
-    // If there is no logfile then return. */
+    // If there is no logfile then return.
     Log::log(DebugLevel::DetailedProgress, messages_[0].c_str());
 
-    full_redraw_window(dc_);
+    request_redraw();
 }
 
 // Callback: whenever an item (file, directory) is moved on disk.
@@ -191,7 +193,8 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
                      std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
         }
     }
-    full_redraw_window(dc_);
+
+    request_redraw();
 }
 
 // Make sure this function does not run more often than 100ms
@@ -225,7 +228,7 @@ void DefragGui::show_analyze_no_state(const ItemStruct *item) {
     show_analyze_update_item_text(item);
 
     repaint_top_area();
-    invalidate_top_area();
+    request_redraw_top_area();
 //    repaint_window(dc_);
 }
 
@@ -241,7 +244,7 @@ void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
 
     show_analyze_update_item_text(item);
     repaint_top_area();
-    invalidate_top_area();
+    request_redraw_top_area();
 //    repaint_window(dc_);
 }
 
@@ -268,7 +271,7 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
     if (level <= DefragLog::debug_level_) {
         // repaint_window(dc_);
         repaint_top_area();
-        invalidate_top_area();
+        request_redraw_top_area();
     }
 }
 
@@ -321,7 +324,7 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
 
     prepare_cells_for_cluster_range(cluster_start_square_num, cluster_end_square_num);
 
-    full_redraw_window(dc_);
+    request_redraw();
 }
 
 // Callback: just before the defragger starts a new Phase, and when it finishes
@@ -395,9 +398,16 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             PostQuitMessage(0);
             return 0;
 
-        case WM_TIMER:
+        case WM_TIMER: {
             InvalidateRect(wnd, nullptr, FALSE);
+
+            std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
+//            PAINTSTRUCT ps{};
+//            instance_->dc_ = BeginPaint(wnd, &ps);
+            instance_->full_redraw_window(instance_->dc_);
+//            EndPaint(wnd, &ps);
             return 0;
+        }
 
         case WM_PAINT: {
             // Grab the display mutex, to make sure that we are the only thread changing the window
@@ -408,9 +418,9 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             instance_->dc_ = BeginPaint(wnd, &ps);
             instance_->on_paint(instance_->dc_, ps);
             EndPaint(wnd, &ps);
-        }
 
             return 0;
+        }
 
         case WM_ERASEBKGND: {
             InvalidateRect(instance_->wnd_, nullptr, FALSE);
@@ -424,10 +434,10 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 
             instance_->dc_ = BeginPaint(wnd, &ps);
             instance_->set_display_data(instance_->dc_);
-            instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
-
-            instance_->full_redraw_window(instance_->dc_);
             EndPaint(wnd, &ps);
+
+            instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
+            instance_->request_redraw();
 
             return 0;
         }

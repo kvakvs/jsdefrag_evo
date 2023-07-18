@@ -41,6 +41,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
         return false;
     }
 
+    gui->log_detailed_progress(L"Analyzing NTFS: Done reading bootblock");
+
     // Test if the boot block is an NTFS boot block
     constexpr long long int NTFS_BOOT_BLOCK_PASTRY = 0x202020205346544E;
 
