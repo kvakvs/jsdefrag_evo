@@ -14,61 +14,62 @@ set(RSRC ${PROJECT_SOURCE_DIR}/jkdefrag_evo/resource)
 include_directories(${INCL})
 
 set(HEADER_FILES
+        ${INCL}/app.h
+        ${INCL}/colormap.h
         ${INCL}/constants.h
-        ${INCL}/types.h
+        ${INCL}/defrag_gui.h
+        ${INCL}/defrag_lib.h
+        ${INCL}/defrag_log.h
+        ${INCL}/defrag_state.h
+        ${INCL}/defrag_struct.h
+        ${INCL}/itemstruct.h
+        ${INCL}/mem_util.h
         ${INCL}/precompiled_header.h
         ${INCL}/printing.h
-        ${INCL}/defrag_log.h
-        ${INCL}/app.h
-        ${INCL}/time_util.h
-        ${INCL}/scan_ntfs.h
         ${INCL}/scan_fat.h
-        ${INCL}/itemstruct.h
-        ${INCL}/defrag_struct.h
-        ${INCL}/defrag_lib.h
-        ${INCL}/defrag_state.h
-        ${INCL}/defrag_gui.h
-        ${INCL}/colormap.h
+        ${INCL}/scan_ntfs.h
+        ${INCL}/time_util.h
         ${INCL}/tree.h
+        ${INCL}/types.h
         )
 set(SOURCE_FILES
-        ${SRC}/precompiled_header.cpp
-        ${SRC}/main.cpp ${SRC}/app.cpp ${SRC}/app_debug.cpp
-        ${SRC}/time_util.cpp
-        ${SRC}/printing.cpp
+        ${SRC}/app.cpp
+        ${SRC}/app_debug.cpp
         ${SRC}/defrag_log.cpp
-
-        ${SRC}/gui/defrag_gui.cpp
         ${SRC}/gui/colormap.cpp
+        ${SRC}/gui/defrag_gui.cpp
         ${SRC}/gui/paint.cpp
         ${SRC}/gui/stats.cpp
-
+        ${SRC}/main.cpp
+        ${SRC}/precompiled_header.cpp
+        ${SRC}/printing.cpp
+        ${SRC}/tech/defrag/analyze.cpp
+        ${SRC}/tech/defrag/defrag_state.cpp
+        ${SRC}/tech/defrag/finding.cpp
+        ${SRC}/tech/defrag/move_mft.cpp
+        ${SRC}/tech/defrag/moving.cpp
+        ${SRC}/tech/defrag/scan.cpp
         ${SRC}/tech/defrag_lib.cpp
         ${SRC}/tech/defrag_struct.cpp
-        ${SRC}/tech/itemstruct.cpp
-        ${SRC}/tech/defrag/moving.cpp
-        ${SRC}/tech/defrag/defrag_state.cpp
-        ${SRC}/tech/defrag/move_mft.cpp
-        ${SRC}/tech/defrag/finding.cpp
-        ${SRC}/tech/defrag/scan.cpp
-        ${SRC}/tech/defrag/analyze.cpp
-        ${SRC}/tech/fat/scan_fat.cpp
         ${SRC}/tech/fat/analyze.cpp
         ${SRC}/tech/fat/directory.cpp
-        ${SRC}/tech/ntfs/scan_ntfs.cpp
+        ${SRC}/tech/fat/scan_fat.cpp
+        ${SRC}/tech/itemstruct.cpp
+        ${SRC}/tech/methods/defrag_mountpoints.cpp
+        ${SRC}/tech/methods/defrag_one_path.cpp
+        ${SRC}/tech/methods/defragment.cpp
+        ${SRC}/tech/methods/fixup.cpp
+        ${SRC}/tech/methods/forced_fill.cpp
+        ${SRC}/tech/methods/optimize_sort.cpp
+        ${SRC}/tech/methods/optimize_up.cpp
+        ${SRC}/tech/methods/optimize_volume.cpp
+        ${SRC}/tech/methods/vacate.cpp
         ${SRC}/tech/ntfs/analyze.cpp
         ${SRC}/tech/ntfs/attributes.cpp
         ${SRC}/tech/ntfs/mft.cpp
+        ${SRC}/tech/ntfs/scan_ntfs.cpp
         ${SRC}/tech/ntfs/stream.cpp
-        ${SRC}/tech/methods/fixup.cpp
-        ${SRC}/tech/methods/defragment.cpp
-        ${SRC}/tech/methods/forced_fill.cpp
-        ${SRC}/tech/methods/vacate.cpp
-        ${SRC}/tech/methods/optimize_sort.cpp
-        ${SRC}/tech/methods/optimize_volume.cpp
-        ${SRC}/tech/methods/optimize_up.cpp
-        ${SRC}/tech/methods/defrag_one_path.cpp
-        ${SRC}/tech/methods/defrag_mountpoints.cpp
+        ${SRC}/time_util.cpp
         )
 
 add_executable(${APP_NAME} ${OPTIONS} ${HEADER_FILES} ${SOURCE_FILES})

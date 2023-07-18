@@ -17,35 +17,20 @@
 
 #include "precompiled_header.h"
 
-// Scan all files in a volume and store the information in a tree in
-// memory for later use by the optimizer.
-void DefragLib::analyze_volume(DefragState &data) {
+void DefragLib::analyze_volume_read_fs(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
-
-    gui->log_detailed_progress(L"Analyzing volume: Started...");
-
-    ScanFAT *scan_fat = ScanFAT::get_instance();
     ScanNTFS *scan_ntfs = ScanNTFS::get_instance();
 
-    call_show_status(data, DefragPhase::Analyze, Zone::None); // "Phase 1: Analyze"
-
-    // Fetch the current time in the uint64_t format (1 second = 10000000)
-    filetime64_t system_time;
-    SYSTEMTIME time1;
-    FILETIME time2;
-
-    GetSystemTime(&time1);
-
-    if (SystemTimeToFileTime(&time1, &time2) == TRUE) {
-        system_time = from_FILETIME(time2);
-    }
-
     // Scan NTFS disks
+    // Expensive call (can reach 1 minute runtime or more)
     bool result = scan_ntfs->analyze_ntfs_volume(data);
+
     gui->log_detailed_progress(L"Analyzing volume: Done analyzing NTFS volume");
 
     // Scan FAT disks
     if (result == FALSE && *data.running_ == RunningState::RUNNING) {
+        ScanFAT *scan_fat = ScanFAT::get_instance();
+
         result = scan_fat->analyze_fat_volume(data);
         gui->log_detailed_progress(L"Analyzing volume: Done analyzing FAT volume");
     }
@@ -65,6 +50,30 @@ void DefragLib::analyze_volume(DefragState &data) {
         scan_dir(data, data.include_mask_.c_str(), nullptr);
         gui->log_detailed_progress(L"Analyzing volume: Done scanning dir");
     }
+}
+
+// Scan all files in a volume and store the information in a tree in
+// memory for later use by the optimizer.
+void DefragLib::analyze_volume(DefragState &data) {
+    DefragGui *gui = DefragGui::get_instance();
+
+    gui->log_detailed_progress(L"Analyzing volume: Started...");
+
+    call_show_status(data, DefragPhase::Analyze, Zone::None); // "Phase 1: Analyze"
+
+    // Fetch the current time in the uint64_t format (1 second = 10000000)
+    filetime64_t system_time;
+    SYSTEMTIME time1;
+    FILETIME time2;
+
+    GetSystemTime(&time1);
+
+    if (SystemTimeToFileTime(&time1, &time2) == TRUE) {
+        system_time = from_FILETIME(time2);
+    }
+
+    // Expensive call (can reach 1 minute runtime or more)
+    analyze_volume_read_fs(data);
 
     // Update the diskmap with the colors
     data.clusters_done_ = data.phase_todo_;

@@ -30,9 +30,11 @@ http://www.kessels.com/
 #include <optional>
 #include <tchar.h>
 
+#include "tree.h"
 #include "constants.h"
 #include "types.h"
 #include "defrag_state.h"
+#include "itemstruct.h"
 
 // The three running states.
 enum class RunningState {
@@ -276,6 +278,8 @@ private:
     void scan_dir(DefragState &data, const wchar_t *mask, ItemStruct *parent_directory);
 
     void analyze_volume(DefragState &data);
+
+    void analyze_volume_read_fs(DefragState &data);
 
     void fixup(DefragState &data);
 

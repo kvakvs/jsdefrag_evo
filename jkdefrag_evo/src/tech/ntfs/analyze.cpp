@@ -18,11 +18,12 @@
 #include "precompiled_header.h"
 
 // Load the MFT into a list of ItemStruct records in memory
+// Expensive call (can reach 1 minute runtime or more)
 bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     DefragGui *gui = DefragGui::get_instance();
 
     // Read the boot block from the disk
-    auto buffer = std::make_unique<BYTE[]>(MFT_BUFFER_SIZE);
+    MemReader<uint8_t> buff(std::make_unique<uint8_t[]>(MFT_BUFFER_SIZE), MFT_BUFFER_SIZE);
 
     OVERLAPPED g_overlapped{
             .Offset = 0,
@@ -31,7 +32,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     };
 
     DWORD bytes_read;
-    auto result = ReadFile(data.disk_.volume_handle_, buffer.get(), (uint32_t) 512, &bytes_read, &g_overlapped);
+    auto result = ReadFile(data.disk_.volume_handle_, buff.get(), (uint32_t) 512,
+                           &bytes_read, &g_overlapped);
 
     if (result == 0 || bytes_read != 512) {
         gui->show_debug(DebugLevel::Progress, nullptr,
@@ -42,7 +44,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     // Test if the boot block is an NTFS boot block
     constexpr long long int NTFS_BOOT_BLOCK_PASTRY = 0x202020205346544E;
 
-    if (*(ULONGLONG *) &buffer.get()[3] != NTFS_BOOT_BLOCK_PASTRY) {
+    if (buff.read<ULONGLONG>(3) != NTFS_BOOT_BLOCK_PASTRY) {
         gui->show_debug(DebugLevel::Progress, nullptr, L"This is not an NTFS disk (different cookie).");
         return false;
     }
@@ -51,25 +53,24 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     NtfsDiskInfoStruct disk_info{};
 
     data.disk_.type_ = DiskType::NTFS;
-    disk_info.bytes_per_sector_ = *(USHORT *) &buffer[11];
+    disk_info.bytes_per_sector_ = buff.read<USHORT>(11);
 
     // Still to do: check for impossible values
-    disk_info.sectors_per_cluster_ = buffer[13];
-    disk_info.total_sectors_ = *(ULONGLONG *) &buffer[40];
-    disk_info.mft_start_lcn_ = *(ULONGLONG *) &buffer[48];
-    disk_info.mft2_start_lcn_ = *(ULONGLONG *) &buffer[56];
+    disk_info.sectors_per_cluster_ = buff.read<uint8_t>(13);
+    disk_info.total_sectors_ = buff.read<ULONGLONG>(40);
+    disk_info.mft_start_lcn_ = buff.read<ULONGLONG>(48);
+    disk_info.mft2_start_lcn_ = buff.read<ULONGLONG>(56);
 
-    ULONG clusters_per_mft_record = *(ULONG *) &buffer[64];
+    auto clusters_per_mft_record = buff.read<ULONG>(64);
 
     if (clusters_per_mft_record >= 128) {
-        // TODO: Bug with << 256 here
         disk_info.bytes_per_mft_record_ = (uint64_t) 1 << (256 - clusters_per_mft_record);
     } else {
-        disk_info.bytes_per_mft_record_ = clusters_per_mft_record * disk_info.bytes_per_sector_ * disk_info.
-                sectors_per_cluster_;
+        disk_info.bytes_per_mft_record_ =
+                clusters_per_mft_record * disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
     }
 
-    disk_info.clusters_per_index_record_ = *(ULONG *) &buffer[68];
+    disk_info.clusters_per_index_record_ = buff.read<ULONG>(68);
 
     data.bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
 
@@ -91,10 +92,10 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
             L"\n  ClustersPerIndexRecord: " NUM_FMT
             L"\n  MediaType: {:x}"
             L"\n  VolumeSerialNumber: {:x}",
-            *(ULONGLONG *) &buffer[3], disk_info.bytes_per_sector_, disk_info.total_sectors_,
-            disk_info.sectors_per_cluster_, *(USHORT *) &buffer[24], *(USHORT *) &buffer[26], disk_info.mft_start_lcn_,
+            buff.read<ULONGLONG>(3), disk_info.bytes_per_sector_, disk_info.total_sectors_,
+            disk_info.sectors_per_cluster_, buff.read<USHORT>(24), buff.read<USHORT>(26), disk_info.mft_start_lcn_,
             disk_info.mft2_start_lcn_, disk_info.bytes_per_mft_record_, disk_info.clusters_per_index_record_,
-            buffer[21], *(ULONGLONG *) &buffer[72]));
+            buff.read<uint8_t>(21), buff.read<ULONGLONG>(72)));
 
     // Calculate the size of first 16 Inodes in the MFT. The Microsoft defragmentation
     // API cannot move these inodes
@@ -107,7 +108,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     g_overlapped.Offset = trans.LowPart;
     g_overlapped.OffsetHigh = trans.HighPart;
     g_overlapped.hEvent = nullptr;
-    result = ReadFile(data.disk_.volume_handle_, buffer.get(),
+    result = ReadFile(data.disk_.volume_handle_, buff.get(),
                       (uint32_t) disk_info.bytes_per_mft_record_, &bytes_read,
                       &g_overlapped);
 
@@ -119,7 +120,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     }
 
     // Fixup the raw data from disk. This will also test if it's a valid $MFT record
-    if (fixup_raw_mftdata(data, &disk_info, buffer.get(), disk_info.bytes_per_mft_record_) == FALSE) {
+    if (fixup_raw_mftdata(data, &disk_info, buff.get(), disk_info.bytes_per_mft_record_) == FALSE) {
         return false;
     }
 
@@ -132,7 +133,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     result = interpret_mft_record(data, &disk_info, nullptr, 0, 0,
                                   PARAM_OUT mft_data_fragments, PARAM_OUT mft_data_bytes,
                                   PARAM_OUT mft_bitmap_fragments, PARAM_OUT mft_bitmap_bytes,
-                                  buffer.get(), disk_info.bytes_per_mft_record_);
+                                  buff.get(), disk_info.bytes_per_mft_record_);
 
     if (!result ||
         mft_data_fragments == nullptr || mft_data_bytes == 0 ||
@@ -316,7 +317,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
                                     (block_end - block_start) * disk_info.bytes_per_mft_record_,
                                     trans.QuadPart / (disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_)));
 
-            result = ReadFile(data.disk_.volume_handle_, buffer.get(),
+            result = ReadFile(data.disk_.volume_handle_, buff.get(),
                               (uint32_t) ((block_end - block_start) * disk_info.bytes_per_mft_record_), &bytes_read,
                               &g_overlapped);
 
@@ -332,7 +333,8 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
         }
 
         // Fixup the raw data of this Inode
-        if (fixup_raw_mftdata(data, &disk_info, &buffer[(inode_number - block_start) * disk_info.bytes_per_mft_record_],
+        const auto raw_mftdata_offset = (inode_number - block_start) * disk_info.bytes_per_mft_record_;
+        if (fixup_raw_mftdata(data, &disk_info, buff.get() + raw_mftdata_offset,
                               disk_info.bytes_per_mft_record_) == FALSE) {
             gui->show_debug(DebugLevel::Progress, nullptr,
                             std::format(L"The error occurred while processing Inode %I64u (max " NUM_FMT ")",
@@ -345,7 +347,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
         result = interpret_mft_record(data, &disk_info, inode_array.get(), inode_number, max_inode,
                                       PARAM_OUT mft_data_fragments, PARAM_OUT mft_data_bytes,
                                       PARAM_OUT mft_bitmap_fragments, PARAM_OUT mft_bitmap_bytes,
-                                      &buffer[(inode_number - block_start) * disk_info.bytes_per_mft_record_],
+                                      buff.get() + raw_mftdata_offset,
                                       disk_info.bytes_per_mft_record_);
     }
 

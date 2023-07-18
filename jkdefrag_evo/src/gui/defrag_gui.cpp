@@ -149,7 +149,7 @@ void DefragGui::clear_screen(std::wstring &&text) {
     // If there is no logfile then return. */
     Log::log(DebugLevel::DetailedProgress, messages_[0].c_str());
 
-    repaint_window(dc_);
+    full_redraw_window(dc_);
 }
 
 // Callback: whenever an item (file, directory) is moved on disk.
@@ -191,11 +191,11 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
                      std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
         }
     }
-    repaint_window(dc_);
+    full_redraw_window(dc_);
 }
 
 // Make sure this function does not run more often than 100ms
-static bool show_analyze_update_timer() {
+static bool show_analyze_throttle_timer() {
     static std::chrono::steady_clock::time_point last_time = std::chrono::steady_clock::now();
     auto current_time = std::chrono::steady_clock::now();
     auto duration = current_time - last_time;
@@ -218,7 +218,7 @@ void DefragGui::show_analyze_update_item_text(const ItemStruct *item) {
 }
 
 void DefragGui::show_analyze_no_state(const ItemStruct *item) {
-    if (!show_analyze_update_timer()) return;
+    if (!show_analyze_throttle_timer()) return;
 
     messages_[3] = L"Applying Exclude and SpaceHogs masks....";
 
@@ -232,7 +232,7 @@ void DefragGui::show_analyze_no_state(const ItemStruct *item) {
 // Callback: for every file during analysis.
 // This subroutine is called one last time with Item=nullptr when analysis has finished
 void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
-    if (!show_analyze_update_timer()) return;
+    if (!show_analyze_throttle_timer()) return;
 
     if (data.count_all_files_ != 0) {
         messages_[3] = std::format(L"Files " NUM_FMT ", Directories " NUM_FMT ", Clusters " NUM_FMT,
@@ -247,20 +247,29 @@ void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
 
 // Callback: show filename in the slot 4, show the message in the debug slot 5 + log the message
 void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::wstring &&text) {
-    // Save the name of the file in messages[4]
-    if (item != nullptr && item->have_long_path()) {
-        messages_[4] = item->get_long_path();
-    }
+    // Avoid extra data motions below log level
+    if (level <= DefragLog::debug_level_) {
+        // Save the name of the file in messages[4]
+        if (item != nullptr && item->have_long_path()) {
+            messages_[4] = item->get_long_path();
+        }
 
-    // Save the debug message in Messages 5
-    messages_[5] = std::move(text);
+        // Save the debug message in Messages 5
+        messages_[5] = std::move(text);
+    } else {
+        messages_[4].clear();
+        messages_[5].clear();
+    }
 
     // Log the message
     Log::log(DebugLevel::Debug, messages_[5].c_str());
 
-    // repaint_window(dc_);
-    repaint_top_area();
-    invalidate_top_area();
+    // Avoid repainting below log level
+    if (level <= DefragLog::debug_level_) {
+        // repaint_window(dc_);
+        repaint_top_area();
+        invalidate_top_area();
+    }
 }
 
 // Callback: paint a cluster on the screen in a given palette color
@@ -312,7 +321,7 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
 
     prepare_cells_for_cluster_range(cluster_start_square_num, cluster_end_square_num);
 
-    repaint_window(dc_);
+    full_redraw_window(dc_);
 }
 
 // Callback: just before the defragger starts a new Phase, and when it finishes
@@ -417,7 +426,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             instance_->set_display_data(instance_->dc_);
             instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
 
-            instance_->repaint_window(instance_->dc_);
+            instance_->full_redraw_window(instance_->dc_);
             EndPaint(wnd, &ps);
 
             return 0;

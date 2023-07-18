@@ -1,6 +1,10 @@
 #pragma once
 
 #include "constants.h"
+#include "defrag_state.h"
+#include "defrag_log.h"
+#include "itemstruct.h"
+#include "defrag_struct.h"
 
 class DefragGui {
 public:
@@ -48,7 +52,7 @@ public:
 
     void on_paint(HDC dc, const PAINTSTRUCT &ps) const;
 
-    void repaint_window(HDC dc);
+    void full_redraw_window(HDC dc);
 
     static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
 

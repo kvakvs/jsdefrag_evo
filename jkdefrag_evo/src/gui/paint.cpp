@@ -97,7 +97,23 @@ void DefragGui::paint_strings(Graphics *graphics) const {
     }
 }
 
-void DefragGui::repaint_window(HDC dc) {
+// Make sure this function does not run more often than 100ms
+static bool full_redraw_throttle_timer() {
+    static std::chrono::steady_clock::time_point last_time = std::chrono::steady_clock::now();
+    auto current_time = std::chrono::steady_clock::now();
+    auto duration = current_time - last_time;
+
+    if (duration < std::chrono::milliseconds(100)) {
+        return false;
+    }
+
+    last_time = current_time;
+    return true;
+}
+
+void DefragGui::full_redraw_window(HDC dc) {
+    if (!full_redraw_throttle_timer()) return;
+
     std::unique_ptr<Graphics> graphics(Graphics::FromImage(bmp_.get()));
     Rect window_size = client_size_;
 
