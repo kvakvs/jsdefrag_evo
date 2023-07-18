@@ -358,7 +358,7 @@ bool DefragApp::is_already_running() const {
 
     if (snapshot == INVALID_HANDLE_VALUE) {
         auto err = std::format(L"Cannot get process snapshot: {}", Str::system_error(GetLastError()));
-        gui_->log_fatal(std::move(err));
+        gui_->show_always(std::move(err));
         return true;
     }
 
@@ -383,7 +383,7 @@ bool DefragApp::is_already_running() const {
     if (*my_name == '\0') {
         // "Cannot find my own name in the process list: %s"
         auto s1 = std::format(L"Cannot find my own name in the process list: {}", Str::from_char(my_name));
-        gui_->log_fatal(std::move(s1));
+        gui_->show_always(std::move(s1));
         return true;
     }
 
@@ -401,7 +401,7 @@ bool DefragApp::is_already_running() const {
 
             auto s1 = std::format(L"I am already running: {}", Str::from_char(pe32.szExeFile));
 
-            gui_->log_fatal(std::move(s1));
+            gui_->show_always(std::move(s1));
             return true;
         }
     } while (Process32Next(snapshot, &pe32));

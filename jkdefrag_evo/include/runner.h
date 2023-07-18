@@ -212,6 +212,9 @@ private:
 
     void defrag_mountpoints(DefragState &data, const wchar_t *mount_point, OptimizeMode opt_mode);
 
+    static void set_up_unusable_cluster_list(DefragState &data);
+
+private:
     // static member that is an instance of itself
     inline static std::unique_ptr<DefragRunner> instance_;
 };

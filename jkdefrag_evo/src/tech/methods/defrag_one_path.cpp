@@ -86,19 +86,11 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     }
 
     // Make two versions of the MountPoint, one with a trailing backslash and one without
-    // wchar_t *p1 = wcschr(data.disk_.mount_point_.get(), 0);
-//    if (p1 != data.disk_.mount_point_.get()) {
-//        p1--;
-//        if (*p1 == '\\') *p1 = 0;
-//    }
     // Kill the trailing backslash
     if (!data.disk_.mount_point_.empty() && data.disk_.mount_point_.back() == L'\\') {
         data.disk_.mount_point_.pop_back();
     }
 
-    //size_t length = wcslen(data.disk_.mount_point_.get()) + 2;
-    //data.disk_.mount_point_slash_ = std::make_unique<wchar_t[]>(length);
-    // swprintf_s(data.disk_.mount_point_slash_.get(), length, L"%s\\", data.disk_.mount_point_.get());
     data.disk_.mount_point_slash_ = std::format(L"{}\\", data.disk_.mount_point_);
 
     // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
@@ -142,7 +134,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
         DWORD w = 0;
 
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
-            gui->log_fatal(L"Will not process this disk, it contains hybernated data.");
+            gui->show_always(L"Will not process this disk, it contains hybernated data.");
 
             data.disk_.mount_point_.clear();
             data.disk_.mount_point_slash_.clear();
@@ -221,46 +213,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
 
     if (error_code != 0) data.bytes_per_cluster_ = total_bytes / data.total_clusters_;
 
-    // Set up the list of clusters that cannot be used.
-    // The Master File Table cannot be moved and cannot be used by files. All this is only necessary for NTFS volumes.
-    NTFS_VOLUME_DATA_BUFFER ntfs_data;
-
-    DWORD w2;
-    error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_NTFS_VOLUME_DATA,
-                                 nullptr, 0, &ntfs_data, sizeof ntfs_data,
-                                 &w2, nullptr);
-
-    if (error_code != 0) {
-        // Note: NtfsData.TotalClusters.QuadPart should be exactly the same
-        // as the Data->TotalClusters that was determined in the previous block.
-
-        data.bytes_per_cluster_ = ntfs_data.BytesPerCluster;
-
-        data.mft_excludes_[0].start_ = ntfs_data.MftStartLcn.QuadPart;
-        data.mft_excludes_[0].end_ = ntfs_data.MftStartLcn.QuadPart +
-                                     ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
-        data.mft_excludes_[1].start_ = ntfs_data.MftZoneStart.QuadPart;
-        data.mft_excludes_[1].end_ = ntfs_data.MftZoneEnd.QuadPart;
-        data.mft_excludes_[2].start_ = ntfs_data.Mft2StartLcn.QuadPart;
-        data.mft_excludes_[2].end_ = ntfs_data.Mft2StartLcn.QuadPart +
-                                     ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
-
-        // Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d"
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(
-                                L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT ", MftValidDataLength=" NUM_FMT,
-                                ntfs_data.MftStartLcn.QuadPart, ntfs_data.MftZoneStart.QuadPart,
-                                ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
-                                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster));
-
-        // Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d"
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 0, data.mft_excludes_[0].start_, 0, data.mft_excludes_[0].end_));
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 1, data.mft_excludes_[1].start_, 1, data.mft_excludes_[1].end_));
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 2, data.mft_excludes_[2].start_, 2, data.mft_excludes_[2].end_));
-    }
+    set_up_unusable_cluster_list(data);
 
     // Fixup the input mask.
     // - If the length is 2 or 3 characters then rewrite into "<DRIVE>:\*".
@@ -275,9 +228,9 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
         data.include_mask_ = std::format(L"{}*", path);
     }
 
-    gui->log_fatal(std::format(L"Input mask: {}", data.include_mask_));
+    gui->show_always(std::format(L"Input mask: {}", data.include_mask_));
 
-    // Defragment and optimize
+    // Defragment and optimize; Potentially long running, on large volumes
     gui->show_diskmap(data);
 
     if (*data.running_ == RunningState::RUNNING) {

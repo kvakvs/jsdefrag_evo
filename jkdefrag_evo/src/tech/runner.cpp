@@ -1036,8 +1036,8 @@ void DefragRunner::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_
         }
     }
 
-    // If a Path is specified then call DefragOnePath() for that path. Otherwise call DefragMountpoints() for every disk
-    // in the system
+    // If a Path is specified, then call DefragOnePath() for that path.
+    // Otherwise, call DefragMountpoints() for every disk in the system
     if (path != nullptr && *path != 0) {
         // Long-running call
         defrag_one_path(data, path, optimize_mode);
@@ -1054,19 +1054,19 @@ void DefragRunner::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_
 
 // Stop the defragger. The "Running" variable must be the same as what was given to the RunJkDefrag() subroutine. Wait
 // for a maximum of time_out milliseconds for the defragger to stop. If time_out is zero then wait indefinitely. If
-// time_out is negative then immediately return without waiting.
+// time_out is negative, then immediately return without waiting.
 void DefragRunner::stop_defrag_sync(RunningState *run_state, SystemClock::duration time_out) {
     // Sanity check
     if (run_state == nullptr) return;
 
     // All loops in the library check if the Running variable is set to RUNNING. If not then the loop will exit.
-    // In effect this will stop the defragger
+    // In effect, this will stop the defragger
     if (*run_state == RunningState::RUNNING) {
         *run_state = RunningState::STOPPING;
     }
 
     // Wait for a maximum of time_out milliseconds for the defragger to stop.
-    // If time_out is zero then wait indefinitely. If time_out is negative then immediately return without waiting
+    // If time_out is zero, then wait indefinitely. If time_out is negative then immediately return without waiting
     SystemClock::duration time_waited{};
     const auto WAIT_MS = 100;
 

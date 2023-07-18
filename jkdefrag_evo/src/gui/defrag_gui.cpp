@@ -476,7 +476,6 @@ void DefragGui::show_diskmap(DefragState &data) {
 
     do {
         if (*data.running_ != RunningState::RUNNING) break;
-        //		if (*data.RedrawScreen != 2) break;
         if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data

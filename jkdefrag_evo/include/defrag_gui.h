@@ -23,7 +23,7 @@ public:
 
     void show_debug(DebugLevel level, const FileNode *item, std::wstring &&text);
 
-    void log_fatal(std::wstring &&text) {
+    void show_always(std::wstring &&text) {
         show_debug(DebugLevel::AlwaysLog, nullptr, std::move(text));
     }
 

@@ -130,13 +130,13 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
 
     if (disk_info.countof_clusters_ < 4085) {
         data.disk_.type_ = DiskType::FAT12;
-        gui->log_fatal(L"This is a FAT12 disk.");
+        gui->show_always(L"This is a FAT12 disk.");
     } else if (disk_info.countof_clusters_ < 65525) {
         data.disk_.type_ = DiskType::FAT16;
-        gui->log_fatal(L"This is a FAT16 disk.");
+        gui->show_always(L"This is a FAT16 disk.");
     } else {
         data.disk_.type_ = DiskType::FAT32;
-        gui->log_fatal(L"This is a FAT32 disk.");
+        gui->show_always(L"This is a FAT32 disk.");
     }
 
     data.bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
@@ -424,7 +424,7 @@ void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_i
         if (last_long_name_section != 1) {
             long_name[0] = '\0';
         } else if (calculate_short_name_check_sum(dir->dir_name_) != long_name_checksum) {
-            gui->log_fatal(L"%u.\tError: long filename is out of sync");
+            gui->show_always(L"%u.\tError: long filename is out of sync");
             long_name[0] = '\0';
         }
 
