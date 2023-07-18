@@ -59,8 +59,9 @@ public:
 protected:
     void write_stats(const DefragState &data);
 
-    void
-    paint_background(Rect &window_size, Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const;
+    void paint_top_background(Graphics *graphics) const;
+
+    void paint_background(Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const;
 
     void paint_diskmap_outline(Graphics *graphics, const POINT &m_org, const POINT &m_end) const;
 

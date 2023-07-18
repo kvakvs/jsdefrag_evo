@@ -10,6 +10,8 @@ class DefragState {
 public:
     DefragState();
 
+    void add_default_space_hogs();
+
 public:
     // The current Phase (1...3)
     DefragPhase phase_ = DefragPhase::Analyze;
@@ -108,4 +110,6 @@ public:
     Clock::time_point start_time_{};
     Clock::duration running_time_{};
     Clock::time_point last_checkpoint_{};
+
+    void check_last_access_enabled();
 };

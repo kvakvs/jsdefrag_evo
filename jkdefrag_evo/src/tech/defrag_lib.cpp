@@ -1017,9 +1017,10 @@ void DefragLib::call_show_status(DefragState &data, const DefragPhase phase, con
 }
 
 // Run the defragger/optimizer. See the .h file for a full explanation
-void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
-                              const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
+void DefragLib::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
+                                  const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
     DefragGui *gui = DefragGui::get_instance();
+
     gui->log_detailed_progress(L"Defrag starting…");
 
     // Copy the input values to the data struct
@@ -1050,65 +1051,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
     }
 
     if (data.use_default_space_hogs_) {
-        data.space_hogs_.emplace_back(L"?:\\$RECYCLE.BIN\\*"); // Vista
-        data.space_hogs_.emplace_back(L"?:\\RECYCLED\\*"); // FAT on 2K/XP
-        data.space_hogs_.emplace_back(L"?:\\RECYCLER\\*"); // NTFS on 2K/XP
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\$*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Downloaded Installations\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Ehome\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Fonts\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Help\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\I386\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\IME\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Installer\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\ServicePackFiles\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\SoftwareDistribution\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Speech\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\Symbols\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\ie7updates\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINDOWS\\system32\\dllcache\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\$*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\Downloaded Installations\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\I386\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\Installer\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\ServicePackFiles\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\SoftwareDistribution\\*");
-        data.space_hogs_.emplace_back(L"?:\\WINNT\\ie7updates\\*");
-        data.space_hogs_.emplace_back(L"?:\\*\\Installshield Installation Information\\*");
-        data.space_hogs_.emplace_back(L"?:\\I386\\*");
-        data.space_hogs_.emplace_back(L"?:\\System Volume Information\\*");
-        data.space_hogs_.emplace_back(L"?:\\windows.old\\*");
-
-        data.space_hogs_.emplace_back(L"*.7z");
-        data.space_hogs_.emplace_back(L"*.arj");
-        data.space_hogs_.emplace_back(L"*.bz2");
-        data.space_hogs_.emplace_back(L"*.gz");
-        data.space_hogs_.emplace_back(L"*.z");
-        data.space_hogs_.emplace_back(L"*.zip");
-
-        data.space_hogs_.emplace_back(L"*.bak");
-        data.space_hogs_.emplace_back(L"*.bup"); // DVD
-        data.space_hogs_.emplace_back(L"*.cab");
-        data.space_hogs_.emplace_back(L"*.chm"); // Help files
-        data.space_hogs_.emplace_back(L"*.dvr-ms");
-        data.space_hogs_.emplace_back(L"*.ifo"); // DVD
-        data.space_hogs_.emplace_back(L"*.log");
-        data.space_hogs_.emplace_back(L"*.lzh");
-        data.space_hogs_.emplace_back(L"*.msi");
-        data.space_hogs_.emplace_back(L"*.old");
-        data.space_hogs_.emplace_back(L"*.pdf");
-        data.space_hogs_.emplace_back(L"*.rar");
-        data.space_hogs_.emplace_back(L"*.rpm");
-        data.space_hogs_.emplace_back(L"*.tar");
-
-        data.space_hogs_.emplace_back(L"*.avi");
-        data.space_hogs_.emplace_back(L"*.mpg"); // MPEG2
-        data.space_hogs_.emplace_back(L"*.mp3"); // MPEG3 sound
-        data.space_hogs_.emplace_back(L"*.mp4"); // MPEG4 video
-        data.space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis sound
-        data.space_hogs_.emplace_back(L"*.wmv"); // Windows media video
-        data.space_hogs_.emplace_back(L"*.vob"); // DVD 
-        data.space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis Video 
+        data.add_default_space_hogs();
     }
 
     // If the NtfsDisableLastAccessUpdate setting in the registry is 1, then disable the LastAccessTime check
@@ -1116,26 +1059,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
     data.use_last_access_time_ = true;
 
     if (data.use_default_space_hogs_) {
-        LONG result;
-        HKEY key;
-        DWORD key_disposition;
-        result = RegCreateKeyExW(
-                HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0,
-                nullptr, REG_OPTION_NON_VOLATILE, KEY_READ, nullptr, &key, &key_disposition);
-
-        if (result == ERROR_SUCCESS) {
-            uint32_t ntfs_disable_last_access_update;
-            DWORD length = sizeof ntfs_disable_last_access_update;
-
-            result = RegQueryValueExW(key, L"NtfsDisableLastAccessUpdate", nullptr, nullptr,
-                                      (BYTE *) &ntfs_disable_last_access_update, &length);
-
-            if (result == ERROR_SUCCESS && ntfs_disable_last_access_update == 1) {
-                data.use_last_access_time_ = false;
-            }
-
-            RegCloseKey(key);
-        }
+        data.check_last_access_enabled();
 
         if (data.use_last_access_time_) {
             gui->show_debug(
@@ -1148,11 +1072,13 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
         }
     }
 
-    // If a Path is specified then call DefragOnePath() for that path. Otherwise call
-    // DefragMountpoints() for every disk in the system
+    // If a Path is specified then call DefragOnePath() for that path. Otherwise call DefragMountpoints() for every disk
+    // in the system
     if (path != nullptr && *path != 0) {
+        // Long running call
         defrag_one_path(data, path, optimize_mode);
     } else {
+        // Enumerate all drives, and defrag each
         uint32_t drives_size;
         drives_size = GetLogicalDriveStringsW(0, nullptr);
 
@@ -1169,6 +1095,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
             wchar_t *drive = drives.get();
 
             while (*drive != '\0') {
+                // Long running call, in a loop
                 defrag_mountpoints(data, drive, optimize_mode);
                 while (*drive != '\0') {
                     drive++;
@@ -1187,7 +1114,7 @@ void DefragLib::run_jk_defrag(wchar_t *path, OptimizeMode optimize_mode, int spe
 // Stop the defragger. The "Running" variable must be the same as what was given to the RunJkDefrag() subroutine. Wait
 // for a maximum of time_out milliseconds for the defragger to stop. If time_out is zero then wait indefinitely. If
 // time_out is negative then immediately return without waiting.
-void DefragLib::stop_jk_defrag(RunningState *run_state, int time_out) {
+void DefragLib::stop_defrag_sync(RunningState *run_state, int time_out) {
     // Sanity check
     if (run_state == nullptr) return;
 

@@ -137,7 +137,7 @@ void DefragLib::analyze_volume(DefragState &data) {
             if (data.use_default_space_hogs_ && item->bytes_ > kilobytes(50)) {
                 item->is_hog_ = true;
             } else if (data.use_default_space_hogs_ &&
-                       data.use_last_access_time_ == TRUE &&
+                       data.use_last_access_time_ &&
                        item->last_access_time_ + std::chrono::months(1) < system_time) {
                 item->is_hog_ = true;
             } else {

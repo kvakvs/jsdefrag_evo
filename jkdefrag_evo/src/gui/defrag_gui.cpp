@@ -264,8 +264,8 @@ void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::
         messages_[5].clear();
     }
 
-    // Log the message
-    Log::log(DebugLevel::Debug, messages_[5].c_str());
+    // Pass the message on to the disk log
+    Log::log(level, messages_[5].c_str());
 
     // Avoid repainting below log level
     if (level <= DefragLog::debug_level_) {
@@ -399,20 +399,20 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             return 0;
 
         case WM_TIMER: {
-            InvalidateRect(wnd, nullptr, FALSE);
+//          InvalidateRect(wnd, nullptr, FALSE);
 
             std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
-//            PAINTSTRUCT ps{};
-//            instance_->dc_ = BeginPaint(wnd, &ps);
+            PAINTSTRUCT ps{};
+
+            instance_->dc_ = BeginPaint(wnd, &ps);
             instance_->full_redraw_window(instance_->dc_);
-//            EndPaint(wnd, &ps);
+            EndPaint(wnd, &ps);
             return 0;
         }
 
         case WM_PAINT: {
             // Grab the display mutex, to make sure that we are the only thread changing the window
             std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
-
             PAINTSTRUCT ps{};
 
             instance_->dc_ = BeginPaint(wnd, &ps);
@@ -450,10 +450,9 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 }
 
 // Show a map on the screen of all the clusters on disk. The map shows which clusters are free and which are in use.
-// The data.RedrawScreen flag controls redrawing of the screen. It is set to "2" (busy) when the subroutine starts. If
-// another thread changes it to "1" (request) while the subroutine is busy then it will immediately exit without
-// completing the redraw. When redrawing is completely finished the flag is set to "0" (no).
 void DefragGui::show_diskmap(DefragState &data) {
+    Log::log(DebugLevel::DetailedProgress, L"Diskmap repainting started…");
+
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
@@ -473,7 +472,7 @@ void DefragGui::show_diskmap(DefragState &data) {
     uint64_t cluster_start = 0;
     int prev_in_use = 1;
 
-    BOOL error_code;
+    DWORD error_code;
 
     do {
         if (*data.running_ != RunningState::RUNNING) break;
@@ -575,9 +574,8 @@ void DefragGui::show_diskmap(DefragState &data) {
         draw_cluster(data, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
     }
 
-    /* Colorize all the files on the screen.
-    Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
-    ignore it. */
+    // Colorize all the files on the screen
+    // Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to ignore it
     for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (*data.running_ != RunningState::RUNNING) break;
         //		if (*data.RedrawScreen != 2) break;
@@ -588,8 +586,6 @@ void DefragGui::show_diskmap(DefragState &data) {
 
         defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
     }
-
-    // Set the flag to "no"
-    //	if (*data.RedrawScreen == 2) *data.RedrawScreen = 0;
+    Log::log(DebugLevel::DetailedProgress, L"Diskmap painting ended");
 }
 

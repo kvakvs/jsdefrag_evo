@@ -35,8 +35,8 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
     // Exit if we're running inside a debugger
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
 
-    Log::log(DebugLevel::AlwaysLog, L"I have crashed!");
-    Log::log(DebugLevel::AlwaysLog, std::format(L"  Command line: {}", GetCommandLineW()).c_str());
+    Log::log_always( L"I have crashed!");
+    Log::log_always( std::format(L"  Command line: {}", GetCommandLineW()).c_str());
 
     // Show the type of exception
     switch (exception_info->ExceptionRecord->ExceptionCode) {
@@ -130,15 +130,15 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
             strcpy_s(s1, BUFSIZ, "(unknown exception)");
     }
 
-    Log::log(DebugLevel::AlwaysLog, std::format(L"  Exception: {}", Str::from_char(s1)));
+    Log::log_always( std::format(L"  Exception: {}", Str::from_char(s1)));
 
     // Try to show the linenumber of the sourcefile
     SymSetOptions(SymGetOptions() || SYMOPT_LOAD_LINES);
     BOOL result = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
 
     if (result == FALSE) {
-        Log::log(DebugLevel::AlwaysLog, std::format(L"  Failed to initialize SymInitialize(): {}",
-                                                    DefragLib::system_error_str(GetLastError())));
+        Log::log_always( std::format(L"  Failed to initialize SymInitialize(): {}",
+                                      DefragLib::system_error_str(GetLastError())));
         return EXCEPTION_EXECUTE_HANDLER;
     }
 
@@ -184,12 +184,12 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
             result = SymGetLineFromAddr64(GetCurrentProcess(), stack_frame.AddrPC.Offset,
                                           &line_displacement, &source_line);
             if (result == TRUE) {
-                Log::log(DebugLevel::AlwaysLog,
-                         std::format(L"  Frame {}. At line {} in '{}'", frame_number, source_line.LineNumber,
-                                     Str::from_char(source_line.FileName)));
+                Log::log_always(
+                        std::format(L"  Frame {}. At line {} in '{}'", frame_number, source_line.LineNumber,
+                                    Str::from_char(source_line.FileName)));
             } else {
-                Log::log(DebugLevel::AlwaysLog,
-                         std::format(L"  Frame {}. At line (unknown) in (unknown)", frame_number));
+                Log::log_always(
+                        std::format(L"  Frame {}. At line (unknown) in (unknown)", frame_number));
             }
         }
     }

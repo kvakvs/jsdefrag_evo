@@ -66,10 +66,9 @@ constexpr COLORREF display_colors[9] = {
         RGB(128, 128, 128),     // 2 Unfragmented  - Unfragmented files
         RGB(128, 0, 0),         // 3 Unmovable     - Unmovable files
         RGB(200, 60, 60),       // 4 Fragmented    - Fragmented files
-        RGB(0, 0, 160),         // 5 Busy          - Busy color
-        RGB(140, 0, 140),       // 6 Mft           - MFT reserved zones
-        RGB(40, 40, 160),       // 7 SpaceHog      - Large files, rarely changed
-        // RGB(255, 255, 255)      // 8 background
+        RGB(255, 160, 0),       // 5 Busy          - Busy color
+        RGB(220, 0, 180),       // 6 Mft           - MFT reserved zones
+        RGB(80, 80, 200),       // 7 SpaceHog      - Large files, rarely changed
 };
 
 // The colors used by the defragger

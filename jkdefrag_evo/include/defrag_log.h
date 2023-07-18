@@ -15,6 +15,7 @@ enum class DebugLevel {
     DetailedGapFilling = 5,
     // Detailed gap-finding messages.
     DetailedGapFinding = 6,
+    // Log all, also is used as max value for range comparisons
     Debug = 7,
 };
 
@@ -58,6 +59,12 @@ private:
 };
 
 namespace Log {
+    // Do not check debug level, equal to DebugLevel::AlwaysLog
+    template<typename T>
+    void log_always(T text) {
+        DefragLog::get_instance()->log_always(std::move(text));
+    }
+
     inline void log(const DebugLevel level, std::wstring &&text) {
         if (level <= DefragLog::debug_level_) {
             DefragLog::get_instance()->log_always(std::move(text));

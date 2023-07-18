@@ -18,28 +18,24 @@
 #include "precompiled_header.h"
 #include "defrag_gui.h"
 
-void DefragGui::paint_background(Rect &window_size, Graphics *graphics,
-                                 const POINT &diskmap_org, const POINT &diskmap_end) const {
-    Color back_color1;
-    back_color1.SetFromCOLORREF(RGB(0, 0, 255));
+void DefragGui::paint_top_background(Graphics *graphics) const {
+    // Fill top area
+    SolidBrush bg_brush(Color::Gray);
+    Rect top_area(client_size_.X, client_size_.Y, client_size_.Width, top_area_height_ + 1);
+    graphics->FillRectangle(&bg_brush, top_area);
+}
 
-    Color back_color2;
-    back_color2.SetFromCOLORREF(RGB(255, 0, 0));
+void DefragGui::paint_background(Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const {
+    // LinearGradientBrush bg_brush(window_size, Color::DarkBlue, Color::LightBlue, LinearGradientModeForwardDiagonal);
+    SolidBrush bg_brush(Color::Gray);
 
-    LinearGradientBrush bg_brush(window_size, Color::DarkBlue, Color::LightBlue, LinearGradientModeForwardDiagonal);
-
-    Rect draw_area = window_size;
-    draw_area.Height = top_area_height_ + 1;
-
-    Color busy_color;
-    busy_color.SetFromCOLORREF(display_colors[(size_t) DrawColor::Busy]);
-
-    // SolidBrush busy_brush(busy_color);
-    // graphics->FillRectangle(&busyBrush, drawArea);
-    graphics->FillRectangle(&bg_brush, draw_area);
+    // Color busy_color;
+    // busy_color.SetFromCOLORREF(display_colors[(size_t) DrawColor::Busy]);
 
     // Paint bottom background, below the status panel
-    draw_area = Rect(0, top_area_height_ + 1, client_size_.Width, diskmap_org.y - top_area_height_ - 2);
+
+    // Narrow horizontal rectangle above the disk map
+    Rect draw_area = Rect(0, top_area_height_ + 1, client_size_.Width, diskmap_org.y - top_area_height_ - 2);
     graphics->FillRectangle(&bg_brush, draw_area);
 
     draw_area = Rect(0, diskmap_end.y + 2, client_size_.Width, client_size_.Height - diskmap_end.y - 2);
@@ -115,7 +111,6 @@ void DefragGui::full_redraw_window(HDC dc) {
     if (!full_redraw_throttle_timer()) return;
 
     std::unique_ptr<Graphics> graphics(Graphics::FromImage(bmp_.get()));
-    Rect window_size = client_size_;
 
     [[maybe_unused]] const auto square_size_unit = 1.f / (float) square_size_;
 
@@ -150,9 +145,10 @@ void DefragGui::full_redraw_window(HDC dc) {
     };
 
     if (redraw_top_area_ || redraw_disk_map_) {
-        paint_background(window_size, graphics.get(), diskmap_org, diskmap_end);
+        paint_background(graphics.get(), diskmap_org, diskmap_end);
     }
     if (redraw_top_area_) {
+        paint_top_background(graphics.get());
         paint_strings(graphics.get());
 
         redraw_top_area_ = false;
@@ -167,6 +163,8 @@ void DefragGui::full_redraw_window(HDC dc) {
 
 void DefragGui::repaint_top_area() const {
     std::unique_ptr<Graphics> graphics(Graphics::FromImage(bmp_.get()));
+
+    paint_top_background(graphics.get());
     paint_strings(graphics.get());
 }
 
@@ -340,12 +338,14 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
     }
 }
 
+// Actual re-rendering happens on WM_TIMER event
 void DefragGui::request_redraw() {
     redraw_top_area_ = true;
     redraw_disk_map_ = true;
     InvalidateRect(wnd_, nullptr, FALSE);
 }
 
+// Actual re-rendering happens on WM_TIMER event
 void DefragGui::request_redraw_top_area() {
     redraw_top_area_ = true;
     InvalidateRect(wnd_, &top_area_rect_, FALSE);
