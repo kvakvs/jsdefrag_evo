@@ -166,7 +166,7 @@ link. */
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-    gui->show_debug(DebugLevel::Fatal, nullptr,
+    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                     std::format(NUM_FMT L" {}", item->get_item_lcn(), item->get_long_fn()));
 
     if (!item->is_dir_) {
@@ -180,7 +180,7 @@ link. */
     }
 
     if (file_handle == INVALID_HANDLE_VALUE) {
-        gui->show_debug(DebugLevel::Fatal, nullptr,
+        gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                         std::format(L"  Could not open: {}", system_error_str(GetLastError())));
         return;
     }
@@ -192,7 +192,7 @@ link. */
         if (item->creation_time_ != fi_creation) {
             auto diff = item->creation_time_ - fi_creation;
             gui->show_debug(
-                    DebugLevel::Fatal, nullptr,
+                    DebugLevel::AlwaysLog, nullptr,
                     std::format(L"  Different CreationTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
                                 item->creation_time_.count(), fi_creation.count(), diff.count()));
         }
@@ -203,7 +203,7 @@ link. */
         if (item->last_access_time_ != fi_lastaccess) {
             auto diff = item->last_access_time_ - fi_lastaccess;
             gui->show_debug(
-                    DebugLevel::Fatal, nullptr,
+                    DebugLevel::AlwaysLog, nullptr,
                     std::format(L"  Different LastAccessTime " NUM_FMT " <> " NUM_FMT " = " NUM_FMT,
                                 item->last_access_time_.count(), fi_lastaccess.count(), diff.count()));
         }
@@ -290,13 +290,13 @@ link. */
                 gui->log_fatal(L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             } else {
                 if (fragment->lcn_ != extent_data.extents_[i].lcn_) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     std::format(L"  Different LCN in fragment: " NUM_FMT " <> " NUM_FMT,
                                                 fragment->lcn_, extent_data.extents_[i].lcn_));
                 }
 
                 if (fragment->next_vcn_ != extent_data.extents_[i].next_vcn_) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     std::format(L"  Different NextVcn in fragment: " NUM_FMT " <> " NUM_FMT,
                                                 fragment->next_vcn_, extent_data.extents_[i].next_vcn_));
                 }
@@ -313,7 +313,7 @@ link. */
 
     // If there was an error while reading the clustermap then return false
     if (error_code != NO_ERROR && error_code != ERROR_HANDLE_EOF) {
-        gui->show_debug(DebugLevel::Fatal, item,
+        gui->show_debug(DebugLevel::AlwaysLog, item,
                         std::format(L"  Error while processing clustermap: {}", system_error_str(error_code)));
         return;
     }
@@ -323,7 +323,7 @@ link. */
     }
 
     if (item->clusters_count_ != clusters) {
-        gui->show_debug(DebugLevel::Fatal, nullptr,
+        gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                         std::format(L"  Different cluster count: " NUM_FMT " <> " NUM_FMT,
                                     item->clusters_count_, clusters));
     }

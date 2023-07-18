@@ -109,7 +109,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
         // API puts a limit of 52 on length, but wstring has no length limit
         if (data.disk_.mount_point_slash_.length() > 52 - 1 - 4) {
             // "Cannot find volume name for mountpoint '%s': %s"
-            gui->show_debug(DebugLevel::Fatal, nullptr,
+            gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
                                         data.disk_.mount_point_slash_, system_error_str(GetLastError())));
 
@@ -156,7 +156,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
     }
 
     // Show debug message: "Opening volume '%s' at mountpoint '%s'"
-    gui->show_debug(DebugLevel::Fatal, nullptr,
+    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                     std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
                                 data.disk_.mount_point_));
 
@@ -198,7 +198,7 @@ void DefragLib::defrag_one_path(DefragState &data, const wchar_t *path, Optimize
 
     if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
         // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
-        gui->show_debug(DebugLevel::Fatal, nullptr,
+        gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                         std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
                                     data.disk_.mount_point_));
 

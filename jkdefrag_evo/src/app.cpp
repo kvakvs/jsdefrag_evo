@@ -28,7 +28,7 @@ DefragApp::DefragApp()
           debug_level_(DebugLevel::Warning) {
     gui_ = DefragGui::get_instance();
     defrag_lib_ = DefragLib::get_instance();
-    log_ = std::make_unique<DefragLog>();
+    defrag_log_ = DefragLog::get_instance();
     defrag_struct_ = std::make_unique<DefragStruct>();
 }
 
@@ -61,7 +61,7 @@ WPARAM DefragApp::start_program(HINSTANCE instance,
 #endif
 
     // Initialize the GUI and start update timer (sends WM_TIMER)
-    gui_->initialize(instance, cmd_show, log_.get(), debug_level_);
+    gui_->initialize(instance, cmd_show, debug_level_);
 
     // Start up the defragmentation thread
     std::thread defrag_thread_object(&DefragApp::defrag_thread);
@@ -80,16 +80,46 @@ WPARAM DefragApp::start_program(HINSTANCE instance,
     return w_param;
 }
 
+static void log_windows_version() {
+//    OSVERSIONINFO os_version;
+//    ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
+//    os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+
+//    if (GetVersionEx(&os_version) != 0) {
+//        log->log(std::format(L"Windows version: v{}.{} build {} {}", os_version.dwMajorVersion,
+//                             os_version.dwMinorVersion, os_version.dwBuildNumber,
+//                             Str::from_char(os_version.szCSDVersion)));
+//    }
+    OSVERSIONINFOEX ver_info{
+            .dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX)
+    };
+    DWORDLONG condition_mask = 0;
+    VER_SET_CONDITION(condition_mask, VER_MAJORVERSION, VER_EQUAL);
+    VER_SET_CONDITION(condition_mask, VER_MINORVERSION, VER_EQUAL);
+    VER_SET_CONDITION(condition_mask, VER_BUILDNUMBER, VER_EQUAL);
+
+    // we're not picky about the modern version as long as its NTFS
+    ver_info.dwMajorVersion = HIBYTE(_WIN32_WINNT_WINXP);
+    ver_info.dwMinorVersion = LOBYTE(_WIN32_WINNT_WINXP);
+    ver_info.dwBuildNumber = 0;
+
+    if (VerifyVersionInfo(&ver_info, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, condition_mask)) {
+        Log::log(DebugLevel::AlwaysLog, static_cast<const std::wstring>(std::format(
+                L"Windows version {}.{} build {}", ver_info.dwMajorVersion, ver_info.dwMinorVersion,
+                ver_info.dwBuildNumber)));
+    } else {
+        DWORD error = GetLastError();
+        Log::log(DebugLevel::AlwaysLog,
+                 std::format(L"Failed to retrieve Windows version information. Error code: {}", error));
+    }
+}
+
 // The main thread that performs all the work. Interpret the commandline
 // parameters and call the defragger library.
 // DWORD WINAPI Defrag::defrag_thread(LPVOID) {
 void DefragApp::defrag_thread() {
-//    std::time_t now;
-//    std::tm now_tm{};
-    OSVERSIONINFO os_version;
     int i;
 
-    DefragLog *log = instance_->log_.get();
     DefragStruct *defrag_struct = instance_->defrag_struct_.get();
     DefragGui *gui = instance_->gui_;
     DefragLib *defrag_lib = instance_->defrag_lib_;
@@ -106,6 +136,7 @@ void DefragApp::defrag_thread() {
     // Fetch the commandline
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    auto log = DefragLog::get_instance();
 
     // Scan the commandline arguments for "-l" and setup the logfile
     if (argc > 1) {
@@ -133,14 +164,7 @@ void DefragApp::defrag_thread() {
     auto now = std::chrono::current_zone()->to_local(std::chrono::system_clock::now());
     log->log(std::format(L"Date: {:%Y-%m-%d %X}", now));
 
-    ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
-    os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-    if (GetVersionEx(&os_version) != 0) {
-        log->log(std::format(L"Windows version: v{}.{} build {} {}", os_version.dwMajorVersion,
-                             os_version.dwMinorVersion, os_version.dwBuildNumber,
-                             Str::from_char(os_version.szCSDVersion)));
-    }
+    log_windows_version();
 
     // Scan the commandline again for all the other arguments
     if (argc > 1) {
@@ -150,7 +174,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a number after the \"-a\" commandline argument.");
 
                     continue;
@@ -159,13 +183,13 @@ void DefragApp::defrag_thread() {
                 optimize_mode = (OptimizeMode) _wtol(argv[i]);
 
                 if (optimize_mode < OptimizeMode::AnalyzeOnly || optimize_mode >= OptimizeMode::Max) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
                     optimize_mode = OptimizeMode::DeprecatedAnalyzeFixupFull;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-a' accepted, optimizemode = {}",
                                             (int) optimize_mode));
 
@@ -176,13 +200,13 @@ void DefragApp::defrag_thread() {
                 optimize_mode = (OptimizeMode) _wtol(&argv[i][2]);
 
                 if (optimize_mode < OptimizeMode::AnalyzeOnly || optimize_mode >= OptimizeMode::Max) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-a\" commandline argument is invalid.");
 
                     optimize_mode = OptimizeMode::DeprecatedAnalyzeFixupFull;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-a' accepted, optimizemode = {}",
                                             (int) optimize_mode));
                 continue;
@@ -193,7 +217,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a number after the \"-s\" commandline argument.");
 
                     continue;
@@ -202,13 +226,13 @@ void DefragApp::defrag_thread() {
                 speed = _wtol(argv[i]);
 
                 if (speed < 1 || speed > 100) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-s\" commandline argument is invalid.");
 
                     speed = 100;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-s' accepted, slowing down to {}%", speed));
 
                 continue;
@@ -218,13 +242,13 @@ void DefragApp::defrag_thread() {
                 speed = _wtol(&argv[i][2]);
 
                 if (speed < 1 || speed > 100) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-s\" commandline argument is invalid.");
 
                     speed = 100;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-s' accepted, speed = {}%", speed));
                 continue;
             }
@@ -234,7 +258,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a number after the \"-f\" commandline argument.");
 
                     continue;
@@ -243,13 +267,13 @@ void DefragApp::defrag_thread() {
                 free_space = _wtof(argv[i]);
 
                 if (free_space < 0 || free_space > 100) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-f\" commandline argument is invalid.");
 
                     free_space = 1;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-f' accepted, freespace = {:.1f}%", free_space));
                 continue;
             }
@@ -258,13 +282,13 @@ void DefragApp::defrag_thread() {
                 free_space = _wtof(&argv[i][2]);
 
                 if (free_space < 0 || free_space > 100) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-f\" command line argument is invalid.");
 
                     free_space = 1;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Command line argument '-f' accepted, free space = {:.1f}%", free_space));
 
                 continue;
@@ -275,7 +299,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a number after the \"-d\" commandline argument.");
 
                     continue;
@@ -283,15 +307,15 @@ void DefragApp::defrag_thread() {
 
                 instance_->debug_level_ = (DebugLevel) _wtol(argv[i]);
 
-                if (instance_->debug_level_ < DebugLevel::Fatal ||
+                if (instance_->debug_level_ < DebugLevel::AlwaysLog ||
                     instance_->debug_level_ > DebugLevel::DetailedGapFinding) {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Error: the number after the \"-d\" commandline argument is invalid.");
 
                     instance_->debug_level_ = DebugLevel::Warning;
                 }
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-d' accepted, debug level set to {}",
                                             (int) instance_->debug_level_));
                 continue;
@@ -301,7 +325,7 @@ void DefragApp::defrag_thread() {
                 argv[i][2] >= '0' && argv[i][2] <= '6') {
                 instance_->debug_level_ = (DebugLevel) _wtol(&argv[i][2]);
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-d' accepted, debug level set to {}",
                                             (int) instance_->debug_level_));
                 continue;
@@ -312,7 +336,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a filename after the \"-l\" commandline argument.");
 
                     continue;
@@ -321,10 +345,10 @@ void DefragApp::defrag_thread() {
                 auto log_file = log->get_log_filename();
 
                 if (*log_file != '\0') {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     std::format(L"Commandline argument '-l' accepted, logfile = {}", log_file));
                 } else {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Commandline argument '-l' accepted, logfile turned off");
                 }
 
@@ -335,10 +359,10 @@ void DefragApp::defrag_thread() {
                 auto log_file = log->get_log_filename();
 
                 if (*log_file != '\0') {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     std::format(L"Commandline argument '-l' accepted, logfile = {}", log_file));
                 } else {
-                    gui->show_debug(DebugLevel::Fatal, nullptr,
+                    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                     L"Commandline argument '-l' accepted, logfile turned off");
                 }
 
@@ -350,7 +374,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a mask after the \"-e\" commandline argument.");
 
                     continue;
@@ -358,7 +382,7 @@ void DefragApp::defrag_thread() {
 
                 excludes.emplace_back(argv[i]);
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-e' accepted, added '{}' to the excludes",
                                             argv[i]));
 
@@ -368,7 +392,7 @@ void DefragApp::defrag_thread() {
             if (wcsncmp(argv[i], L"-e", 2) == 0 && wcslen(argv[i]) >= 3) {
                 excludes.emplace_back(&argv[i][2]);
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-e' accepted, added '{}' to the excludes",
                                             &argv[i][2]));
 
@@ -380,7 +404,7 @@ void DefragApp::defrag_thread() {
 
                 if (i >= argc) {
                     gui->show_debug(
-                            DebugLevel::Fatal, nullptr,
+                            DebugLevel::AlwaysLog, nullptr,
                             L"Error: you have not specified a mask after the \"-u\" commandline argument.");
 
                     continue;
@@ -388,7 +412,7 @@ void DefragApp::defrag_thread() {
 
                 space_hogs.emplace_back(argv[i]);
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-u' accepted, added '{}' to the spacehogs",
                                             argv[i]));
 
@@ -398,7 +422,7 @@ void DefragApp::defrag_thread() {
             if (wcsncmp(argv[i], L"-u", 2) == 0 && wcslen(argv[i]) >= 3) {
                 space_hogs.emplace_back(&argv[i][2]);
 
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Commandline argument '-u' accepted, added '{}' to the spacehogs",
                                             &argv[i][2]));
 
@@ -414,7 +438,7 @@ void DefragApp::defrag_thread() {
             }
 
             if (argv[i][0] == '-') {
-                gui->show_debug(DebugLevel::Fatal, nullptr,
+                gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                                 std::format(L"Error: commandline argument not recognised: {}", argv[i]));
             }
         }

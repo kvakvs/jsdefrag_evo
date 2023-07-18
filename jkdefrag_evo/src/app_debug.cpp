@@ -30,14 +30,13 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
     uint32_t image_type;
     char s1[BUFSIZ];
 
-    DefragLog *log = instance_->log_.get();
     const DefragLib *defrag_lib = instance_->defrag_lib_;
 
     // Exit if we're running inside a debugger
     //  if (IsDebuggerPresent() == TRUE) return(EXCEPTION_EXECUTE_HANDLER);
 
-    log->log(L"I have crashed!");
-    log->log(std::format(L"  Command line: {}", GetCommandLineW()).c_str());
+    Log::log(DebugLevel::AlwaysLog, L"I have crashed!");
+    Log::log(DebugLevel::AlwaysLog, std::format(L"  Command line: {}", GetCommandLineW()).c_str());
 
     // Show the type of exception
     switch (exception_info->ExceptionRecord->ExceptionCode) {
@@ -131,15 +130,15 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
             strcpy_s(s1, BUFSIZ, "(unknown exception)");
     }
 
-    log->log(std::format(L"  Exception: {}", Str::from_char(s1)));
+    Log::log(DebugLevel::AlwaysLog, std::format(L"  Exception: {}", Str::from_char(s1)));
 
     // Try to show the linenumber of the sourcefile
     SymSetOptions(SymGetOptions() || SYMOPT_LOAD_LINES);
     BOOL result = SymInitialize(GetCurrentProcess(), nullptr, TRUE);
 
     if (result == FALSE) {
-        log->log(std::format(L"  Failed to initialize SymInitialize(): {}",
-                             DefragLib::system_error_str(GetLastError())));
+        Log::log(DebugLevel::AlwaysLog, std::format(L"  Failed to initialize SymInitialize(): {}",
+                                                    DefragLib::system_error_str(GetLastError())));
         return EXCEPTION_EXECUTE_HANDLER;
     }
 
@@ -185,14 +184,12 @@ LONG __stdcall DefragApp::crash_report(EXCEPTION_POINTERS *exception_info) {
             result = SymGetLineFromAddr64(GetCurrentProcess(), stack_frame.AddrPC.Offset,
                                           &line_displacement, &source_line);
             if (result == TRUE) {
-                log->log(std::format(L"  Frame {}. At line {} in '{}'", frame_number, source_line.LineNumber,
+                Log::log(DebugLevel::AlwaysLog,
+                         std::format(L"  Frame {}. At line {} in '{}'", frame_number, source_line.LineNumber,
                                      Str::from_char(source_line.FileName)));
             } else {
-                log->log(std::format(L"  Frame {}. At line (unknown) in (unknown)", frame_number));
-                /*
-                SystemErrorStr(GetLastError(),s2,BUFSIZ);
-                LogMessage(L"  Error executing SymGetLineFromAddr64(): %s",s2);
-                */
+                Log::log(DebugLevel::AlwaysLog,
+                         std::format(L"  Frame {}. At line (unknown) in (unknown)", frame_number));
             }
         }
     }

@@ -19,6 +19,8 @@
 
 #include <ctime>
 #include <cstdarg>
+#include <defrag_log.h>
+
 
 DefragLog::DefragLog() {
     wchar_t name_buf[MAX_PATH];
@@ -113,4 +115,12 @@ void DefragLog::write_timestamp(FILE *fout) {
     auto sse = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     auto time_str = std::format(L"{:%FT%H:%M}.{:%S}", now, sse);
     fwprintf_s(fout, L"%s ", time_str.c_str());
+}
+
+DefragLog *DefragLog::get_instance() {
+    if (instance_ == nullptr) {
+        instance_ = std::make_unique<DefragLog>();
+    }
+
+    return instance_.get();
 }

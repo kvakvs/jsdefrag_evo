@@ -22,7 +22,7 @@
 
 DefragGui *DefragGui::instance_ = nullptr;
 
-DefragGui::DefragGui() : debug_level_(), color_map_(), diskmap_pos_() {
+DefragGui::DefragGui() : color_map_(), diskmap_pos_() {
     defrag_lib_ = DefragLib::get_instance();
     defrag_struct_ = std::make_unique<DefragStruct>();
 
@@ -39,14 +39,13 @@ DefragGui *DefragGui::get_instance() {
     return instance_;
 }
 
-int DefragGui::initialize(HINSTANCE instance, const int cmd_show, DefragLog *log, const DebugLevel debug_level) {
+int DefragGui::initialize(HINSTANCE instance, const int cmd_show, const DebugLevel debug_level) {
     ULONG_PTR gdiplus_token;
     const GdiplusStartupInput gdiplus_startup_input;
 
     GdiplusStartup(&gdiplus_token, &gdiplus_startup_input, nullptr);
 
-    log_ = log;
-    debug_level_ = debug_level;
+    DefragLog::debug_level_ = debug_level;
 
     static const auto window_class_name = APP_NAME "Class";
 
@@ -115,10 +114,11 @@ void DefragGui::set_display_data(HDC dc) {
     graphics.GetVisibleClipBounds(&client_window_size);
 
     client_size_ = client_window_size;
-    top_area_height_ = 33;
 
-    if (debug_level_ > DebugLevel::Warning) {
+    if (DefragLog::debug_level_ > DebugLevel::Warning) {
         top_area_height_ = 49;
+    } else {
+        top_area_height_ = 33;
     }
 
     disk_area_size_.Width = client_window_size.Width - drawing_area_offset_.x * 2;
@@ -147,9 +147,7 @@ void DefragGui::clear_screen(std::wstring &&text) {
     }
 
     // If there is no logfile then return. */
-    if (log_ != nullptr) {
-        log_->log(messages_[0].c_str());
-    }
+    Log::log(DebugLevel::DetailedProgress, messages_[0].c_str());
 
     repaint_window(dc_);
 }
@@ -172,21 +170,25 @@ void DefragGui::show_move(const ItemStruct *item, const uint64_t clusters, const
     }
 
     // If debug mode then write a message to the logfile.
-    if (debug_level_ < DebugLevel::DetailedProgress) return;
+    if (DefragLog::debug_level_ < DebugLevel::DetailedProgress) return;
 
     if (from_vcn > 0) {
         if (clusters % 10 == 1) {
-            log_->log(std::format(L"{}\n  Moving 1 cluster from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
-                                  item->get_long_path(), from_lcn, to_lcn, from_vcn));
+            Log::log(DebugLevel::DetailedProgress,
+                     std::format(L"{}\n  Moving 1 cluster from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
+                                 item->get_long_path(), from_lcn, to_lcn, from_vcn));
         } else {
-            log_->log(std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
-                                  item->get_long_path(), clusters, from_lcn, to_lcn, from_vcn));
+            Log::log(DebugLevel::DetailedProgress,
+                     std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
+                                 item->get_long_path(), clusters, from_lcn, to_lcn, from_vcn));
         }
     } else {
         if (clusters % 10 == 1) {
-            log_->log(std::format(L"{}\n  " MOVING_1_CLUSTER_FMT, item->get_long_path(), from_lcn, to_lcn));
+            Log::log(DebugLevel::DetailedProgress,
+                     std::format(L"{}\n  " MOVING_1_CLUSTER_FMT, item->get_long_path(), from_lcn, to_lcn));
         } else {
-            log_->log(std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
+            Log::log(DebugLevel::DetailedProgress,
+                     std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
         }
     }
     repaint_window(dc_);
@@ -243,18 +245,18 @@ void DefragGui::show_analyze(const DefragState &data, const ItemStruct *item) {
 //    repaint_window(dc_);
 }
 
-// Callback: show a debug message
+// Callback: show filename in the slot 4, show the message in the debug slot 5 + log the message
 void DefragGui::show_debug(const DebugLevel level, const ItemStruct *item, std::wstring &&text) {
-    if (debug_level_ < level) return;
-
     // Save the name of the file in messages[4]
     if (item != nullptr && item->have_long_path()) {
         messages_[4] = item->get_long_path();
     }
 
-    // Save the debug message in Messages 5.
+    // Save the debug message in Messages 5
     messages_[5] = std::move(text);
-    log_->log(messages_[5].c_str());
+
+    // Log the message
+    Log::log(DebugLevel::Debug, messages_[5].c_str());
 
     // repaint_window(dc_);
     repaint_top_area();
@@ -349,15 +351,14 @@ void DefragGui::show_status(const DefragState &data) {
             break;
         case DefragPhase::Done:
             messages_[1] = L"Finished.";
-            messages_[4] = std::format(L"Logfile: {}", log_->get_log_filename());
+            messages_[4] = std::format(L"Logfile: {}", DefragLog::get_instance()->get_log_filename());
             break;
         case DefragPhase::Fixup:
             messages_[1] = L"Phase 3: Fixup";
             break;
     }
 
-    log_->log(messages_[1]);
-
+    Log::log(DebugLevel::DetailedProgress, messages_[1].c_str());
 
     // Write some statistics to the logfile
     if (data.phase_ == DefragPhase::Done) {

@@ -21,7 +21,7 @@ public:
     void show_debug(DebugLevel level, const ItemStruct *item, std::wstring &&text);
 
     void log_fatal(std::wstring &&text) {
-        show_debug(DebugLevel::Fatal, nullptr, std::move(text));
+        show_debug(DebugLevel::AlwaysLog, nullptr, std::move(text));
     }
 
     void log_detailed_progress(std::wstring &&text) {
@@ -40,7 +40,7 @@ public:
 
     void show_diskmap(DefragState &data);
 
-    int initialize(HINSTANCE instance, int cmd_show, DefragLog *log, DebugLevel debug_level);
+    int initialize(HINSTANCE instance, const int cmd_show, const DebugLevel debug_level);
 
     void set_display_data(HDC dc);
 
@@ -84,9 +84,8 @@ private:
     MSG message_{};
 
     // The texts displayed on the screen
+    // Messages[5] is the debug row, only displayed if LogLevel is > Warning
     std::wstring messages_[6] = {};
-
-    DebugLevel debug_level_;
 
     // The time at percentage zero
     Clock::time_point progress_start_time_{};
@@ -142,9 +141,6 @@ private:
 
     // Bitmap used for double buffering
     std::unique_ptr<Bitmap> bmp_;
-
-    // Non-owning pointer to logger
-    DefragLog *log_{};
 
     // Non-owning pointer to library
     DefragLib *defrag_lib_;

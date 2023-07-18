@@ -74,9 +74,9 @@ void DefragGui::paint_strings(Graphics *graphics) const {
     Font font(&font_family, 12, FontStyleRegular, UnitPixel);
     PointF point_f(2.0f, 0.0f);
 
-    // [Messages[0]] [Messages[1]]              [Messages[2]]   [Messages[3]]
-    // [Messages[4]]
-    // [Messages[5] debug only]
+    // [Messages[0]] [Messages[1].............] [Messages[2]...] [Messages[3]]
+    // [Messages[4]..........................................................]
+    // [Messages[5] debug only...............................................]
     graphics->DrawString(messages_[0].c_str(), -1, &font, point_f, &brush);
 
     point_f = PointF(40.0f, 0.0f);
@@ -91,7 +91,7 @@ void DefragGui::paint_strings(Graphics *graphics) const {
     point_f = PointF(2.0f, 17.0f);
     graphics->DrawString(messages_[4].c_str(), -1, &font, point_f, &brush);
 
-    if (debug_level_ > DebugLevel::Warning) {
+    if (DefragLog::debug_level_ >= DebugLevel::Debug) {
         point_f = PointF(2.0f, 33.0f);
         graphics->DrawString(messages_[5].c_str(), -1, &font, point_f, &brush);
     }

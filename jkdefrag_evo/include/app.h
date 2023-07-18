@@ -38,9 +38,9 @@ private:
     // Non-owning
     DefragGui *gui_;
     DefragLib *defrag_lib_;
+    DefragLog *defrag_log_;
 
     // Owning
-    std::unique_ptr<DefragLog> log_;
     std::unique_ptr<DefragStruct> defrag_struct_;
 
     // Owning; singleton instance

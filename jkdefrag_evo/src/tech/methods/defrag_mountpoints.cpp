@@ -68,11 +68,11 @@ void DefragLib::defrag_mountpoints(DefragState &data, const wchar_t *mount_point
 
         if (error_code == 3) {
             // "Ignoring volume '%s' because it is not a harddisk."
-            gui->show_debug(DebugLevel::Fatal, nullptr,
+            gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                             std::format(L"Ignoring volume '{}' because it is not a harddisk.", mount_point));
         } else {
             // "Cannot find volume name for mountpoint: %s"
-            gui->show_debug(DebugLevel::Fatal, nullptr,
+            gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}", mount_point,
                                         system_error_str(error_code)));
         }
@@ -120,7 +120,7 @@ void DefragLib::defrag_mountpoints(DefragState &data, const wchar_t *mount_point
     if (DeviceIoControl(volume_handle, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0,
                         nullptr, 0, &w, nullptr) == 0) {
         // Show debug message: "Volume '%s' at mountpoint '%s' is not mounted."
-        gui->show_debug(DebugLevel::Fatal, nullptr,
+        gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                         std::format(L"Volume '{}' at mountpoint '{}' is not mounted.", volume_name, mount_point));
         CloseHandle(volume_handle);
         return;
