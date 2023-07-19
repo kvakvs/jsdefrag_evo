@@ -20,12 +20,6 @@
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
 void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path, OptimizeMode opt_mode) {
-    struct {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
-        BYTE buffer_[8];
-    } bitmap_data{};
-
     DefragGui *gui = DefragGui::get_instance();
 
     // Compare the item with the Exclude masks. If a mask matches then return, ignoring the item.
@@ -51,132 +45,9 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path
 
     try_request_privileges();
 
-    // Try finding the MountPoint by treating the input path as a path to something on the disk.
-    // If this does not succeed, then use the Path as a literal MountPoint name.
-    data.disk_.mount_point_ = target_path;
+    if (!defrag_one_path_mountpoint_setup(data, target_path)) return;
 
-    // Will write into mount_point_
-    auto result = GetVolumePathNameW(target_path, data.disk_.mount_point_.data(),
-                                     (uint32_t) data.disk_.mount_point_.length() + 1);
-
-    if (result == FALSE) {
-        data.disk_.mount_point_ = target_path;
-    }
-
-    // Make two versions of the MountPoint, one with a trailing backslash and one without
-    // Kill the trailing backslash
-    if (!data.disk_.mount_point_.empty() && data.disk_.mount_point_.back() == L'\\') {
-        data.disk_.mount_point_.pop_back();
-    }
-
-    data.disk_.mount_point_slash_ = std::format(L"{}\\", data.disk_.mount_point_);
-
-    // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
-    wchar_t vname[MAX_PATH];
-    result = GetVolumeNameForVolumeMountPointW(data.disk_.mount_point_slash_.c_str(), vname, MAX_PATH);
-    data.disk_.volume_name_slash_ = vname;
-
-    if (result == FALSE) {
-        // API puts a limit of 52 on length, but wstring has no length limit
-        if (data.disk_.mount_point_slash_.length() > 52 - 1 - 4) {
-            // "Cannot find volume name for mountpoint '%s': %s"
-            gui->show_debug(DebugLevel::AlwaysLog, nullptr,
-                            std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
-                                        data.disk_.mount_point_slash_, Str::system_error(GetLastError())));
-
-            data.disk_.mount_point_.clear();
-            data.disk_.mount_point_slash_.clear();
-
-            return;
-        }
-
-        data.disk_.volume_name_slash_ = std::format(L"\\\\.\\{}", data.disk_.mount_point_slash_);
-    }
-
-    // Make a copy of the VolumeName without the trailing backslash
-    data.disk_.volume_name_ = data.disk_.volume_name_slash_;
-
-    // Kill the trailing backslash
-    if (!data.disk_.volume_name_.empty() && data.disk_.volume_name_.back() == L'\\') {
-        data.disk_.volume_name_.pop_back();
-    }
-
-    // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
-    // length = wcslen(data.disk_.mount_point_slash_.get()) + 14;
-    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data.disk_.mount_point_slash_);
-
-    FILE *fin;
-    result = _wfopen_s(&fin, hibernation_path.c_str(), L"rb");
-
-    if (result == 0 && fin != nullptr) {
-        DWORD w = 0;
-
-        if (fread(&w, 4, 1, fin) == 1 && w != 0) {
-            gui->show_always(L"Will not process this disk, it contains hybernated data.");
-
-            data.disk_.mount_point_.clear();
-            data.disk_.mount_point_slash_.clear();
-
-            return;
-        }
-    }
-
-    // Show a debug message: "Opening volume '%s' at mountpoint '%s'"
-    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
-                    std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
-                                data.disk_.mount_point_));
-
-    // Open the VolumeHandle. If error then leave.
-    data.disk_.volume_handle_ = CreateFileW(data.disk_.volume_name_.c_str(), GENERIC_READ,
-                                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                                            OPEN_EXISTING, 0, nullptr);
-
-    if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
-        gui->show_debug(DebugLevel::Warning, nullptr,
-                        std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    data.disk_.volume_name_, data.disk_.mount_point_,
-                                    Str::system_error(GetLastError())));
-
-        data.disk_.mount_point_.clear();
-        data.disk_.mount_point_slash_.clear();
-        return;
-    }
-
-    // Determine the maximum LCN (maximum cluster number). A single call to FSCTL_GET_VOLUME_BITMAP is enough, we don't
-    // have to walk through the entire bitmap. It's a pity we have to do it in this roundabout manner, because
-    // there is no system call that reports the total number of clusters in a volume. GetDiskFreeSpace() does,
-    // but is limited to 2Gb volumes, GetDiskFreeSpaceEx() reports in bytes, not clusters, _getdiskfree()
-    // requires a drive letter so cannot be used on unmounted volumes or volumes that are mounted on a directory,
-    // and FSCTL_GET_NTFS_VOLUME_DATA only works for NTFS volumes.
-    STARTING_LCN_INPUT_BUFFER bitmap_param;
-    bitmap_param.StartingLcn.QuadPart = 0;
-
-    DWORD w;
-    DWORD error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                       &bitmap_param, sizeof bitmap_param, &bitmap_data,
-                                       sizeof bitmap_data, &w, nullptr);
-
-    if (error_code != 0) {
-        error_code = NO_ERROR;
-    } else {
-        error_code = GetLastError();
-    }
-
-    if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
-        // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
-        gui->show_debug(DebugLevel::AlwaysLog, nullptr,
-                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
-                                    data.disk_.mount_point_));
-
-        CloseHandle(data.disk_.volume_handle_);
-
-        data.disk_.mount_point_.clear();
-        data.disk_.mount_point_slash_.clear();
-
-        return;
-    }
-
-    data.total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
+    defrag_one_path_count_clusters(data);
 
     // Determine the number of bytes per cluster.
     // Again I have to do this in a roundabout manner. As far as I know, there is no system call that returns the number
@@ -185,32 +56,21 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path
     uint64_t free_bytes_to_caller;
     uint64_t total_bytes;
     uint64_t free_bytes;
-    error_code = GetDiskFreeSpaceExW(target_path, (PULARGE_INTEGER) &free_bytes_to_caller,
-                                     (PULARGE_INTEGER) &total_bytes,
-                                     (PULARGE_INTEGER) &free_bytes);
+    auto error_code = GetDiskFreeSpaceExW(target_path, (PULARGE_INTEGER) &free_bytes_to_caller,
+                                          (PULARGE_INTEGER) &total_bytes,
+                                          (PULARGE_INTEGER) &free_bytes);
 
     if (error_code != 0) data.bytes_per_cluster_ = total_bytes / data.total_clusters_;
 
     set_up_unusable_cluster_list(data);
 
-    // Fixup the input mask.
-    // - If the length is 2 or 3 characters then rewrite into "<DRIVE>:\*".
-    // - If it does not contain a wildcard then append '*'.
-    data.include_mask_ = target_path;
-
-    const size_t path_len = wcslen(target_path);
-
-    if (path_len == 2 || path_len == 3) {
-        data.include_mask_ = std::format(L"{:c}:\\*", std::towlower(target_path[0]));
-    } else if (wcschr(target_path, L'*') == nullptr) {
-        data.include_mask_ = std::format(L"{}*", target_path);
-    }
-
-    gui->show_always(std::format(L"Input mask: {}", data.include_mask_));
+    defrag_one_path_fixup_input_mask(data, target_path);
 
     // Defragment and optimize; Potentially long running, on large volumes
+    StopWatch clock_clustermap(L"defrag_one_path: clustermap");
     gui->get_color_map().set_cluster_count(data.total_clusters_);
     gui->show_diskmap(data);
+    clock_clustermap.stop_and_log();
 
     if (*data.running_ == RunningState::RUNNING) {
         StopWatch clock1(L"defrag_one_path: analyze");
@@ -318,4 +178,164 @@ void DefragRunner::try_request_privileges() {
     } else {
         gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
     }
+}
+
+// Try finding the MountPoint by treating the input path as a path to something on the disk.
+// If this does not succeed, then use the Path as a literal MountPoint name.
+bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &data, const wchar_t *target_path) {
+    DefragGui *gui = DefragGui::get_instance();
+
+    data.disk_.mount_point_ = target_path;
+
+    // Will write into mount_point_
+    auto result = GetVolumePathNameW(target_path, data.disk_.mount_point_.data(),
+                                     (uint32_t) data.disk_.mount_point_.length() + 1);
+
+    if (result == FALSE) {
+        data.disk_.mount_point_ = target_path;
+    }
+
+    // Make two versions of the MountPoint, one with a trailing backslash and one without
+    // Kill the trailing backslash
+    if (!data.disk_.mount_point_.empty() && data.disk_.mount_point_.back() == L'\\') {
+        data.disk_.mount_point_.pop_back();
+    }
+
+    data.disk_.mount_point_slash_ = std::format(L"{}\\", data.disk_.mount_point_);
+
+    // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
+    wchar_t vname[MAX_PATH];
+    result = GetVolumeNameForVolumeMountPointW(data.disk_.mount_point_slash_.c_str(), vname, MAX_PATH);
+    data.disk_.volume_name_slash_ = vname;
+
+    if (result == FALSE) {
+        // API puts a limit of 52 on length, but wstring has no length limit
+        if (data.disk_.mount_point_slash_.length() > 52 - 1 - 4) {
+            // "Cannot find volume name for mountpoint '%s': %s"
+            gui->show_debug(DebugLevel::AlwaysLog, nullptr,
+                            std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
+                                        data.disk_.mount_point_slash_, Str::system_error(GetLastError())));
+
+            data.disk_.mount_point_.clear();
+            data.disk_.mount_point_slash_.clear();
+
+            return false;
+        }
+
+        data.disk_.volume_name_slash_ = std::format(L"\\\\.\\{}", data.disk_.mount_point_slash_);
+    }
+
+    // Make a copy of the VolumeName without the trailing backslash
+    data.disk_.volume_name_ = data.disk_.volume_name_slash_;
+
+    // Kill the trailing backslash
+    if (!data.disk_.volume_name_.empty() && data.disk_.volume_name_.back() == L'\\') {
+        data.disk_.volume_name_.pop_back();
+    }
+
+    // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
+    // length = wcslen(data.disk_.mount_point_slash_.get()) + 14;
+    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data.disk_.mount_point_slash_);
+
+    FILE *fin;
+    result = _wfopen_s(&fin, hibernation_path.c_str(), L"rb");
+
+    if (result == 0 && fin != nullptr) {
+        DWORD w = 0;
+
+        if (fread(&w, 4, 1, fin) == 1 && w != 0) {
+            gui->show_always(L"Will not process this disk, it contains hybernated data.");
+
+            data.disk_.mount_point_.clear();
+            data.disk_.mount_point_slash_.clear();
+
+            return false;
+        }
+    }
+
+    // Show a debug message: "Opening volume '%s' at mountpoint '%s'"
+    gui->show_debug(DebugLevel::AlwaysLog, nullptr,
+                    std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
+                                data.disk_.mount_point_));
+
+    // Open the VolumeHandle. If error then leave.
+    data.disk_.volume_handle_ = CreateFileW(data.disk_.volume_name_.c_str(), GENERIC_READ,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                            OPEN_EXISTING, 0, nullptr);
+
+    if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
+        gui->show_debug(DebugLevel::Warning, nullptr,
+                        std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
+                                    data.disk_.volume_name_, data.disk_.mount_point_,
+                                    Str::system_error(GetLastError())));
+
+        data.disk_.mount_point_.clear();
+        data.disk_.mount_point_slash_.clear();
+        return false;
+    }
+    return true;
+}
+
+// Determine the maximum LCN (maximum cluster number). A single call to FSCTL_GET_VOLUME_BITMAP is enough, we don't
+// have to walk through the entire bitmap. It's a pity we have to do it in this roundabout manner, because
+// there is no system call that reports the total number of clusters in a volume. GetDiskFreeSpace() does,
+// but is limited to 2Gb volumes, GetDiskFreeSpaceEx() reports in bytes, not clusters, _getdiskfree()
+// requires a drive letter so cannot be used on unmounted volumes or volumes that are mounted on a directory,
+// and FSCTL_GET_NTFS_VOLUME_DATA only works for NTFS volumes.
+bool DefragRunner::defrag_one_path_count_clusters(DefragState &data) {
+    DefragGui *gui = DefragGui::get_instance();
+
+    STARTING_LCN_INPUT_BUFFER bitmap_param;
+    bitmap_param.StartingLcn.QuadPart = 0;
+    DWORD w;
+    struct {
+        uint64_t starting_lcn_;
+        uint64_t bitmap_size_;
+        BYTE buffer_[8];
+    } bitmap_data{};
+    DWORD error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+                                       &bitmap_param, sizeof bitmap_param, &bitmap_data,
+                                       sizeof bitmap_data, &w, nullptr);
+
+    if (error_code != 0) {
+        error_code = NO_ERROR;
+    } else {
+        error_code = GetLastError();
+    }
+
+    if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
+        // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
+        gui->show_debug(DebugLevel::AlwaysLog, nullptr,
+                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
+                                    data.disk_.mount_point_));
+
+        CloseHandle(data.disk_.volume_handle_);
+
+        data.disk_.mount_point_.clear();
+        data.disk_.mount_point_slash_.clear();
+
+        return false;
+    }
+
+    data.total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
+    return true;
+}
+
+// Fixup the input mask.
+// - If the length is 2 or 3 characters then rewrite into "<DRIVE>:\*".
+// - If it does not contain a wildcard then append '*'.
+void DefragRunner::defrag_one_path_fixup_input_mask(DefragState &data, const wchar_t *target_path) {
+    DefragGui *gui = DefragGui::get_instance();
+    const size_t path_len = wcslen(target_path);
+
+    data.include_mask_ = target_path;
+
+
+    if (path_len == 2 || path_len == 3) {
+        data.include_mask_ = std::format(L"{:c}:\\*", std::towlower(target_path[0]));
+    } else if (wcschr(target_path, L'*') == nullptr) {
+        data.include_mask_ = std::format(L"{}*", target_path);
+    }
+
+    gui->show_always(std::format(L"Input mask: {}", data.include_mask_));
 }

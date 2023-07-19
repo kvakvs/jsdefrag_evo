@@ -136,6 +136,12 @@ public:
 private:
     static void try_request_privileges();
 
+    bool defrag_one_path_mountpoint_setup(DefragState &data, const wchar_t *target_path);
+
+    bool defrag_one_path_count_clusters(DefragState &data);
+
+    void defrag_one_path_fixup_input_mask(DefragState &data, const wchar_t *target_path);
+
     void defrag_all_drives_sync(DefragState &data, OptimizeMode mode);
 
     void append_to_short_path(const FileNode *item, std::wstring &path);
