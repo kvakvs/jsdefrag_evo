@@ -15,6 +15,8 @@
  http://www.kessels.com/
  */
 
+#include <runner.h>
+
 #include "precompiled_header.h"
 
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then

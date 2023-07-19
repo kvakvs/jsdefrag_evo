@@ -421,6 +421,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             instance_->set_display_data(instance_->dc_);
             EndPaint(wnd, &ps);
 
+            // Full update of all squares (can be long) TODO: Can be a separate worker thread
             instance_->color_map_.update_square_colors_from_diskmap(0, instance_->color_map_.get_total_count());
             instance_->request_delayed_redraw();
 
@@ -434,10 +435,8 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
     return DefWindowProc(wnd, message, w_param, l_param);
 }
 
-// Show a map on the screen of all the clusters on disk. The map shows which clusters are free and which are in use.
+// Show a map on the screen of all the clusters on the disk. The map shows which clusters are free and which are in use.
 void DefragGui::show_diskmap(DefragState &data) {
-    Log::log_always(L"Diskmap repainting started…");
-
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
@@ -458,8 +457,7 @@ void DefragGui::show_diskmap(DefragState &data) {
     int prev_in_use = 1;
 
     DWORD error_code;
-
-    Log::log_always(L"Diskmap repainting: Checkpoint 1");
+    StopWatch clock1(L"show_diskmap: load and repaint");
 
     uint64_t count = 0;
     do {
@@ -544,7 +542,8 @@ void DefragGui::show_diskmap(DefragState &data) {
             lcn = lcn + 1;
         }
     } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
-    Log::log_always(std::format(L"Diskmap repainting: Checkpoint 2 count={}", count));
+
+    clock1.stop_and_log();
 
     if (lcn > 0) {
         if (prev_in_use == 0) {
@@ -557,14 +556,20 @@ void DefragGui::show_diskmap(DefragState &data) {
     }
 
     // Show the MFT zones
+    StopWatch clock2(L"show_diskmap: show MFT zones");
+
     for (auto &mft_exclude: data.mft_excludes_) {
         if (mft_exclude.start_ <= 0) continue;
 
         draw_cluster(data, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
     }
 
+    clock2.stop_and_log();
+
     // Colorize all the files on the screen
     // Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to ignore it
+    StopWatch clock3(L"show_diskmap: colorize files");
+
     for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (*data.running_ != RunningState::RUNNING) break;
         //		if (*data.RedrawScreen != 2) break;
@@ -575,6 +580,7 @@ void DefragGui::show_diskmap(DefragState &data) {
 
         defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
     }
-    Log::log_always(L"Diskmap painting ended");
+
+    clock3.stop_and_log();
 }
 

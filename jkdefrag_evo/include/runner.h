@@ -56,9 +56,9 @@ enum class DiskType {
 struct DiskStruct {
     HANDLE volume_handle_;
 
-    // Example: "c:"; TODO: use std::wstring
+    // Example: "c:"
     std::wstring mount_point_;
-    // Example: "c:\"; TODO: use std::wstring
+    // Example: "c:\"
     std::wstring mount_point_slash_;
     std::wstring volume_name_; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}"
     std::wstring volume_name_slash_; // Example: "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\"
@@ -103,7 +103,7 @@ public:
     ///     directory) matches one of the strings in this array then it will be marked as a space hog and moved to the
     ///     end of the disk. A build-in list of spacehogs will be added to this list, except if one of the strings in
     ///     the array is "DisableDefaults".
-    /// \param run_state It is used by the stop_defrag() subroutine to stop the defragger. If the pointer is nullptr
+    /// \param run_state It is used by the stop_defrag() subroutine to stop_and_log the defragger. If the pointer is nullptr
     ///     then this feature is disabled.
     void start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
                            const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state);
@@ -134,6 +134,8 @@ public:
     static void call_show_status(DefragState &data, DefragPhase phase, Zone zone);
 
 private:
+    static void try_request_privileges();
+
     void defrag_all_drives_sync(DefragState &data, OptimizeMode mode);
 
     void append_to_short_path(const FileNode *item, std::wstring &path);
@@ -208,7 +210,7 @@ private:
 
     void optimize_up(DefragState &data);
 
-    void defrag_one_path(DefragState &data, const wchar_t *path, OptimizeMode opt_mode);
+    void defrag_one_path(DefragState &data, const wchar_t *target_path, OptimizeMode opt_mode);
 
     void defrag_mountpoints(DefragState &data, const wchar_t *mount_point, OptimizeMode opt_mode);
 

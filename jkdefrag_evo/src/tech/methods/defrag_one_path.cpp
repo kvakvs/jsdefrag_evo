@@ -19,7 +19,7 @@
 
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
-void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, OptimizeMode opt_mode) {
+void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path, OptimizeMode opt_mode) {
     struct {
         uint64_t starting_lcn_;
         uint64_t bitmap_size_;
@@ -29,11 +29,11 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     DefragGui *gui = DefragGui::get_instance();
 
     // Compare the item with the Exclude masks. If a mask matches then return, ignoring the item.
-    for (const auto &s: data.excludes_) {
-        if (Str::match_mask(path, s.c_str())) break;
-        if (wcschr(s.c_str(), L'*') == nullptr
-            && s.length() <= 3
-            && std::towlower(path[0]) == std::towlower(s[0])) {
+    for (const auto &each_exclude: data.excludes_) {
+        if (Str::match_mask(target_path, each_exclude.c_str())) break;
+        if (wcschr(each_exclude.c_str(), L'*') == nullptr
+            && each_exclude.length() <= 3
+            && std::towlower(target_path[0]) == std::towlower(each_exclude[0])) {
             break;
         }
     }
@@ -47,42 +47,20 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
 //    }
 
     // Clear the screen and show "Processing '%s'" message
-    gui->clear_screen(std::format(L"Processing {}", path));
+    gui->clear_screen(std::format(L"Processing {}", target_path));
 
-    // Try to change our permissions, so we can access special files and directories
-    // such as "C:\System Volume Information". If this does not succeed then quietly
-    // continue, we'll just have to do with whatever permissions we have.
-    // SE_BACKUP_NAME = Backup and Restore Privileges.
-
-    HANDLE process_token_handle;
-    LUID take_ownership_value;
-    TOKEN_PRIVILEGES token_privileges;
-
-    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
-                         &process_token_handle) != 0 &&
-        LookupPrivilegeValue(nullptr, SE_BACKUP_NAME, &take_ownership_value) != 0) {
-        token_privileges.PrivilegeCount = 1;
-        token_privileges.Privileges[0].Luid = take_ownership_value;
-        token_privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-        if (AdjustTokenPrivileges(process_token_handle, FALSE, &token_privileges,
-                                  sizeof(TOKEN_PRIVILEGES), nullptr, nullptr) == FALSE) {
-            gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
-        }
-    } else {
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
-    }
+    try_request_privileges();
 
     // Try finding the MountPoint by treating the input path as a path to something on the disk.
     // If this does not succeed, then use the Path as a literal MountPoint name.
-    data.disk_.mount_point_ = path;
+    data.disk_.mount_point_ = target_path;
 
     // Will write into mount_point_
-    auto result = GetVolumePathNameW(path, data.disk_.mount_point_.data(),
+    auto result = GetVolumePathNameW(target_path, data.disk_.mount_point_.data(),
                                      (uint32_t) data.disk_.mount_point_.length() + 1);
 
     if (result == FALSE) {
-        data.disk_.mount_point_ = path;
+        data.disk_.mount_point_ = target_path;
     }
 
     // Make two versions of the MountPoint, one with a trailing backslash and one without
@@ -207,7 +185,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     uint64_t free_bytes_to_caller;
     uint64_t total_bytes;
     uint64_t free_bytes;
-    error_code = GetDiskFreeSpaceExW(path, (PULARGE_INTEGER) &free_bytes_to_caller,
+    error_code = GetDiskFreeSpaceExW(target_path, (PULARGE_INTEGER) &free_bytes_to_caller,
                                      (PULARGE_INTEGER) &total_bytes,
                                      (PULARGE_INTEGER) &free_bytes);
 
@@ -218,14 +196,14 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     // Fixup the input mask.
     // - If the length is 2 or 3 characters then rewrite into "<DRIVE>:\*".
     // - If it does not contain a wildcard then append '*'.
-    data.include_mask_ = path;
+    data.include_mask_ = target_path;
 
-    const size_t path_len = wcslen(path);
+    const size_t path_len = wcslen(target_path);
 
     if (path_len == 2 || path_len == 3) {
-        data.include_mask_ = std::format(L"{:c}:\\*", std::towlower(path[0]));
-    } else if (wcschr(path, L'*') == nullptr) {
-        data.include_mask_ = std::format(L"{}*", path);
+        data.include_mask_ = std::format(L"{:c}:\\*", std::towlower(target_path[0]));
+    } else if (wcschr(target_path, L'*') == nullptr) {
+        data.include_mask_ = std::format(L"{}*", target_path);
     }
 
     gui->show_always(std::format(L"Input mask: {}", data.include_mask_));
@@ -235,48 +213,68 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     gui->show_diskmap(data);
 
     if (*data.running_ == RunningState::RUNNING) {
+        StopWatch clock1(L"defrag_one_path: analyze");
         analyze_volume(data);
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeFixup) {
+        StopWatch clock1(L"defrag_one_path: defragment");
         defragment(data);
     }
 
     if (*data.running_ == RunningState::RUNNING
         && (opt_mode == OptimizeMode::AnalyzeFixupFastopt
             || opt_mode == OptimizeMode::DeprecatedAnalyzeFixupFull)) {
+        StopWatch clock1(L"defrag_one_path: Defr+F+Opt+F (defragment)");
         defragment(data);
+        clock1.stop_and_log();
 
-        if (*data.running_ == RunningState::RUNNING) fixup(data);
-        if (*data.running_ == RunningState::RUNNING) optimize_volume(data);
-        if (*data.running_ == RunningState::RUNNING) fixup(data); // Again, in case of new zone startpoint
+        if (*data.running_ == RunningState::RUNNING) {
+            StopWatch clock2(L"defrag_one_path: Defr+F+Opt+F (fixup 1)");
+            fixup(data);
+        }
+        if (*data.running_ == RunningState::RUNNING) {
+            StopWatch clock3(L"defrag_one_path: Defr+F+Opt+F (optimize)");
+            optimize_volume(data);
+        }
+        if (*data.running_ == RunningState::RUNNING) {
+            StopWatch clock4(L"defrag_one_path: Defr+F+Opt+F (fixup 2)");
+            fixup(data);
+        } // Again, in case of new zone startpoint
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeGroup) {
+        StopWatch clock1(L"defrag_one_path: forced_fill");
         forced_fill(data);
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeMoveToEnd) {
+        StopWatch clock1(L"defrag_one_path: opt_up");
         optimize_up(data);
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByName) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(filename)");
         optimize_sort(data, 0); // Filename
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortBySize) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(size)");
         optimize_sort(data, 1); // Filesize
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(access)");
         optimize_sort(data, 2); // Last access
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(last_change)");
         optimize_sort(data, 3); // Last change
     }
 
     if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(creation)");
         optimize_sort(data, 4); // Creation
     }
     // if ((*Data->Running == RUNNING) && (Mode == 11)) { MoveMftToBeginOfDisk(Data); }
@@ -294,4 +292,30 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
 
     data.disk_.mount_point_.clear();
     data.disk_.mount_point_slash_.clear();
+}
+
+// Try to change our permissions, so we can access special files and directories
+// such as "C:\System Volume Information". If this does not succeed then quietly
+// continue, we'll just have to do with whatever permissions we have.
+// SE_BACKUP_NAME = Backup and Restore Privileges.
+void DefragRunner::try_request_privileges() {
+    HANDLE process_token_handle;
+    LUID take_ownership_value;
+    TOKEN_PRIVILEGES token_privileges;
+    DefragGui *gui = DefragGui::get_instance();
+
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+                         &process_token_handle) != 0 &&
+        LookupPrivilegeValue(nullptr, SE_BACKUP_NAME, &take_ownership_value) != 0) {
+        token_privileges.PrivilegeCount = 1;
+        token_privileges.Privileges[0].Luid = take_ownership_value;
+        token_privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+        if (AdjustTokenPrivileges(process_token_handle, FALSE, &token_privileges,
+                                  sizeof(TOKEN_PRIVILEGES), nullptr, nullptr) == FALSE) {
+            gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
+        }
+    } else {
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
+    }
 }

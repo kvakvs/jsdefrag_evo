@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <optional>
-#include <cwctype>
 
 DefragRunner::DefragRunner() = default;
 
@@ -33,76 +32,6 @@ DefragRunner *DefragRunner::get_instance() {
 
     return instance_.get();
 }
-
-///
-//
-//All the text strings used by the defragger library.
-//Note: The RunJkDefrag() function call has a parameter where you can specify
-//a different array. Do not change this default array, simply create a new
-//array in your program and specify it as a parameter.
-//
-///
-//const wchar_t *DEPRECATED_default_debug_msg[] =
-//        {
-//                /*  0 */ L"",
-//                /*  1 */ L"",
-//                /*  2 */ L"",
-//                /*  3 */ L"",
-//                /*  4 */ L"",
-//                /*  5 */ L"",
-//                /*  6 */ L"",
-//                /*  7 */ L"",
-//                /*  8 */ L"",
-//                /*  9 */ L"",
-////                /* 10 */ L"Getting cluster bitmap: %s",
-////                /* 11 */ L"Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u",
-//                /* 12 */ L"ERROR: could not get volume bitmap: %s",
-////                /* 13 */ L"Gap found: LCN=%I64d, Size=%I64d",
-//                /* 14 */ L"Processing '%s'",
-////                /* 15 */ L"Could not open '%s': %s",
-////                /* 16 */ L"%I64d clusters at %I64d, %I64d bytes",
-////                /* 17 */ L"Special file attribute: Compressed",
-////                /* 18 */ L"Special file attribute: Encrypted",
-////                /* 19 */ L"Special file attribute: Offline",
-////                /* 20 */ L"Special file attribute: Read-only",
-////                /* 21 */ L"Special file attribute: Sparse-file",
-////                /* 22 */ L"Special file attribute: Temporary",
-////                /* 23 */ L"Analyzing: %s",
-//                /* 24 */ L"",
-////                /* 25 */ L"Cannot move file away because no gap is big enough: %I64d[%I64d]",
-//                /* 26 */ L"Don't know which file is at the end of the gap: %I64d[%I64d]",
-//                /* 27 */ L"Enlarging gap %I64d[%I64d] by moving %I64d[%I64d]",
-////                /* 28 */ L"Skipping gap, cannot fill: %I64d[%I64d]",
-////                /* 29 */ L"Opening volume '%s' at mountpoint '%s'",
-//                /* 30 */ L"",
-////                /* 31 */ L"Volume '%s' at mountpoint '%s' is not mounted.",
-////                /* 32 */ L"Cannot defragment volume '%s' at mountpoint '%s'",
-////                /* 33 */ L"MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d",
-////                /* 34 */ L"MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d",
-//                /* 35 */ L"",
-////                /* 36 */ L"Ignoring volume '%s' because it is read-only.",
-//                /* 37 */ L"Analyzing volume '%s'",
-////                /* 38 */ L"Finished.",
-////                /* 39 */ L"Could not get list of volumes: %s",
-////                /* 40 */ L"Cannot find volume name for mountpoint '%s': %s",
-//                /* 41 */ L"Cannot enlarge gap at %I64d[%I64d] because of unmovable data.",
-//                /* 42 */ L"Windows could not move the file, trying alternative method.",
-////                /* 43 */ L"Cannot process clustermap of '%s': %s",
-////                /* 44 */ L"Disk is full, cannot defragment.",
-//                /* 45 */ L"Alternative method failed, leaving file where it is.",
-////                /* 46 */ L"Extent (virtual): Vcn=%I64u, NextVcn=%I64u",
-////                /* 47 */ L"Ignoring volume '%s' because of exclude mask '%s'.",
-//                /* 48 */ L"Vacating %I64u clusters starting at LCN=%I64u",
-//                /* 49 */ L"Vacated %I64u clusters (until %I64u) from LCN=%I64u",
-//                /* 50 */ L"Finished vacating %I64u clusters, until LCN=%I64u",
-//                /* 51 */ L"",
-//                /* 52 */ L"",
-//                /* 53 */ L"I am fragmented.",
-////                /* 54 */ L"I am in MFT reserved space.",
-////                /* 55 */ L"I am a regular file in zone 1.",
-////                /* 56 */ L"I am a spacehog in zone 1 or 2.",
-////                /* 57 */ L"Ignoring volume '%s' because it is not a harddisk."
-//        };
 
 // Search case-insensitive for a substring
 const wchar_t *DefragRunner::stristr_w(const wchar_t *haystack, const wchar_t *needle) {
@@ -151,7 +80,7 @@ void DefragRunner::show_hex([[maybe_unused]] DefragState &data, const BYTE *buff
                 if (buffer[i + j] < 32) {
                     s1 += L".";
                 } else {
-                    s1 += L"{:c}", buffer[i + j];
+                    s1 += std::format(L"{:c}", buffer[i + j]);
                 }
             }
         }
