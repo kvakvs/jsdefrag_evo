@@ -6,11 +6,11 @@
 
 #include <optional>
 
-// List in memory of the fragments of a file
-struct FragmentListStruct {
+// File fragment descriptor, stored as a list of file fragments; TODO: std::forward_list
+struct FileFragment {
     uint64_t lcn_; // Logical cluster number, location on disk
     uint64_t next_vcn_; // Virtual cluster number of next fragment
-    FragmentListStruct *next_;
+    FileFragment *next_;
 };
 
 
@@ -35,7 +35,7 @@ public:
         // Sanity check
         if (this == nullptr) return 0;
 
-        const FragmentListStruct *fragment = fragments_;
+        const FileFragment *fragment = fragments_;
 
         while (fragment != nullptr && fragment->lcn_ == VIRTUALFRAGMENT) {
             fragment = fragment->next_;
@@ -64,7 +64,7 @@ public:
 
     // List of fragments
     // TODO: Owning pointer
-    FragmentListStruct *fragments_;
+    FileFragment *fragments_;
 
     // The Inode number of the parent directory
     uint64_t parent_inode_;

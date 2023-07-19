@@ -157,8 +157,8 @@ link. */
 
     BY_HANDLE_FILE_INFORMATION file_information;
     uint64_t vcn;
-    FragmentListStruct *fragment;
-    FragmentListStruct *last_fragment;
+    FileFragment *fragment;
+    FileFragment *last_fragment;
     uint32_t error_code;
     wchar_t error_string[BUFSIZ];
     int max_loop;

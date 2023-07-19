@@ -25,7 +25,7 @@ ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_inf
                                  BYTE *buffer, const uint64_t buf_length, const int depth) {
     std::unique_ptr<BYTE[]> buffer_2;
     ATTRIBUTE_LIST *attribute;
-    FragmentListStruct *fragment;
+    FileFragment *fragment;
     OVERLAPPED g_overlapped;
     DWORD bytes_read;
     DefragGui *gui = DefragGui::get_instance();

@@ -298,7 +298,7 @@ struct StreamStruct {
     StreamStruct *next_;
     std::wstring stream_name_;
     ATTRIBUTE_TYPE stream_type_;
-    FragmentListStruct *fragments_; // The fragments of the stream
+    FileFragment *fragments_; // The fragments of the stream
     uint64_t clusters_; // Total number of clusters
     uint64_t bytes_; // Total number of bytes
 };
@@ -320,11 +320,11 @@ struct InodeDataStruct {
     micro64_t last_access_time_;
 
     StreamStruct *streams_; // List of StreamStruct
-    FragmentListStruct *mft_data_fragments_; // The Fragments of the $MFT::$DATA stream
+    FileFragment *mft_data_fragments_; // The Fragments of the $MFT::$DATA stream
 
     uint64_t mft_data_bytes_; // Length of the $MFT::$DATA
 
-    FragmentListStruct *mft_bitmap_fragments_; // The Fragments of the $MFT::$BITMAP stream
+    FileFragment *mft_bitmap_fragments_; // The Fragments of the $MFT::$BITMAP stream
 
     uint64_t mft_bitmap_bytes_; // Length of the $MFT::$BITMAP
 };
@@ -357,6 +357,15 @@ public:
     bool analyze_ntfs_volume(DefragState &data);
 
 private:
+    bool analyze_ntfs_volume_read_bootblock(DefragState &data, MemReader<uint8_t> &buff);
+
+    bool analyze_ntfs_volume_read_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MemReader<uint8_t> &buff);
+
+    bool analyze_ntfs_volume_extract_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MemReader<uint8_t> &buff,
+                                         PARAM_OUT FileFragment *&mft_bitmap_fragments,
+                                         PARAM_OUT uint64_t &bitmap_bytes, PARAM_OUT uint64_t &mft_data_bytes,
+                                         PARAM_OUT FileFragment *&mft_data_fragments);
+
     static const wchar_t *stream_type_names(ATTRIBUTE_TYPE stream_type);
 
     bool fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
@@ -387,8 +396,8 @@ private:
 
     bool interpret_mft_record(
             DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array, uint64_t inode_number,
-            uint64_t max_inode, PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
-            PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
+            uint64_t max_inode, PARAM_OUT FileFragment *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
+            PARAM_OUT FileFragment *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
             BYTE *buffer, uint64_t buf_length
     );
 

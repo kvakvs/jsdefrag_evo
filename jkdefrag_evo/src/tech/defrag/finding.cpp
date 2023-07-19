@@ -371,7 +371,7 @@ uint64_t DefragRunner::find_fragment_begin(const FileNode *item, const uint64_t 
     /* Walk through all the fragments of the item. If a fragment is found
     that contains the LCN then return the begin of that fragment. */
     uint64_t vcn = 0;
-    for (const FragmentListStruct *fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+    for (const FileFragment *fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
         if (fragment->lcn_ != VIRTUALFRAGMENT) {
             if (lcn >= fragment->lcn_ &&
                 lcn < fragment->lcn_ + fragment->next_vcn_ - vcn) {

@@ -48,7 +48,7 @@ void DefragRunner::forced_fill(DefragState &data) {
             uint64_t vcn = 0;
             uint64_t real_vcn = 0;
 
-            FragmentListStruct *fragment;
+            FileFragment *fragment;
             for (fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
                 if (fragment->lcn_ != VIRTUALFRAGMENT) {
                     if (fragment->lcn_ > highest_lcn && fragment->lcn_ < max_lcn) {

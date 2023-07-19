@@ -25,7 +25,7 @@ void DefragRunner::defragment(DefragState &data) {
     uint64_t gap_end;
     uint64_t clusters_done;
     uint64_t clusters;
-    FragmentListStruct *fragment;
+    FileFragment *fragment;
     uint64_t vcn;
     uint64_t real_vcn;
     HANDLE file_handle;

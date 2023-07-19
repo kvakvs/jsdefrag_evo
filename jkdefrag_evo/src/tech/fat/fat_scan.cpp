@@ -68,8 +68,8 @@ filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const U
 // the next cluster of the file.
 void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info,
                                  FileNode *item, uint64_t cluster) {
-    FragmentListStruct *new_fragment;
-    FragmentListStruct *last_fragment;
+    FileFragment *new_fragment;
+    FileFragment *last_fragment;
 
     int max_iterate;
 
@@ -102,7 +102,7 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
         /* If this is a new fragment then create a record for the previous fragment. If not then
             add the cluster to the counters and continue. */
         if (cluster != last_cluster + 1 && last_cluster != 0) {
-            new_fragment = new FragmentListStruct();
+            new_fragment = new FileFragment();
 
             new_fragment->lcn_ = first_cluster - 2;
             vcn = vcn + last_cluster - first_cluster + 1;
@@ -151,7 +151,7 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
 
     // Create the last fragment
     if (last_cluster != 0) {
-        new_fragment = new FragmentListStruct();
+        new_fragment = new FileFragment();
 
         new_fragment->lcn_ = first_cluster - 2;
         vcn = vcn + last_cluster - first_cluster + 1;

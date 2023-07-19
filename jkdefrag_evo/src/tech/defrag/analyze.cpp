@@ -26,20 +26,18 @@ void DefragRunner::analyze_volume_read_fs(DefragState &data) {
     bool result = scan_ntfs->analyze_ntfs_volume(data);
     if (result) {
         gui->log_detailed_progress(L"Analyzing volume: Done analyzing NTFS volume");
-        return;
     }
 
     // Scan FAT disks
-    if (data.is_still_running()) {
+    if (!result && data.is_still_running()) {
         ScanFAT *scan_fat = ScanFAT::get_instance();
 
         result = scan_fat->analyze_fat_volume(data);
         gui->log_detailed_progress(L"Analyzing volume: Done analyzing FAT volume");
-        return;
     }
 
     // Scan all other filesystems
-    if (data.is_still_running()) {
+    if (!result && data.is_still_running()) {
         gui->log_detailed_progress(L"This is not a FAT or NTFS disk, using the slow scanner.");
 
         // Set up the width of the progress bar

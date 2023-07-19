@@ -107,7 +107,7 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
                                     const uint64_t new_lcn, const uint64_t offset,
                                     const uint64_t size) const {
     MOVE_FILE_DATA move_params;
-    FragmentListStruct *fragment;
+    FileFragment *fragment;
     uint64_t lcn;
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();

@@ -39,7 +39,7 @@ void FileNode::set_names(const wchar_t *long_path, const wchar_t *long_filename,
 
 FileNode::~FileNode() {
     while (fragments_ != nullptr) {
-        FragmentListStruct *fragment = fragments_->next_;
+        FileFragment *fragment = fragments_->next_;
         delete fragments_;
         fragments_ = fragment;
     }

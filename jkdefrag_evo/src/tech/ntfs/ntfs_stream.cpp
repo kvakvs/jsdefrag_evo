@@ -138,10 +138,10 @@ void ScanNTFS::cleanup_streams(InodeDataStruct *inode_data, const bool cleanup_f
 
     while (stream != nullptr) {
         if (cleanup_fragments == TRUE) {
-            const FragmentListStruct *fragment = stream->fragments_;
+            const FileFragment *fragment = stream->fragments_;
 
             while (fragment != nullptr) {
-                const FragmentListStruct *temp_fragment = fragment;
+                const FileFragment *temp_fragment = fragment;
                 fragment = fragment->next_;
 
                 delete temp_fragment;

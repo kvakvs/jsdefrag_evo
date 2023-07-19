@@ -20,8 +20,8 @@
 bool ScanNTFS::interpret_mft_record(
         DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array,
         const uint64_t inode_number, const uint64_t max_inode,
-        PARAM_OUT FragmentListStruct *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
-        PARAM_OUT FragmentListStruct *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
+        PARAM_OUT FileFragment *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
+        PARAM_OUT FileFragment *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
         BYTE *buffer, const uint64_t buf_length
 ) {
     InodeDataStruct inode_data{};

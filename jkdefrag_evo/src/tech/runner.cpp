@@ -222,7 +222,7 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
     } extent_data{};
 
     BY_HANDLE_FILE_INFORMATION file_information;
-    FragmentListStruct *last_fragment;
+    FileFragment *last_fragment;
     uint32_t error_code;
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
@@ -315,7 +315,7 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
 
             // Add the fragment to the Fragments
 
-            auto new_fragment = new FragmentListStruct();
+            auto new_fragment = new FileFragment();
             new_fragment->lcn_ = extent_data.extents_[i].lcn_;
             new_fragment->next_vcn_ = extent_data.extents_[i].next_vcn_;
             new_fragment->next_ = nullptr;
@@ -385,7 +385,7 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
     uint64_t fragment_end = 0;
     uint64_t vcn = 0;
     uint64_t next_lcn = 0;
-    const FragmentListStruct *fragment = item->fragments_;
+    const FileFragment *fragment = item->fragments_;
 
     while (fragment != nullptr) {
         // Virtual fragments do not occupy space on disk and do not count as fragments
@@ -454,7 +454,7 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
     uint64_t vcn = 0;
     uint64_t real_vcn = 0;
 
-    const FragmentListStruct *fragment = item->fragments_;
+    const FileFragment *fragment = item->fragments_;
 
     while (fragment != nullptr) {
         // Ignore virtual fragments. They do not occupy space on disk and do not require colorization.

@@ -350,7 +350,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
             }
 
             // Add the extent to the Fragments
-            const auto new_fragment = new FragmentListStruct();
+            const auto new_fragment = new FileFragment();
 
             new_fragment->lcn_ = lcn;
 
