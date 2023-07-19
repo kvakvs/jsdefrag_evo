@@ -12,6 +12,10 @@ public:
 
     void add_default_space_hogs();
 
+    bool is_still_running() const {
+        return *running_ == RunningState::RUNNING;
+    }
+
 public:
     // The current Phase (1...3)
     DefragPhase phase_ = DefragPhase::Analyze;

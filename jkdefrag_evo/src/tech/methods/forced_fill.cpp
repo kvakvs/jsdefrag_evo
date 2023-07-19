@@ -25,7 +25,7 @@ void DefragRunner::forced_fill(DefragState &data) {
     uint64_t gap_begin = 0;
     uint64_t max_lcn = data.total_clusters_;
 
-    while (*data.running_ == RunningState::RUNNING) {
+    while (data.is_still_running()) {
         // Find the next gap. If there are no more gaps then exit
         uint64_t gap_end;
         auto result = find_gap(data, gap_begin, 0, 0, true, false,

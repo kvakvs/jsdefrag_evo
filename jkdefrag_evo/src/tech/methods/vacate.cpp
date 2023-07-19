@@ -65,7 +65,7 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
     uint64_t move_gap_end = 0;
     uint64_t done_until = lcn;
 
-    while (*data.running_ == RunningState::RUNNING) {
+    while (data.is_still_running()) {
         // Find the first movable data fragment at or above the done_until lcn. If there is nothing
         // then return, we have reached the end of the disk.
         FileNode *bigger_item = nullptr;

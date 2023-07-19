@@ -244,7 +244,6 @@ void DefragGui::show_analyze(const DefragState &data, const FileNode *item) {
     show_analyze_update_item_text(item);
     repaint_top_area();
     request_delayed_redraw_top_area();
-//    repaint_window(dc_);
 }
 
 // Callback: show filename in the slot 4, show the message in the debug slot 5 + log the message
@@ -308,7 +307,6 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
     }
 
     color_map_.set_cluster_colors(cluster_start, cluster_end, color);
-
     request_delayed_redraw();
 }
 
@@ -493,7 +491,7 @@ void DefragGui::show_diskmap(DefragState &data) {
 
         if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
 
-        while (index < index_max && *data.running_ == RunningState::RUNNING) {
+        while (index < index_max && data.is_still_running()) {
             auto in_use = bitmap_data.buffer_[index] & mask;
 
             // If at the beginning of the disk then copy the in_use value as our starting value

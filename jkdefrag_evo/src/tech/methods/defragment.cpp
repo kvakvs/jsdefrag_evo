@@ -52,7 +52,7 @@ void DefragRunner::defragment(DefragState &data) {
     // Walk through all files and defrag
     next_item = Tree::smallest(data.item_tree_);
 
-    while (next_item != nullptr && *data.running_ == RunningState::RUNNING) {
+    while (next_item != nullptr && data.is_still_running()) {
         /* The loop may change the position of the item in the tree, so we have
         to determine and remember the next item now. */
         item = next_item;
@@ -155,7 +155,7 @@ void DefragRunner::defragment(DefragState &data) {
 
                 if (result == false) break;
             }
-        } while (clusters_done < item->clusters_count_ && *data.running_ == RunningState::RUNNING);
+        } while (clusters_done < item->clusters_count_ && data.is_still_running());
 
         // Close the item
         FlushFileBuffers(file_handle); // Is this useful? Can't hurt

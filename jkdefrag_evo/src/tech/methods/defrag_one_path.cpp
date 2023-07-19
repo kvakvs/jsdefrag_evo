@@ -72,72 +72,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path
     gui->show_diskmap(data);
     clock_clustermap.stop_and_log();
 
-    if (*data.running_ == RunningState::RUNNING) {
-        StopWatch clock1(L"defrag_one_path: analyze");
-        analyze_volume(data);
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeFixup) {
-        StopWatch clock1(L"defrag_one_path: defragment");
-        defragment(data);
-    }
-
-    if (*data.running_ == RunningState::RUNNING
-        && (opt_mode == OptimizeMode::AnalyzeFixupFastopt
-            || opt_mode == OptimizeMode::DeprecatedAnalyzeFixupFull)) {
-        StopWatch clock1(L"defrag_one_path: Defr+F+Opt+F (defragment)");
-        defragment(data);
-        clock1.stop_and_log();
-
-        if (*data.running_ == RunningState::RUNNING) {
-            StopWatch clock2(L"defrag_one_path: Defr+F+Opt+F (fixup 1)");
-            fixup(data);
-        }
-        if (*data.running_ == RunningState::RUNNING) {
-            StopWatch clock3(L"defrag_one_path: Defr+F+Opt+F (optimize)");
-            optimize_volume(data);
-        }
-        if (*data.running_ == RunningState::RUNNING) {
-            StopWatch clock4(L"defrag_one_path: Defr+F+Opt+F (fixup 2)");
-            fixup(data);
-        } // Again, in case of new zone startpoint
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeGroup) {
-        StopWatch clock1(L"defrag_one_path: forced_fill");
-        forced_fill(data);
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeMoveToEnd) {
-        StopWatch clock1(L"defrag_one_path: opt_up");
-        optimize_up(data);
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByName) {
-        StopWatch clock1(L"defrag_one_path: opt_sort(filename)");
-        optimize_sort(data, 0); // Filename
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortBySize) {
-        StopWatch clock1(L"defrag_one_path: opt_sort(size)");
-        optimize_sort(data, 1); // Filesize
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
-        StopWatch clock1(L"defrag_one_path: opt_sort(access)");
-        optimize_sort(data, 2); // Last access
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
-        StopWatch clock1(L"defrag_one_path: opt_sort(last_change)");
-        optimize_sort(data, 3); // Last change
-    }
-
-    if (*data.running_ == RunningState::RUNNING && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
-        StopWatch clock1(L"defrag_one_path: opt_sort(creation)");
-        optimize_sort(data, 4); // Creation
-    }
-    // if ((*Data->Running == RUNNING) && (Mode == 11)) { MoveMftToBeginOfDisk(Data); }
+    defrag_one_path_stages(data, opt_mode);
 
     call_show_status(data, DefragPhase::Done, Zone::None); // "Finished."
 
@@ -338,4 +273,73 @@ void DefragRunner::defrag_one_path_fixup_input_mask(DefragState &data, const wch
     }
 
     gui->show_always(std::format(L"Input mask: {}", data.include_mask_));
+}
+
+void DefragRunner::defrag_one_path_stages(DefragState &data, OptimizeMode opt_mode) {
+    if (data.is_still_running()) {
+        StopWatch clock1(L"defrag_one_path: analyze");
+        analyze_volume(data);
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeFixup) {
+        StopWatch clock1(L"defrag_one_path: defragment");
+        defragment(data);
+    }
+
+    if (data.is_still_running()
+        && (opt_mode == OptimizeMode::AnalyzeFixupFastopt
+            || opt_mode == OptimizeMode::DeprecatedAnalyzeFixupFull)) {
+        StopWatch clock1(L"defrag_one_path: Defr+F+Opt+F (defragment)");
+        defragment(data);
+        clock1.stop_and_log();
+
+        if (data.is_still_running()) {
+            StopWatch clock2(L"defrag_one_path: Defr+F+Opt+F (fixup 1)");
+            fixup(data);
+        }
+        if (data.is_still_running()) {
+            StopWatch clock3(L"defrag_one_path: Defr+F+Opt+F (optimize)");
+            optimize_volume(data);
+        }
+        if (data.is_still_running()) {
+            StopWatch clock4(L"defrag_one_path: Defr+F+Opt+F (fixup 2)");
+            fixup(data);
+        } // Again, in case of new zone startpoint
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeGroup) {
+        StopWatch clock1(L"defrag_one_path: forced_fill");
+        forced_fill(data);
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeMoveToEnd) {
+        StopWatch clock1(L"defrag_one_path: opt_up");
+        optimize_up(data);
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeSortByName) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(filename)");
+        optimize_sort(data, 0); // Filename
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeSortBySize) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(size)");
+        optimize_sort(data, 1); // Filesize
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeSortByAccess) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(access)");
+        optimize_sort(data, 2); // Last access
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeSortByChanged) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(last_change)");
+        optimize_sort(data, 3); // Last change
+    }
+
+    if (data.is_still_running() && opt_mode == OptimizeMode::AnalyzeSortByCreated) {
+        StopWatch clock1(L"defrag_one_path: opt_sort(creation)");
+        optimize_sort(data, 4); // Creation
+    }
+    // if ((*Data->Running == RUNNING) && (Mode == 11)) { MoveMftToBeginOfDisk(Data); }
 }

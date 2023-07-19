@@ -50,7 +50,7 @@ bool DefragRunner::move_item(DefragState &data, FileNode *item, const uint64_t n
     uint64_t clusters_done = 0;
     bool result = true;
 
-    while (clusters_done < size && *data.running_ == RunningState::RUNNING) {
+    while (clusters_done < size && data.is_still_running()) {
         uint64_t clusters_todo = size - clusters_done;
 
         if (data.bytes_per_cluster_ > 0) {

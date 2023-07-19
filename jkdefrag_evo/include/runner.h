@@ -129,7 +129,7 @@ public:
     static bool is_fragmented(const FileNode *item, uint64_t offset, uint64_t size);
 
     void colorize_disk_item(DefragState &data, const FileNode *item,
-                            uint64_t busy_offset, uint64_t busy_size, int un_draw) const;
+                            uint64_t busy_offset, uint64_t busy_size, int erase_from_screen) const;
 
     static void call_show_status(DefragState &data, DefragPhase phase, Zone zone);
 
@@ -141,6 +141,8 @@ private:
     bool defrag_one_path_count_clusters(DefragState &data);
 
     void defrag_one_path_fixup_input_mask(DefragState &data, const wchar_t *target_path);
+
+    void defrag_one_path_stages(DefragState &data, OptimizeMode opt_mode);
 
     void defrag_all_drives_sync(DefragState &data, OptimizeMode mode);
 
@@ -199,6 +201,8 @@ private:
     void analyze_volume(DefragState &data);
 
     void analyze_volume_read_fs(DefragState &data);
+
+    void analyze_volume_process_file(DefragState &data, FileNode *item, filetime64_t time_now);
 
     void fixup(DefragState &data);
 

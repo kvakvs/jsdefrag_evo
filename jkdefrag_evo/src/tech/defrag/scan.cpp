@@ -408,14 +408,11 @@ int DefragRunner::compare_items(FileNode *item_1, FileNode *item_2, int sort_fie
 void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, FileNode *parent_directory) {
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Slow the program down to the percentage that was specified on the
-    command line. */
+    // Slow the program down to the percentage that was specified on the command line.
     slow_down(data);
 
-    /* Determine the rootpath (base path of the directory) by stripping
-    everything after the last backslash in the mask. The FindFirstFile()
-    system call only processes wildcards in the last section (i.e. after
-    the last backslash). */
+    // Determine the rootpath (base path of the directory) by stripping everything after the last backslash in the mask.
+    // The FindFirstFile() system call only processes wildcards in the last section (i.e. after the last backslash).
     std::unique_ptr<wchar_t[]> root_path(_wcsdup(mask));
 
     wchar_t *p1 = wcsrchr(root_path.get(), L'\\');

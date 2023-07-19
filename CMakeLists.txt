@@ -55,9 +55,15 @@ set(SOURCE_FILES
         ${SRC}/tech/defrag/moving.cpp
         ${SRC}/tech/defrag/scan.cpp
 
-        ${SRC}/tech/fat/analyze.cpp
-        ${SRC}/tech/fat/directory.cpp
-        ${SRC}/tech/fat/scan_fat.cpp
+        ${SRC}/tech/ntfs/ntfs_analyze.cpp
+        ${SRC}/tech/ntfs/ntfs_attributes.cpp
+        ${SRC}/tech/ntfs/ntfs_mft.cpp
+        ${SRC}/tech/ntfs/ntfs_scan.cpp
+        ${SRC}/tech/ntfs/ntfs_stream.cpp
+
+        ${SRC}/tech/fat/fat_analyze.cpp
+        ${SRC}/tech/fat/fat_directory.cpp
+        ${SRC}/tech/fat/fat_scan.cpp
 
         ${SRC}/tech/methods/defrag_mountpoints.cpp
         ${SRC}/tech/methods/defrag_one_path.cpp
@@ -68,12 +74,6 @@ set(SOURCE_FILES
         ${SRC}/tech/methods/optimize_up.cpp
         ${SRC}/tech/methods/optimize_volume.cpp
         ${SRC}/tech/methods/vacate.cpp
-
-        ${SRC}/tech/ntfs/analyze.cpp
-        ${SRC}/tech/ntfs/attributes.cpp
-        ${SRC}/tech/ntfs/mft.cpp
-        ${SRC}/tech/ntfs/scan_ntfs.cpp
-        ${SRC}/tech/ntfs/stream.cpp
         )
 
 add_executable(${APP_NAME} ${OPTIONS} ${HEADER_FILES} ${SOURCE_FILES})

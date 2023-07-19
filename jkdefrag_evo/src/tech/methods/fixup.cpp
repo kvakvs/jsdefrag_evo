@@ -59,7 +59,7 @@ void DefragRunner::fixup(DefragState &data) {
 
     auto next_item = Tree::smallest(data.item_tree_);
 
-    while (next_item != nullptr && *data.running_ == RunningState::RUNNING) {
+    while (next_item != nullptr && data.is_still_running()) {
         // The loop will change the position of the item in the tree, so we have to determine the next item before executing the loop.
         item = next_item;
 

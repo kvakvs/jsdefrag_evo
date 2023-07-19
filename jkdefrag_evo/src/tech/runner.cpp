@@ -379,9 +379,8 @@ it only looks at cached information in memory.
 
 */
 bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, const uint64_t size) {
-    /* Walk through all fragments. If a fragment is found where either the
-    begin or the end of the fragment is inside the block then the file is
-    fragmented and return true. */
+    // Walk through all fragments. If a fragment is found where either the begin or the end of the fragment is inside
+    // the block then the file is fragmented and return true.
     uint64_t fragment_begin = 0;
     uint64_t fragment_end = 0;
     uint64_t vcn = 0;
@@ -396,13 +395,13 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
             especially system files and very large files. The defragger treats these
             files as unfragmented. */
             if (next_lcn != 0 && fragment->lcn_ != next_lcn) {
-                /* If the fragment is above the block then return false, the block is
-                not fragmented and we don't have to scan any further. */
+                // If the fragment is above the block then return false, the block is not fragmented and we don't
+                // have to scan any further.
                 if (fragment_begin >= offset + size) return false;
 
-                /* If the first cluster of the fragment is above the first cluster of
-                the block, or the last cluster of the fragment is before the last
-                cluster of the block, then the block is fragmented, return true. */
+                // If the first cluster of the fragment is above the first cluster of the block,
+                // or the last cluster of the fragment is before the last cluster of the block,
+                // then the block is fragmented, return true.
                 if (fragment_begin > offset ||
                     (fragment_end - 1 >= offset &&
                      fragment_end - 1 < offset + size - 1)) {
@@ -435,18 +434,17 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
 }
 
 /**
- * \brief Colorize an item (file, directory) on the screen in the proper color
- * (fragmented, unfragmented, unmovable, empty). If specified then highlight
- * part of the item. If Undraw=true then remove the item from the screen.
+ * \brief Colorize an item (file, directory) on the screen in the proper color (fragmented, unfragmented, unmovable,
+ * empty). If specified then highlight part of the item. If Undraw=true then remove the item from the screen.
  * Note: the offset and size of the highlight block is in absolute clusters, not virtual clusters.
  * \param data 
  * \param item 
  * \param busy_offset Number of first cluster to be highlighted. 
  * \param busy_size Number of clusters to be highlighted.
- * \param un_draw true to undraw the file from the screen.
+ * \param erase_from_screen true to undraw the file from the screen.
  */
 void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const uint64_t busy_offset,
-                                      const uint64_t busy_size, const int un_draw) const {
+                                      const uint64_t busy_size, const int erase_from_screen) const {
     DefragGui *gui = DefragGui::get_instance();
 
     // Determine if the item is fragmented.
@@ -477,9 +475,8 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
             DrawColor color;
 
             // Determine the color with which to draw this segment.
-            if (un_draw == false) {
-                if (item->is_excluded_) color = DrawColor::Unmovable;
-                else if (item->is_unmovable_) color = DrawColor::Unmovable;
+            if (erase_from_screen == false) {
+                if (item->is_excluded_ || item->is_unmovable_) color = DrawColor::Unmovable;
                 else if (is_fragmented) color = DrawColor::Fragmented;
                 else if (item->is_hog_) color = DrawColor::SpaceHog;
                 else color = DrawColor::Unfragmented;
@@ -500,16 +497,16 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
             } else {
                 color = DrawColor::Empty;
 
-                for (int i = 0; i < 3; i++) {
-                    if (fragment->lcn_ + segment_begin - real_vcn < data.mft_excludes_[i].start_ &&
-                        fragment->lcn_ + segment_end - real_vcn > data.mft_excludes_[i].start_) {
-                        segment_end = real_vcn + data.mft_excludes_[i].start_ - fragment->lcn_;
+                for (auto &mft_exclude: data.mft_excludes_) {
+                    if (fragment->lcn_ + segment_begin - real_vcn < mft_exclude.start_ &&
+                        fragment->lcn_ + segment_end - real_vcn > mft_exclude.start_) {
+                        segment_end = real_vcn + mft_exclude.start_ - fragment->lcn_;
                     }
 
-                    if (fragment->lcn_ + segment_begin - real_vcn >= data.mft_excludes_[i].start_ &&
-                        fragment->lcn_ + segment_begin - real_vcn < data.mft_excludes_[i].end_) {
-                        if (fragment->lcn_ + segment_end - real_vcn > data.mft_excludes_[i].end_) {
-                            segment_end = real_vcn + data.mft_excludes_[i].end_ - fragment->lcn_;
+                    if (fragment->lcn_ + segment_begin - real_vcn >= mft_exclude.start_ &&
+                        fragment->lcn_ + segment_begin - real_vcn < mft_exclude.end_) {
+                        if (fragment->lcn_ + segment_end - real_vcn > mft_exclude.end_) {
+                            segment_end = real_vcn + mft_exclude.end_ - fragment->lcn_;
                         }
 
                         color = DrawColor::Mft;
@@ -534,151 +531,6 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
         fragment = fragment->next_;
     }
 }
-
-/*
-
-Show a map on the screen of all the clusters on disk. The map shows
-which clusters are free and which are in use.
-The Data->RedrawScreen flag controls redrawing of the screen. It is set
-to "2" (busy) when the subroutine starts. If another thread changes it to
-"1" (request) while the subroutine is busy then it will immediately exit
-without completing the redraw. When redrawing is completely finished the
-flag is set to "0" (no). */
-/*
-void ShowDiskmap2(struct DefragState &Data) {
-	struct ItemStruct *Item;
-	STARTING_LCN_INPUT_BUFFER BitmapParam;
-	struct {
-		uint64_t StartingLcn;
-		uint64_t BitmapSize;
-		BYTE Buffer[65536];               / * Most efficient if binary multiple. * /
-	} BitmapData;
-	uint64_t Lcn;
-	uint64_t ClusterStart;
-	uint32_t ErrorCode;
-	int Index;
-	int IndexMax;
-	BYTE Mask;
-	int InUse;
-	int PrevInUse;
-	uint32_t w;
-	int i;
-
-	*Data->RedrawScreen = 2;                       / * Set the flag to "busy". * /
-
-	/ * Exit if the library is not processing a disk yet. * /
-	if (Data->Disk.VolumeHandle == nullptr) {
-		*Data->RedrawScreen = 0;                       / * Set the flag to "no". * /
-		return;
-	}
-
-	/ * Clear screen. * /
-	m_jkGui->ClearScreen(nullptr);
-
-	/ * Show the map of all the clusters in use. * /
-	Lcn = 0;
-	ClusterStart = 0;
-	PrevInUse = 1;
-	do {
-		if (*Data->Running != RUNNING) break;
-		if (*Data->RedrawScreen != 2) break;
-		if (Data->Disk.VolumeHandle == INVALID_HANDLE_VALUE) break;
-
-		/ * Fetch a block of cluster data. * /
-		BitmapParam.StartingLcn.QuadPart = Lcn;
-		ErrorCode = DeviceIoControl(Data->Disk.VolumeHandle,FSCTL_GET_VOLUME_BITMAP,
-			&BitmapParam,sizeof(BitmapParam),&BitmapData,sizeof(BitmapData),&w,nullptr);
-		if (ErrorCode != 0) {
-			ErrorCode = NO_ERROR;
-		} else {
-			ErrorCode = GetLastError();
-		}
-		if ((ErrorCode != NO_ERROR) && (ErrorCode != ERROR_MORE_DATA)) break;
-
-		/ * Sanity check. * /
-		if (Lcn >= BitmapData.StartingLcn + BitmapData.BitmapSize) break;
-
-		/ * Analyze the clusterdata. We resume where the previous block left off. * /
-		Lcn = BitmapData.StartingLcn;
-		Index = 0;
-		Mask = 1;
-		IndexMax = sizeof(BitmapData.Buffer);
-		if (BitmapData.BitmapSize / 8 < IndexMax) IndexMax = (int)(BitmapData.BitmapSize / 8);
-		while ((Index < IndexMax) && (*Data->Running == RUNNING)) {
-			InUse = (BitmapData.Buffer[Index] & Mask);
-			/ * If at the beginning of the disk then copy the InUse value as our
-			starting value. * /
-			if (Lcn == 0) PrevInUse = InUse;
-			/ * At the beginning and end of an Exclude draw the cluster. * /
-			if ((Lcn == Data->MftExcludes[0].Start) || (Lcn == Data->MftExcludes[0].End) ||
-				(Lcn == Data->MftExcludes[1].Start) || (Lcn == Data->MftExcludes[1].End) ||
-				(Lcn == Data->MftExcludes[2].Start) || (Lcn == Data->MftExcludes[2].End)) {
-					if ((Lcn == Data->MftExcludes[0].End) ||
-						(Lcn == Data->MftExcludes[1].End) ||
-						(Lcn == Data->MftExcludes[2].End)) {
-							m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Unmovable);
-					} else if (PrevInUse == 0) {
-						m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Empty);
-					} else {
-						m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Allocated);
-					}
-					InUse = 1;
-					PrevInUse = 1;
-					ClusterStart = Lcn;
-			}
-			if ((PrevInUse == 0) && (InUse != 0)) {          / * Free * /
-				m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Empty);
-				ClusterStart = Lcn;
-			}
-			if ((PrevInUse != 0) && (InUse == 0)) {          / * In use * /
-				m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Allocated);
-				ClusterStart = Lcn;
-			}
-			PrevInUse = InUse;
-			if (Mask == 128) {
-				Mask = 1;
-				Index = Index + 1;
-			} else {
-				Mask = Mask << 1;
-			}
-			Lcn = Lcn + 1;
-		}
-
-	} while ((ErrorCode == ERROR_MORE_DATA) &&
-		(Lcn < BitmapData.StartingLcn + BitmapData.BitmapSize));
-
-	if ((Lcn > 0) && (*Data->RedrawScreen == 2)) {
-		if (PrevInUse == 0) {          / * Free * /
-			m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Empty);
-		}
-		if (PrevInUse != 0) {          / * In use * /
-			m_jkGui->DrawCluster(Data,ClusterStart,Lcn,JKDefragStruct::Allocated);
-		}
-	}
-
-	/ * Show the MFT zones. * /
-	for (i = 0; i < 3; i++) {
-		if (*Data->RedrawScreen != 2) break;
-		if (Data->MftExcludes[i].Start <= 0) continue;
-		m_jkGui->DrawCluster(Data,Data->MftExcludes[i].Start,Data->MftExcludes[i].End,JKDefragStruct::Mft);
-	}
-
-	/ * Colorize all the files on the screen.
-	Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to
-	ignore it. * /
-	for (Item = TreeSmallest(Data->ItemTree); Item != nullptr; Item = TreeNext(Item)) {
-		if (*Data->Running != RUNNING) break;
-		if (*Data->RedrawScreen != 2) break;
-		if ((Item->LongFilename != nullptr) &&
-			((_wcsicmp(Item->LongFilename,L"$BadClus") == 0) ||
-			(_wcsicmp(Item->LongFilename,L"$BadClus:$Bad:$DATA") == 0))) continue;
-		ColorizeItem(Data,Item,0,0,false);
-	}
-
-	/ * Set the flag to "no". * /
-	if (*Data->RedrawScreen == 2) *Data->RedrawScreen = 0;
-}
-*/
 
 // Update some numbers in the DefragData
 void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, const Zone zone) {

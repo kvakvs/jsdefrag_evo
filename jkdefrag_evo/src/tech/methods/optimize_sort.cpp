@@ -49,7 +49,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
         gap_begin = 0;
         gap_end = 0;
 
-        while (*data.running_ == RunningState::RUNNING) {
+        while (data.is_still_running()) {
             // Find the next item that we want to place
             FileNode *item = nullptr;
             uint64_t phase_temp = 0;
@@ -97,7 +97,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
             // the file into whatever gaps are available.
             uint64_t clusters_done = 0;
 
-            while (*data.running_ == RunningState::RUNNING &&
+            while (data.is_still_running() &&
                    clusters_done < item->clusters_count_ &&
                    !item->is_unmovable_) {
                 if (clusters_done > 0) {

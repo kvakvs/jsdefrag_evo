@@ -39,7 +39,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
         gap_begin = data.zones_[(size_t) zone];
         int retry = 0;
 
-        while (*data.running_ == RunningState::RUNNING) {
+        while (data.is_still_running()) {
             // Find the next gap
             auto result = find_gap(data, gap_begin, 0, 0, true, false,
                                    &gap_begin, &gap_end, FALSE);
@@ -70,7 +70,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
             bool perfect_fit = true;
             if (gap_end - gap_begin > phase_temp) perfect_fit = false;
 
-            while (gap_begin < gap_end && retry < 5 && *data.running_ == RunningState::RUNNING) {
+            while (gap_begin < gap_end && retry < 5 && data.is_still_running()) {
                 // Find the Item that is the best fit for the gap. If nothing found (no files
                 // fit the gap) then exit the loop
                 if (perfect_fit) {

@@ -87,7 +87,7 @@
     gap_end = 0;
     clusters_done = data.disk_.mft_locked_clusters_;
 
-    while (*data.running_ == RunningState::RUNNING && clusters_done < item->clusters_count_) {
+    while (data.is_still_running() && clusters_done < item->clusters_count_) {
         if (clusters_done > data.disk_.mft_locked_clusters_) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                             std::format(L"Partially placed, " NUM_FMT " clusters more to do",
