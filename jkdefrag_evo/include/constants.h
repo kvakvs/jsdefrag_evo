@@ -74,7 +74,7 @@ constexpr COLORREF display_colors[9] = {
 // The colors used by the defragger
 enum class DrawColor : uint8_t {
     // Empty diskspace
-    Empty,
+    Empty = 0,
     // Used diskspace / system files
     Allocated,
     // Unfragmented files
@@ -91,6 +91,8 @@ enum class DrawColor : uint8_t {
     SpaceHog,
     // Background color
     // Background
+    // Not a real color, used for counting the enum values
+    MaxValue,
 };
 
 enum class MoveStrategy {

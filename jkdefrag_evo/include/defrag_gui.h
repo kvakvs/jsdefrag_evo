@@ -19,8 +19,6 @@ public:
 
     void draw_cluster(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
 
-    void prepare_cells_for_cluster_range(uint64_t cluster_start_square_num, uint64_t cluster_end_square_num);
-
     void show_debug(DebugLevel level, const FileNode *item, std::wstring &&text);
 
     void show_always(std::wstring &&text) {
@@ -43,7 +41,7 @@ public:
 
     void show_diskmap(DefragState &data);
 
-    int initialize(HINSTANCE instance, const int cmd_show, const DebugLevel debug_level);
+    int initialize(HINSTANCE instance, int cmd_show, DebugLevel debug_level);
 
     void set_display_data(HDC dc);
 
@@ -54,6 +52,8 @@ public:
     void full_redraw_window(HDC dc);
 
     static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
+
+    DiskColorMap &get_color_map() { return color_map_; }
 
 protected:
     void write_stats(const DefragState &data);
@@ -68,7 +68,7 @@ protected:
 
     void paint_diskmap(Graphics *graphics);
 
-    void paint_empty_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen,
+    void paint_empty_cell(Graphics *graphics, const POINT &cell_pos, COLORREF col, const Pen &pen,
                           const Pen &pen_empty) const;
 
     void paint_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen) const;
@@ -76,9 +76,9 @@ protected:
     static void paint_set_gradient_colors(COLORREF col, Color &c1, Color &c2);
 
     // Marks top panel area for redraw
-    void request_redraw_top_area();
+    void request_delayed_redraw_top_area();
 
-    void request_redraw();
+    void request_delayed_redraw();
 
     // Re-render strings in the top area into bitmap; Do not update the window yet. Combine this with
     // invalidate_top_area() to update the window.
@@ -115,22 +115,16 @@ private:
     // Used for invalidating; Updated when drawing/redrawing
     RECT top_area_rect_{};
 
-    // Offsets of drawing area of disk
+    // Offsets of the drawing area
     POINT drawing_area_offset_;
 
-    // Calculated offset of drawing area of disk
+    // Calculated offset of the drawing area
     POINT diskmap_pos_;
 
-    // Size of drawing area of disk
+    // Size of the drawing area
     Rect disk_area_size_;
 
     DiskColorMap color_map_;
-
-    // Color of each disk cluster
-    std::unique_ptr<DrawColor[]> cluster_info_;
-
-    // Number of disk clusters
-    uint64_t num_clusters_;
 
     // 0:no, 1:request, 2: busy
     //	int RedrawScreen;

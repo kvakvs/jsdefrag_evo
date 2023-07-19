@@ -231,6 +231,7 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *path, Optim
     gui->show_always(std::format(L"Input mask: {}", data.include_mask_));
 
     // Defragment and optimize; Potentially long running, on large volumes
+    gui->get_color_map().set_cluster_count(data.total_clusters_);
     gui->show_diskmap(data);
 
     if (*data.running_ == RunningState::RUNNING) {

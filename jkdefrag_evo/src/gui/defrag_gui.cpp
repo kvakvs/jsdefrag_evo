@@ -23,12 +23,11 @@
 
 DefragGui *DefragGui::instance_ = nullptr;
 
-DefragGui::DefragGui() : color_map_(), diskmap_pos_() {
+DefragGui::DefragGui() : color_map_(1), diskmap_pos_() {
     defrag_lib_ = DefragRunner::get_instance();
 
     square_size_ = 6;
     drawing_area_offset_ = {.x=8, .y=8};
-    num_clusters_ = 1;
 }
 
 DefragGui *DefragGui::get_instance() {
@@ -151,7 +150,7 @@ void DefragGui::clear_screen(std::wstring &&text) {
     // If there is no logfile then return.
     Log::log(DebugLevel::DetailedProgress, messages_[0].c_str());
 
-    request_redraw();
+    request_delayed_redraw();
 }
 
 // Callback: whenever an item (file, directory) is moved on disk.
@@ -194,7 +193,7 @@ void DefragGui::show_move(const FileNode *item, const uint64_t clusters, const u
         }
     }
 
-    request_redraw();
+    request_delayed_redraw();
 }
 
 // Make sure this function does not run more often than 100ms
@@ -228,7 +227,7 @@ void DefragGui::show_analyze_no_state(const FileNode *item) {
     show_analyze_update_item_text(item);
 
     repaint_top_area();
-    request_redraw_top_area();
+    request_delayed_redraw_top_area();
 //    repaint_window(dc_);
 }
 
@@ -244,7 +243,7 @@ void DefragGui::show_analyze(const DefragState &data, const FileNode *item) {
 
     show_analyze_update_item_text(item);
     repaint_top_area();
-    request_redraw_top_area();
+    request_delayed_redraw_top_area();
 //    repaint_window(dc_);
 }
 
@@ -271,7 +270,7 @@ void DefragGui::show_debug(const DebugLevel level, const FileNode *item, std::ws
     if (level <= DefragLog::debug_level_) {
         // repaint_window(dc_);
         repaint_top_area();
-        request_redraw_top_area();
+        request_delayed_redraw_top_area();
     }
 }
 
@@ -303,28 +302,14 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
 
     std::lock_guard<std::mutex> display_lock(display_mutex_);
 
-    if (num_clusters_ != data.total_clusters_ || cluster_info_ == nullptr) {
-        num_clusters_ = data.total_clusters_;
-        cluster_info_ = std::make_unique<DrawColor[]>(num_clusters_);
-
-        auto ci_mem = cluster_info_.get();
-        std::fill(cluster_info_.get(), cluster_info_.get() + num_clusters_, DrawColor::Empty);
-
-        return;
+    if (color_map_.get_cluster_count() != data.total_clusters_) {
+        color_map_.set_cluster_count(data.total_clusters_);
+        return; // do not set yet, not till next redraw
     }
 
-    auto ci_mem = cluster_info_.get();
-    for (uint64_t ii = cluster_start; ii <= cluster_end; ii++) {
-        ci_mem[ii] = color;
-    }
+    color_map_.set_cluster_colors(cluster_start, cluster_end, color);
 
-    const auto cluster_per_square = (float) (num_clusters_ / color_map_.get_total_count());
-    const int cluster_start_square_num = (int) ((uint64_t) cluster_start / (uint64_t) cluster_per_square);
-    const int cluster_end_square_num = (int) ((uint64_t) cluster_end / (uint64_t) cluster_per_square);
-
-    prepare_cells_for_cluster_range(cluster_start_square_num, cluster_end_square_num);
-
-    request_redraw();
+    request_delayed_redraw();
 }
 
 // Callback: just before the defragger starts a new Phase, and when it finishes
@@ -436,8 +421,8 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             instance_->set_display_data(instance_->dc_);
             EndPaint(wnd, &ps);
 
-            instance_->prepare_cells_for_cluster_range(0, instance_->color_map_.get_total_count());
-            instance_->request_redraw();
+            instance_->color_map_.update_square_colors_from_diskmap(0, instance_->color_map_.get_total_count());
+            instance_->request_delayed_redraw();
 
             return 0;
         }
@@ -451,7 +436,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 
 // Show a map on the screen of all the clusters on disk. The map shows which clusters are free and which are in use.
 void DefragGui::show_diskmap(DefragState &data) {
-    Log::log(DebugLevel::DetailedProgress, L"Diskmap repainting started…");
+    Log::log_always(L"Diskmap repainting started…");
 
     struct {
         uint64_t starting_lcn_;
@@ -474,13 +459,17 @@ void DefragGui::show_diskmap(DefragState &data) {
 
     DWORD error_code;
 
+    Log::log_always(L"Diskmap repainting: Checkpoint 1");
+
+    uint64_t count = 0;
     do {
+        count++; // for logging after this loop
+
         if (*data.running_ != RunningState::RUNNING) break;
         if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data
         STARTING_LCN_INPUT_BUFFER bitmap_param = {.StartingLcn = {.QuadPart = (LONGLONG) lcn}};
-
         DWORD w;
         error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                      &bitmap_param, sizeof bitmap_param, &bitmap_data,
@@ -555,6 +544,7 @@ void DefragGui::show_diskmap(DefragState &data) {
             lcn = lcn + 1;
         }
     } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
+    Log::log_always(std::format(L"Diskmap repainting: Checkpoint 2 count={}", count));
 
     if (lcn > 0) {
         if (prev_in_use == 0) {
@@ -585,6 +575,6 @@ void DefragGui::show_diskmap(DefragState &data) {
 
         defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
     }
-    Log::log(DebugLevel::DetailedProgress, L"Diskmap painting ended");
+    Log::log_always(L"Diskmap painting ended");
 }
 

@@ -168,65 +168,9 @@ void DefragGui::repaint_top_area() const {
     paint_strings(graphics.get());
 }
 
-// Fill a sequence of squares with their current state bitflags
-void DefragGui::prepare_cells_for_cluster_range(uint64_t cluster_start_square_num, uint64_t cluster_end_square_num) {
-    const auto cluster_per_square = (float) (num_clusters_ / color_map_.get_total_count());
-    auto colors_map = cluster_info_.get();
-
-    for (uint64_t ii = cluster_start_square_num; ii < cluster_end_square_num; ii++) {
-        ClusterSquareStruct::ColorBits cluster_group_colors{};
-
-        for (uint64_t kk = ii * cluster_per_square;
-             kk < num_clusters_ && kk < (ii + 1) * cluster_per_square;
-             kk++) {
-            switch (colors_map[kk]) {
-                case DrawColor::Empty:
-                    cluster_group_colors.empty = true;
-                    break;
-                case DrawColor::Allocated:
-                    cluster_group_colors.allocated = true;
-                    break;
-                case DrawColor::Unfragmented:
-                    cluster_group_colors.unfragmented = true;
-                    break;
-                case DrawColor::Unmovable:
-                    cluster_group_colors.unmovable = true;
-                    break;
-                case DrawColor::Fragmented:
-                    cluster_group_colors.fragmented = true;
-                    break;
-                case DrawColor::Busy:
-                    cluster_group_colors.busy = true;
-                    break;
-                case DrawColor::Mft:
-                    cluster_group_colors.mft = true;
-                    break;
-                case DrawColor::SpaceHog:
-                    cluster_group_colors.spacehog = true;
-                    break;
-            }
-        }
-
-        auto &cell = color_map_.get_cell(ii);
-        cell.dirty_ = true;
-        cell.color_ = cluster_group_colors;
-    }
-}
-
 void DefragGui::paint_set_gradient_colors(COLORREF col, Color &c1, Color &c2) {
     c1.SetFromCOLORREF(col);
     c2.SetFromCOLORREF(col);
-
-//    int rr = GetRValue(col) + 200;
-//    rr = rr > 255 ? 255 : rr;
-//
-//    int gg = GetGValue(col) + 200;
-//    gg = gg > 255 ? 255 : gg;
-//
-//    int bb = GetBValue(col) + 100;
-//    bb = bb > 255 ? 255 : bb;
-//
-//    c2.SetFromCOLORREF(RGB((byte) rr, (byte) gg, (byte) bb));
 }
 
 void DefragGui::paint_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen) const {
@@ -289,11 +233,11 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
     for (size_t cell_index = 0; cell_index < color_map_.get_total_count(); cell_index++) {
         auto &cell = color_map_.get_cell(cell_index);
 
-        if (!cell.dirty_) {
+        if (!cell.dirty) {
             continue;
         }
 
-        cell.dirty_ = false;
+        cell.dirty = false;
 
         // Integer x:y index in the disk map array (not screen position!)
         POINT map_xy = {
@@ -306,26 +250,25 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
                 .y = diskmap_pos_.y + map_xy.y * square_size_ + top_area_height_
         };
 
-        auto &stored_color = cell.color_;
         bool is_empty = true;
         COLORREF col = display_colors[(size_t) DrawColor::Empty];
 
-        if (stored_color.busy) {
+        if (cell.busy) {
             col = display_colors[(size_t) DrawColor::Busy];
             is_empty = false;
-        } else if (stored_color.unmovable) {
+        } else if (cell.unmovable) {
             col = display_colors[(size_t) DrawColor::Unmovable];
             is_empty = false;
-        } else if (stored_color.fragmented) {
+        } else if (cell.fragmented) {
             col = display_colors[(size_t) DrawColor::Fragmented];
             is_empty = false;
-        } else if (stored_color.mft) {
+        } else if (cell.mft) {
             col = display_colors[(size_t) DrawColor::Mft];
             is_empty = false;
-        } else if (stored_color.unfragmented) {
+        } else if (cell.unfragmented) {
             col = display_colors[(size_t) DrawColor::Unfragmented];
             is_empty = false;
-        } else if (stored_color.spacehog) {
+        } else if (cell.spacehog) {
             col = display_colors[(size_t) DrawColor::SpaceHog];
             is_empty = false;
         }
@@ -339,14 +282,14 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
 }
 
 // Actual re-rendering happens on WM_TIMER event
-void DefragGui::request_redraw() {
+void DefragGui::request_delayed_redraw() {
     redraw_top_area_ = true;
     redraw_disk_map_ = true;
     InvalidateRect(wnd_, nullptr, FALSE);
 }
 
 // Actual re-rendering happens on WM_TIMER event
-void DefragGui::request_redraw_top_area() {
+void DefragGui::request_delayed_redraw_top_area() {
     redraw_top_area_ = true;
     InvalidateRect(wnd_, &top_area_rect_, FALSE);
 }
