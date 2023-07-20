@@ -113,7 +113,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                     vacate(data, lcn, item->clusters_count_ - clusters_done + minimum_vacate, FALSE);
 
                     auto result = find_gap(data, lcn, 0, 0, true, false,
-                                           &gap_begin, &gap_end, FALSE);
+                                           &gap_begin, &gap_end, false);
 
                     if (!result) return; // No gaps found, exit
                 }
@@ -142,7 +142,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                     gap_begin = gap_begin + clusters;
                 } else {
                     result = find_gap(data, gap_begin, 0, 0, true,
-                                      false, &gap_begin, &gap_end, FALSE);
+                                      false, &gap_begin, &gap_end, false);
                     if (!result) return; // No gaps found, exit.
                 }
 

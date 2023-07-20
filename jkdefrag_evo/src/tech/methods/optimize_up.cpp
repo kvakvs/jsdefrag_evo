@@ -39,17 +39,13 @@ void DefragRunner::optimize_up(DefragState &data) {
     // Walk through all the gaps
     gap_end = data.total_clusters_;
     int retry = 0;
-    StopWatch clock_fg(L"optimize_up: find_gap", false);
 
     while (data.is_still_running()) {
         // Find the previous gap
         bool result;
-        
-        {
-            clock_fg.start();
-            result = find_gap(data, data.zones_[1], gap_end, 0, true, true, &gap_begin, &gap_end, FALSE);
-            clock_fg.pause();
-        }
+
+        result = find_gap(data, data.zones_[1], gap_end, 0, true,
+                          true, &gap_begin, &gap_end, false);
 
         if (!result) break;
 

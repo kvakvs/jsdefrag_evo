@@ -66,7 +66,8 @@ void DefragRunner::defragment(DefragState &data) {
 
         if (!result) {
             // Try finding a gap again, this time including the free area
-            result = find_gap(data, 0, 0, item->clusters_count_, false, false, &gap_begin, &gap_end, FALSE);
+            result = find_gap(data, 0, 0, item->clusters_count_,
+                              false, false, &gap_begin, &gap_end, false);
 
             if (!result) {
                 gui->show_debug(DebugLevel::Progress, item, L"Disk is full, cannot defragment.");

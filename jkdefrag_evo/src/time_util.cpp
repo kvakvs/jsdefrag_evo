@@ -22,7 +22,8 @@ filetime64_t from_FILETIME(FILETIME &ft) {
     return filetime64_t(u.QuadPart);
 }
 
-StopWatch::StopWatch(const wchar_t *description, bool start) : description_(description), running_(start) {
+StopWatch::StopWatch(const wchar_t *description, bool start)
+        : description_(description), running_(start) {
     if (start) {
         start_clock_ = Clock::now();
     }

@@ -32,9 +32,9 @@
  *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
  */
 bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
-                            const uint64_t minimum_size,
-                            const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
-                            const bool ignore_mft_excludes) {
+                            const uint64_t minimum_size, const int must_fit, const bool find_highest_gap,
+                            uint64_t *begin_lcn, uint64_t *end_lcn, const bool ignore_mft_excludes) {
+    StopWatch clock_fg(L"find_gap", true);
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
         uint64_t starting_lcn_;

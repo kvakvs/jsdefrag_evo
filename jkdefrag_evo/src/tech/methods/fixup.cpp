@@ -135,7 +135,7 @@ void DefragRunner::fixup(DefragState &data) {
         if (item->clusters_count_ > gap_end[file_zone] - gap_begin[file_zone]) {
             result = find_gap(data, data.zones_[file_zone], 0, item->clusters_count_, true, false,
                               &gap_begin[file_zone],
-                              &gap_end[file_zone], FALSE);
+                              &gap_end[file_zone], false);
 
             if (!result) {
                 // Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]"

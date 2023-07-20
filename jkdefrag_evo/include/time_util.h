@@ -36,7 +36,7 @@ public:
 private:
     bool running_;
     // Store 1 because it starts immediately
-    uint64_t start_count_ = 1;
+    uint64_t start_count_{};
     std::wstring description_;
     Clock::time_point start_clock_;
     // Accumulated diff, in case we continue() after stopping.

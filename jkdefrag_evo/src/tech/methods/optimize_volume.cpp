@@ -42,7 +42,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
         while (data.is_still_running()) {
             // Find the next gap
             auto result = find_gap(data, gap_begin, 0, 0, true, false,
-                                   &gap_begin, &gap_end, FALSE);
+                                   &gap_begin, &gap_end, false);
 
             if (!result) break;
 
