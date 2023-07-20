@@ -15,7 +15,8 @@ include_directories(${INCL})
 
 set(HEADER_FILES
         ${INCL}/app.h
-        ${INCL}/colormap.h
+        ${INCL}/diskmap.h
+        ${INCL}/diskmap_cell.h
         ${INCL}/constants.h
         ${INCL}/defrag_gui.h
         ${INCL}/runner.h
@@ -40,7 +41,7 @@ set(SOURCE_FILES
         ${SRC}/str_util.cpp
         ${SRC}/time_util.cpp
 
-        ${SRC}/gui/colormap.cpp
+        ${SRC}/gui/diskmap.cpp
         ${SRC}/gui/defrag_gui.cpp
         ${SRC}/gui/paint.cpp
         ${SRC}/gui/stats.cpp

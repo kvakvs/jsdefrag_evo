@@ -53,7 +53,7 @@ public:
 
     static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
 
-    DiskColorMap &get_color_map() { return color_map_; }
+    DiskMap &get_color_map() { return color_map_; }
 
 protected:
     void write_stats(const DefragState &data);
@@ -124,7 +124,7 @@ private:
     // Size of the drawing area
     Rect disk_area_size_;
 
-    DiskColorMap color_map_;
+    DiskMap color_map_;
 
     // 0:no, 1:request, 2: busy
     //	int RedrawScreen;

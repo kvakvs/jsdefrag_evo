@@ -1,13 +1,13 @@
 #include "precompiled_header.h"
-#include "colormap.h"
+#include "diskmap.h"
 
 
-DiskColorMap::DiskColorMap(uint64_t num_clusters)
+DiskMap::DiskMap(uint64_t num_clusters)
         : width_(1), height_(1), square_count_(1), cells_() {
     set_cluster_count(num_clusters);
 }
 
-void DiskColorMap::set_size(size_t width, size_t height) {
+void DiskMap::set_size(size_t width, size_t height) {
     width_ = width;
     height_ = height;
     square_count_ = width_ * height_;
@@ -15,7 +15,7 @@ void DiskColorMap::set_size(size_t width, size_t height) {
 
     cells_.resize(square_count_);
 
-    auto dirty_value = ClusterRepr{.dirty=true};
+    auto dirty_value = DiskMapCell{.dirty=true};
 
     std::fill(cells_.begin(), cells_.end(), dirty_value);
 }
@@ -23,7 +23,7 @@ void DiskColorMap::set_size(size_t width, size_t height) {
 // Fill a sequence of squares with their current state bitflags, merged.
 // Because the cluster map is much smaller than the physical cluster array, we have to downscale by merging values and
 // combine the bits using OR operation (writing 1 into a lookup array).
-void DiskColorMap::update_square_colors_from_diskmap(uint64_t start_square, uint64_t end_square) {
+void DiskMap::update_square_colors_from_diskmap(uint64_t start_square, uint64_t end_square) {
     uint8_t color_merge_table[(size_t) DrawColor::MaxValue];
 
     _ASSERT(end_square <= square_count_);
@@ -55,7 +55,7 @@ void DiskColorMap::update_square_colors_from_diskmap(uint64_t start_square, uint
     }
 }
 
-void DiskColorMap::set_cluster_count(uint64_t count) {
+void DiskMap::set_cluster_count(uint64_t count) {
     cluster_count_ = count;
     downscale_ratio_ = (double) cluster_count_ / (double) square_count_;
 
@@ -64,7 +64,7 @@ void DiskColorMap::set_cluster_count(uint64_t count) {
     // std::fill(cluster_info_.get(), cluster_info_.get() + num_clusters_, DrawColor::Empty);
 }
 
-void DiskColorMap::set_cluster_colors(uint64_t start, uint64_t end, DrawColor color) {
+void DiskMap::set_cluster_colors(uint64_t start, uint64_t end, DrawColor color) {
     std::fill(cluster_color_.get() + start, cluster_color_.get() + end, color);
 
     const auto cluster_start_square_num = get_square_from_cluster_index(start);

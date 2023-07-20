@@ -25,7 +25,7 @@ using namespace Gdiplus;
 
 #endif
 
-#include "colormap.h"
+#include "diskmap.h"
 #include "constants.h"
 #include "defrag_gui.h"
 #include "runner.h"

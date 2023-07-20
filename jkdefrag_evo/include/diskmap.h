@@ -1,23 +1,11 @@
 #pragma once
 
 #include "constants.h"
+#include "diskmap_cell.h"
 
-// Represents state of a disk cluster, used for coloring the diskmap. Dirty requires a redraw.
-using ClusterRepr = struct {
-    bool dirty: 1;
-    bool empty: 1;
-    bool allocated: 1;
-    bool unfragmented: 1;
-    bool unmovable: 1;
-    bool fragmented: 1;
-    bool busy: 1;
-    bool mft: 1;
-    bool spacehog: 1;
-};
-
-class DiskColorMap {
+class DiskMap {
 public:
-    DiskColorMap(uint64_t num_clusters);
+    DiskMap(uint64_t num_clusters);
 
     void set_size(size_t width, size_t height);
 
@@ -35,7 +23,7 @@ public:
         return square_count_;
     }
 
-    [[nodiscard]] ClusterRepr &get_cell(size_t index) {
+    [[nodiscard]] DiskMapCell &get_cell(size_t index) {
         return cells_[index];
     }
 
@@ -68,12 +56,9 @@ private:
     // Total number of squares in the disk area (cached from width * height)
     size_t square_count_;
 
-    // (cached from cluster_count_, width_ and height_)
-    double downscale_ratio_;
-
-    // Color of each disk cluster. This can be big on large drives
+    // Color of each disk cluster. This scales with drive size, and can be big on large drives
     std::unique_ptr<DrawColor[]> cluster_color_;
 
-    // Color of each square in disk area and status whether it is "dirty"
-    std::vector<ClusterRepr> cells_;
+    // Color of each square in disk area and status whether it is "dirty". This scales with screen size.
+    std::vector<DiskMapCell> cells_;
 };

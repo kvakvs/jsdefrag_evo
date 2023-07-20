@@ -31,6 +31,7 @@
  * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
  *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
  */
+// TODO: Very slow, improve search algorithm
 bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
                             const uint64_t minimum_size, const int must_fit, const bool find_highest_gap,
                             uint64_t *begin_lcn, uint64_t *end_lcn, const bool ignore_mft_excludes) {
@@ -62,7 +63,8 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
         // Fetch a block of cluster data. If error then return false
         bitmap_param.StartingLcn.QuadPart = lcn;
         error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
+                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
+                                     sizeof bitmap_data, &w, nullptr);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -83,7 +85,8 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
         if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) return false;
         if (maximum_lcn == 0) maximum_lcn = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
-        // Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the criteria then return it's LCN (Logical Cluster Number)
+        // Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the
+        // criteria then return it's LCN (Logical Cluster Number)
         lcn = bitmap_data.starting_lcn_;
         int index = 0;
         BYTE mask = 1;
