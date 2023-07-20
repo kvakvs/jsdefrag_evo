@@ -23,7 +23,7 @@ filetime64_t from_FILETIME(FILETIME &ft);
 // Calling start() when paused, stores the diff calculated so far, and continues clocking, also increases start count.
 class StopWatch {
 public:
-    StopWatch(const wchar_t *description);
+    explicit StopWatch(const wchar_t *description, bool start = true);
 
     virtual ~StopWatch();
 
@@ -38,7 +38,7 @@ private:
     // Store 1 because it starts immediately
     uint64_t start_count_ = 1;
     std::wstring description_;
-    Clock::time_point start_;
+    Clock::time_point start_clock_;
     // Accumulated diff, in case we continue() after stopping.
     Clock::duration diff_accrued_{};
 };

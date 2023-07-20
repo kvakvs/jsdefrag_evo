@@ -22,8 +22,10 @@ filetime64_t from_FILETIME(FILETIME &ft) {
     return filetime64_t(u.QuadPart);
 }
 
-StopWatch::StopWatch(const wchar_t *description) : description_(description), running_(true) {
-    start_ = Clock::now();
+StopWatch::StopWatch(const wchar_t *description, bool start) : description_(description), running_(start) {
+    if (start) {
+        start_clock_ = Clock::now();
+    }
 }
 
 StopWatch::~StopWatch() {
@@ -44,7 +46,7 @@ void StopWatch::pause() {
 
     running_ = false;
 
-    diff_accrued_ += (Clock::now() - start_);
+    diff_accrued_ += (Clock::now() - start_clock_);
 }
 
 void StopWatch::start() {
@@ -53,5 +55,5 @@ void StopWatch::start() {
     running_ = true;
     start_count_++;
 
-    start_ = Clock::now();
+    start_clock_ = Clock::now();
 }

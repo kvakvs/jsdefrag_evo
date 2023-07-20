@@ -25,7 +25,7 @@ void DefragGui::write_stats(const DefragState &data) {
     int fragments;
     FileNode *item;
     Log::log_always(
-            std::format(L"- Total disk space: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
+            std::format(L"- Total disk space: " NUM_FMT " bytes ({:.1f} Gb), " NUM_FMT " clusters",
                         data.bytes_per_cluster_ * data.total_clusters_,
                         (double) (data.bytes_per_cluster_ * data.total_clusters_) / gigabytes(1.0),
                         data.total_clusters_));
@@ -36,7 +36,7 @@ void DefragGui::write_stats(const DefragState &data) {
     Log::log_always(
             std::format(L"- Number of directories: " NUM_FMT, data.count_directories_));
     Log::log_always(
-            std::format(L"- Total size of analyzed items: " NUM_FMT " bytes ({:.3} gigabytes), " NUM_FMT " clusters",
+            std::format(L"- Total size of analyzed items: " NUM_FMT " bytes ({:.1f} Gb), " NUM_FMT " clusters",
                         data.count_all_clusters_ * data.bytes_per_cluster_,
                         (double) (data.count_all_clusters_ * data.bytes_per_cluster_) / gigabytes(1.0),
                         data.count_all_clusters_));
