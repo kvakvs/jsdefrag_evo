@@ -360,26 +360,24 @@ FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t c
     return nullptr;
 }
 
-/*
-Return the LCN of the fragment that contains a cluster at the LCN. If the
-item has no fragment that occupies the LCN then return zero.
-*/
+// Return the LCN of the fragment that contains a cluster at the LCN. If the
+// item has no fragment that occupies the LCN then return zero.
 uint64_t DefragRunner::find_fragment_begin(const FileNode *item, const uint64_t lcn) {
     // Sanity check
     if (item == nullptr || lcn == 0) return 0;
 
-    /* Walk through all the fragments of the item. If a fragment is found
-    that contains the LCN then return the begin of that fragment. */
+    // Walk through all the fragments of the item. If a fragment is found that contains the LCN then return
+    // the begin of that fragment
     uint64_t vcn = 0;
-    for (const FileFragment *fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
-        if (fragment->lcn_ != VIRTUALFRAGMENT) {
-            if (lcn >= fragment->lcn_ &&
-                lcn < fragment->lcn_ + fragment->next_vcn_ - vcn) {
-                return fragment->lcn_;
+    for (const auto &fragment: item->fragments_) {
+        if (!fragment.is_virtual()) {
+            if (lcn >= fragment.lcn_ &&
+                lcn < fragment.lcn_ + fragment.next_vcn_ - vcn) {
+                return fragment.lcn_;
             }
         }
 
-        vcn = fragment->next_vcn_;
+        vcn = fragment.next_vcn_;
     }
 
     // Not found: return zero

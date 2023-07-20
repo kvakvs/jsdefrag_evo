@@ -81,22 +81,22 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
             uint64_t vcn = 0;
             uint64_t real_vcn = 0;
 
-            for (auto fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
-                if (fragment->lcn_ != VIRTUALFRAGMENT) {
-                    if (fragment->lcn_ >= done_until &&
-                        (bigger_begin > fragment->lcn_ || bigger_item == nullptr)) {
+            for (auto &fragment: item->fragments_) {
+                if (!fragment.is_virtual()) {
+                    if (fragment.lcn_ >= done_until &&
+                        (bigger_begin > fragment.lcn_ || bigger_item == nullptr)) {
                         bigger_item = item;
-                        bigger_begin = fragment->lcn_;
-                        bigger_end = fragment->lcn_ + fragment->next_vcn_ - vcn;
+                        bigger_begin = fragment.lcn_;
+                        bigger_end = fragment.lcn_ + fragment.next_vcn_ - vcn;
                         bigger_real_vcn = real_vcn;
 
                         if (bigger_begin == lcn) break;
                     }
 
-                    real_vcn = real_vcn + fragment->next_vcn_ - vcn;
+                    real_vcn = real_vcn + fragment.next_vcn_ - vcn;
                 }
 
-                vcn = fragment->next_vcn_;
+                vcn = fragment.next_vcn_;
             }
 
             if (bigger_begin != 0 && bigger_begin == lcn) break;

@@ -1,8 +1,6 @@
 #pragma once
 
 #undef max
-// Used in the file ItemStruct tree for node locations
-constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
 
 enum class Zone {
     // Used as no-value
@@ -132,3 +130,4 @@ enum class MoveDirection {
 #define SCREENSAVER_NAME        "jkdefragscreensaver.exe"
 
 #define PARAM_OUT               /* output param */
+#define PARAM_MOVE              /* value is to be std::move'd into here */

@@ -105,25 +105,25 @@ void DefragRunner::calculate_zones(DefragState &data) {
             uint64_t vcn = 0;
             uint64_t real_vcn = 0;
 
-            for (auto frag = item->fragments_; frag != nullptr; frag = frag->next_) {
-                if (frag->lcn_ != VIRTUALFRAGMENT) {
-                    if ((frag->lcn_ < data.mft_excludes_[0].start_ || frag->lcn_ >= data.mft_excludes_[0].end_)
-                        && (frag->lcn_ < data.mft_excludes_[1].start_ || frag->lcn_ >= data.mft_excludes_[1].end_)
-                        && (frag->lcn_ < data.mft_excludes_[2].start_ || frag->lcn_ >= data.mft_excludes_[2].end_)) {
+            for (auto &frag: item->fragments_) {
+                if (!frag.is_virtual()) {
+                    if ((frag.lcn_ < data.mft_excludes_[0].start_ || frag.lcn_ >= data.mft_excludes_[0].end_)
+                        && (frag.lcn_ < data.mft_excludes_[1].start_ || frag.lcn_ >= data.mft_excludes_[1].end_)
+                        && (frag.lcn_ < data.mft_excludes_[2].start_ || frag.lcn_ >= data.mft_excludes_[2].end_)) {
 
-                        if (frag->lcn_ < zone_end[0]) {
-                            size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + frag->next_vcn_ - vcn;
-                        } else if (frag->lcn_ < zone_end[1]) {
-                            size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1] + frag->next_vcn_ - vcn;
-                        } else if (frag->lcn_ < zone_end[2]) {
-                            size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2] + frag->next_vcn_ - vcn;
+                        if (frag.lcn_ < zone_end[0]) {
+                            size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + frag.next_vcn_ - vcn;
+                        } else if (frag.lcn_ < zone_end[1]) {
+                            size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1] + frag.next_vcn_ - vcn;
+                        } else if (frag.lcn_ < zone_end[2]) {
+                            size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2] + frag.next_vcn_ - vcn;
                         }
                     }
 
-                    real_vcn = real_vcn + frag->next_vcn_ - vcn;
+                    real_vcn = real_vcn + frag.next_vcn_ - vcn;
                 }
 
-                vcn = frag->next_vcn_;
+                vcn = frag.next_vcn_;
             }
         }
     }
@@ -149,15 +149,12 @@ link. */
         uint32_t extent_count_;
         uint64_t starting_vcn_;
 
-        struct {
-            uint64_t next_vcn_;
-            uint64_t lcn_;
-        } extents_[1000];
+        // TODO: Use std::array or vector, and modify the loading code to allocate only as needed
+        FileFragment extents_[1000];
     } extent_data{};
 
     BY_HANDLE_FILE_INFORMATION file_information;
     uint64_t vcn;
-    FileFragment *fragment;
     FileFragment *last_fragment;
     uint32_t error_code;
     wchar_t error_string[BUFSIZ];
@@ -223,10 +220,11 @@ link. */
     }
 #endif
 
-    /* Ask Windows for the clustermap of the item and save it in memory.
-    The buffer that is used to ask Windows for the clustermap has a
-    fixed size, so we may have to loop a couple of times. */
-    fragment = item->fragments_;
+    // Ask Windows for the clustermap of the item and save it in memory.
+    // The buffer that is used to ask Windows for the clustermap has a fixed size,
+    // so we may have to loop a couple of times.
+    auto fragment = item->fragments_.begin();
+
     clusters = 0;
     vcn = 0;
     max_loop = 1000;
@@ -281,12 +279,12 @@ link. */
             There are two kinds of fragments: real and virtual. The latter do not
             occupy clusters on disk, but are information used by compressed
             and sparse files. */
-            if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
+            if (!extent_data.extents_[i].is_virtual()) {
                 clusters = clusters + extent_data.extents_[i].next_vcn_ - vcn;
             }
 
             // Compare the fragment
-            if (fragment == nullptr) {
+            if (fragment == item->fragments_.end()) {
                 gui->show_always(L"  Extra fragment in FSCTL_GET_RETRIEVAL_POINTERS");
             } else {
                 if (fragment->lcn_ != extent_data.extents_[i].lcn_) {
@@ -301,7 +299,7 @@ link. */
                                                 fragment->next_vcn_, extent_data.extents_[i].next_vcn_));
                 }
 
-                fragment = fragment->next_;
+                fragment++;
             }
 
             // The Vcn of the next fragment is the NextVcn field in this record
@@ -318,7 +316,7 @@ link. */
         return;
     }
 
-    if (fragment != nullptr) {
+    if (fragment != item->fragments_.end()) {
         gui->show_always(L"  Extra fragment from MFT");
     }
 
@@ -340,6 +338,7 @@ Return values:
 0    Equal
 1    item_1 is bigger than item_2
 */
+// TODO: Enum for sort_field
 int DefragRunner::compare_items(FileNode *item_1, FileNode *item_2, int sort_field) {
     int result;
 
@@ -517,7 +516,7 @@ void DefragRunner::scan_dir(DefragState &data, const wchar_t *mask, FileNode *pa
 
         // Ignore the item if it has no clusters or no LCN. Very small files are stored in the MFT and are reported by
         // Windows as having zero clusters and no fragments
-        if (item->clusters_count_ == 0 || item->fragments_ == nullptr) continue;
+        if (item->clusters_count_ == 0 || item->fragments_.empty()) continue;
 
         // Draw the item on the screen
         colorize_disk_item(data, item.get(), 0, 0, false);

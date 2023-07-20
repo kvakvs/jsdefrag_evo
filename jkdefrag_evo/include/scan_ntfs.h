@@ -295,10 +295,9 @@ struct ATTRIBUTE_DEFINITION {
 */
 
 struct StreamStruct {
-    StreamStruct *next_;
     std::wstring stream_name_;
     ATTRIBUTE_TYPE stream_type_;
-    FileFragment *fragments_; // The fragments of the stream
+    std::list<FileFragment> fragments_; // The fragments of the stream
     uint64_t clusters_; // Total number of clusters
     uint64_t bytes_; // Total number of bytes
 };
@@ -319,12 +318,12 @@ struct InodeDataStruct {
     micro64_t mft_change_time_;
     micro64_t last_access_time_;
 
-    StreamStruct *streams_; // List of StreamStruct
-    FileFragment *mft_data_fragments_; // The Fragments of the $MFT::$DATA stream
+    std::list<StreamStruct> streams_; // List of StreamStruct
+    std::list<FileFragment> mft_data_fragments_; // The Fragments of the $MFT::$DATA stream
 
     uint64_t mft_data_bytes_; // Length of the $MFT::$DATA
 
-    FileFragment *mft_bitmap_fragments_; // The Fragments of the $MFT::$BITMAP stream
+    std::list<FileFragment> mft_bitmap_fragments_; // The Fragments of the $MFT::$BITMAP stream
 
     uint64_t mft_bitmap_bytes_; // Length of the $MFT::$BITMAP
 };
@@ -362,9 +361,9 @@ private:
     bool analyze_ntfs_volume_read_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MemReader<uint8_t> &buff);
 
     bool analyze_ntfs_volume_extract_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MemReader<uint8_t> &buff,
-                                         PARAM_OUT FileFragment *&mft_bitmap_fragments,
+                                         PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments,
                                          PARAM_OUT uint64_t &bitmap_bytes, PARAM_OUT uint64_t &mft_data_bytes,
-                                         PARAM_OUT FileFragment *&mft_data_fragments);
+                                         PARAM_OUT std::list<FileFragment> &mft_data_fragments);
 
     static const wchar_t *stream_type_names(ATTRIBUTE_TYPE stream_type);
 
@@ -381,7 +380,7 @@ private:
             const BYTE *run_data, uint32_t run_data_length, uint64_t starting_vcn,
             uint64_t bytes);
 
-    static void cleanup_streams(InodeDataStruct *inode_data, bool cleanup_fragments);
+    static void cleanup_streams(InodeDataStruct *inode_data);
 
     static std::wstring
     construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, const StreamStruct *stream);
@@ -396,9 +395,9 @@ private:
 
     bool interpret_mft_record(
             DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array, uint64_t inode_number,
-            uint64_t max_inode, PARAM_OUT FileFragment *&mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
-            PARAM_OUT FileFragment *&mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
-            BYTE *buffer, uint64_t buf_length
+            uint64_t max_inode, PARAM_OUT std::list<FileFragment> &mft_data_fragments, PARAM_OUT
+            uint64_t &mft_data_bytes, PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments, PARAM_OUT
+            uint64_t &mft_bitmap_bytes, BYTE *buffer, uint64_t buf_length
     );
 
     // static member that is an instance of itself

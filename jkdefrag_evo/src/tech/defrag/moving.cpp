@@ -107,7 +107,6 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
                                     const uint64_t new_lcn, const uint64_t offset,
                                     const uint64_t size) const {
     MOVE_FILE_DATA move_params;
-    FileFragment *fragment;
     uint64_t lcn;
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
@@ -118,8 +117,9 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
     uint64_t vcn = 0;
     uint64_t real_vcn = 0;
 
-    for (fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
-        if (fragment->lcn_ != VIRTUALFRAGMENT) {
+    auto fragment = item->fragments_.begin();
+    for (; fragment != item->fragments_.end(); fragment++) {
+        if (!fragment->is_virtual()) {
             if (real_vcn + fragment->next_vcn_ - vcn - 1 >= offset) break;
 
             real_vcn = real_vcn + fragment->next_vcn_ - vcn;
@@ -128,13 +128,13 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
         vcn = fragment->next_vcn_;
     }
 
-    // Setup the parameters for the move
+    // Set up the parameters for the move
     move_params.FileHandle = file_handle;
     move_params.StartingLcn.QuadPart = new_lcn;
     move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
     move_params.ClusterCount = (uint32_t) size;
 
-    if (fragment == nullptr) {
+    if (fragment == item->fragments_.end()) {
         lcn = 0;
     } else {
         lcn = fragment->lcn_ + (offset - real_vcn);
@@ -189,13 +189,13 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle
     uint64_t vcn = 0;
     uint64_t real_vcn = 0;
 
-    for (auto fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
+    for (auto &fragment: item->fragments_) {
         if (*data.running_ != RunningState::RUNNING) break;
 
-        if (fragment->lcn_ != VIRTUALFRAGMENT) {
+        if (!fragment.is_virtual()) {
             if (real_vcn >= offset + size) break;
 
-            if (real_vcn + fragment->next_vcn_ - vcn - 1 >= offset) {
+            if (real_vcn + fragment.next_vcn_ - vcn - 1 >= offset) {
                 /* Setup the parameters for the move. If the block that we want to move
                 begins somewhere in the middle of a fragment then we have to setup
                 slightly differently than when the fragment is at or after the begin
@@ -209,25 +209,25 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle
                     move_params.StartingLcn.QuadPart = new_lcn;
                     move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
 
-                    if (size < fragment->next_vcn_ - vcn - (offset - real_vcn)) {
+                    if (size < fragment.next_vcn_ - vcn - (offset - real_vcn)) {
                         move_params.ClusterCount = (uint32_t) size;
                     } else {
-                        move_params.ClusterCount = (uint32_t) (fragment->next_vcn_ - vcn - (offset - real_vcn));
+                        move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn - (offset - real_vcn));
                     }
 
-                    from_lcn = fragment->lcn_ + (offset - real_vcn);
+                    from_lcn = fragment.lcn_ + (offset - real_vcn);
                 } else {
                     /* The fragment starts at or after the Offset. Move the part of
                     the fragment inside the block (up until Offset+Size). */
                     move_params.StartingLcn.QuadPart = new_lcn + real_vcn - offset;
                     move_params.StartingVcn.QuadPart = vcn;
 
-                    if (fragment->next_vcn_ - vcn < offset + size - real_vcn) {
-                        move_params.ClusterCount = (uint32_t) (fragment->next_vcn_ - vcn);
+                    if (fragment.next_vcn_ - vcn < offset + size - real_vcn) {
+                        move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn);
                     } else {
                         move_params.ClusterCount = (uint32_t) (offset + size - real_vcn);
                     }
-                    from_lcn = fragment->lcn_;
+                    from_lcn = fragment.lcn_;
                 }
 
                 // Show progress message
@@ -263,11 +263,11 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle
                 if (error_code != NO_ERROR) return error_code;
             }
 
-            real_vcn = real_vcn + fragment->next_vcn_ - vcn;
+            real_vcn = real_vcn + fragment.next_vcn_ - vcn;
         }
 
         // Next fragment
-        vcn = fragment->next_vcn_;
+        vcn = fragment.next_vcn_;
     }
 
     return error_code;

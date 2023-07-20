@@ -5,12 +5,23 @@
 #include "constants.h"
 
 #include <optional>
+#include <list>
 
 // File fragment descriptor, stored as a list of file fragments; TODO: std::forward_list
 struct FileFragment {
     uint64_t lcn_; // Logical cluster number, location on disk
     uint64_t next_vcn_; // Virtual cluster number of next fragment
-    FileFragment *next_;
+
+    void set_virtual() {
+        lcn_ = VIRTUALFRAGMENT;
+    }
+
+    [[nodiscard]] bool is_virtual() const {
+        return lcn_ == VIRTUALFRAGMENT;
+    }
+
+private:
+    static constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
 };
 
 
@@ -31,16 +42,19 @@ public:
 //    };
 
     // Return the location on disk (LCN, Logical Cluster Number) of an item
-    TreeLcn get_item_lcn() const {
+    [[nodiscard]] TreeLcn get_item_lcn() const {
         // Sanity check
         if (this == nullptr) return 0;
 
-        const FileFragment *fragment = fragments_;
+        auto fragment = fragments_.begin();
 
-        while (fragment != nullptr && fragment->lcn_ == VIRTUALFRAGMENT) {
-            fragment = fragment->next_;
+        // Skip forward over virtual fragments
+        while (fragment != fragments_.end() && fragment->is_virtual()) {
+            fragment++;
         }
-        return fragment == nullptr ? 0 : fragment->lcn_;
+
+        // Return 0 if the fragment list end was reached without finding a real fragment
+        return fragment == fragments_.end() ? 0 : fragment->lcn_;
     }
 
     [[nodiscard]] Zone get_preferred_zone() const {
@@ -64,7 +78,7 @@ public:
 
     // List of fragments
     // TODO: Owning pointer
-    FileFragment *fragments_;
+    std::list<FileFragment> fragments_;
 
     // The Inode number of the parent directory
     uint64_t parent_inode_;

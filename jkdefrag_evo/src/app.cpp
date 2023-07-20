@@ -56,7 +56,7 @@ WPARAM DefragApp::start_program(HINSTANCE instance,
 
 #ifdef _DEBUG
     // Setup crash report handler
-    SetUnhandledExceptionFilter(&DefragApp::crash_report);
+    // SetUnhandledExceptionFilter(&DefragApp::crash_report);
 #endif
 
     // Initialize the GUI and start update timer (sends WM_TIMER)

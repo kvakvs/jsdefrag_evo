@@ -25,7 +25,6 @@ ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_inf
                                  BYTE *buffer, const uint64_t buf_length, const int depth) {
     std::unique_ptr<BYTE[]> buffer_2;
     ATTRIBUTE_LIST *attribute;
-    FileFragment *fragment;
     OVERLAPPED g_overlapped;
     DWORD bytes_read;
     DefragGui *gui = DefragGui::get_instance();
@@ -92,8 +91,10 @@ ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_inf
         const uint64_t ref_inode_vcn = ref_inode * disk_info->bytes_per_mft_record_ /
                                        (disk_info->bytes_per_sector_ * disk_info->sectors_per_cluster_);
 
-        for (fragment = inode_data->mft_data_fragments_; fragment != nullptr; fragment = fragment->next_) {
-            if (fragment->lcn_ != VIRTUALFRAGMENT) {
+        auto fragment = inode_data->mft_data_fragments_.begin();
+
+        for (; fragment != inode_data->mft_data_fragments_.end(); fragment++) {
+            if (!fragment->is_virtual()) {
                 if (ref_inode_vcn >= real_vcn && ref_inode_vcn < real_vcn + fragment->next_vcn_ - vcn) {
                     break;
                 }
@@ -104,7 +105,7 @@ ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_inf
             vcn = fragment->next_vcn_;
         }
 
-        if (fragment == nullptr) {
+        if (fragment == inode_data->mft_data_fragments_.end()) {
             gui->show_debug(
                     DebugLevel::DetailedGapFinding, nullptr,
                     std::format(
@@ -118,8 +119,10 @@ ScanNTFS::process_attribute_list(DefragState &data, NtfsDiskInfoStruct *disk_inf
         buffer_2 = std::make_unique<BYTE[]>((size_t) disk_info->bytes_per_mft_record_);
 
         ULARGE_INTEGER trans;
-        trans.QuadPart = (fragment->lcn_ - real_vcn) * disk_info->bytes_per_sector_ *
-                         disk_info->sectors_per_cluster_ + ref_inode * disk_info->bytes_per_mft_record_;
+        trans.QuadPart = ((fragment->lcn_ - real_vcn)
+                          * disk_info->bytes_per_sector_
+                          * disk_info->sectors_per_cluster_)
+                         + ref_inode * disk_info->bytes_per_mft_record_;
 
         g_overlapped.Offset = trans.LowPart;
         g_overlapped.OffsetHigh = trans.HighPart;
@@ -327,28 +330,27 @@ bool ScanNTFS::process_attributes(DefragState &data, NtfsDiskInfoStruct *disk_in
             // Cleanup the streamname
             p2.reset();
 
-            // Special case: If this is the $MFT then save data
+            // Special case: If this is the $MFT (intent: to save data,
+            // but for real with STL data structures, there's not much saving now)
             if (inode_data->inode_ == 0) {
                 if (attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeData
-                    && inode_data->mft_data_fragments_ == nullptr) {
-                    inode_data->mft_data_fragments_ = inode_data->streams_->fragments_;
+                    && inode_data->mft_data_fragments_.empty()) {
+                    inode_data->mft_data_fragments_ = inode_data->streams_.begin()->fragments_;
                     inode_data->mft_data_bytes_ = nonresident_attribute->data_size_;
                 }
 
                 if (attribute->attribute_type_ == ATTRIBUTE_TYPE::AttributeBitmap
-                    && inode_data->mft_bitmap_fragments_ == nullptr) {
-                    inode_data->mft_bitmap_fragments_ = inode_data->streams_->fragments_;
+                    && inode_data->mft_bitmap_fragments_.empty()) {
+                    inode_data->mft_bitmap_fragments_ = inode_data->streams_.begin()->fragments_;
                     inode_data->mft_bitmap_bytes_ = nonresident_attribute->data_size_;
                 }
             }
         }
     }
 
-    /* Walk through all the attributes and interpret the AttributeLists. We have to
-    do this after the DATA and BITMAP attributes have been interpreted, because
-    some MFT's have an AttributeList that is stored in fragments that are
-    defined in the DATA attribute, and/or contain a continuation of the DATA or
-    BITMAP attributes. */
+    // Walk through all the attributes and interpret the AttributeLists. We have to do this after the DATA and BITMAP
+    // attributes have been interpreted, because some MFT's have an AttributeList that is stored in fragments that are
+    // defined in the DATA attribute, and/or contain a continuation of the DATA or BITMAP attributes.
     for (attribute_offset = 0; attribute_offset < buf_length; attribute_offset = attribute_offset + attribute->
             length_) {
         attribute = (ATTRIBUTE *) &buffer[attribute_offset];

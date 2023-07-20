@@ -191,8 +191,6 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
         const DefragState &data, InodeDataStruct *inode_data, const wchar_t *stream_name,
         ATTRIBUTE_TYPE stream_type, const BYTE *run_data, const uint32_t run_data_length, const uint64_t starting_vcn,
         const uint64_t bytes) {
-    StreamStruct *stream;
-
     union UlongBytes {
         struct {
             BYTE bytes_[8];
@@ -210,16 +208,18 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
     // Sanity check
     if (inode_data == nullptr) return false;
 
-    // Find the stream in the list of streams. If not found then create a new stream
-    for (stream = inode_data->streams_; stream != nullptr; stream = stream->next_) {
-        if (stream->stream_type_ != stream_type) continue;
-        if (stream_name == nullptr) break;
-        if (stream_name != nullptr && stream->stream_name_ == stream_name) {
-            break;
-        }
+    // Find the stream in the list of streams. If not found, then create a new stream
+    auto stream_iter = inode_data->streams_.begin();
+
+    for (; stream_iter != inode_data->streams_.end(); stream_iter++) {
+        if (stream_iter->stream_type_ != stream_type) continue;
+
+        // Break if stream_name that we are searching for, is a null, or if the stream_name matches
+        if (stream_name == nullptr || stream_iter->stream_name_ == stream_name) break;
     }
 
-    if (stream == nullptr) {
+    // Stream name was not found by the previous loop
+    if (stream_iter == inode_data->streams_.end()) {
         if (stream_name != nullptr) {
             gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                             std::format(L"    Creating new stream: '{}:{}'", stream_name,
@@ -229,35 +229,32 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
                             std::format(L"    Creating new stream: ':{}'", stream_type_names(stream_type)));
         }
 
-        stream = new StreamStruct();
+        StreamStruct new_stream = {
+                .stream_name_ = (stream_name != nullptr && wcslen(stream_name) > 0) ? stream_name : L"",
+                .stream_type_ = stream_type,
+                .fragments_ = {},
+                .clusters_ = 0,
+                .bytes_ = bytes,
+        };
+        inode_data->streams_.push_back(new_stream);
 
-        stream->next_ = inode_data->streams_;
-
-        inode_data->streams_ = stream;
-
-        stream->stream_name_.clear();
-
-        if (stream_name != nullptr && wcslen(stream_name) > 0) {
-            stream->stream_name_ = stream_name;
-        }
-
-        stream->stream_type_ = stream_type;
-        stream->fragments_ = nullptr;
-        stream->clusters_ = 0;
-        stream->bytes_ = bytes;
+        // Step back one from end
+        stream_iter = inode_data->streams_.end();
+        stream_iter--;
     } else {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(L"    Appending rundata to existing stream: '{}:{}",
                                     stream_name ? stream_name : L"", stream_type_names(stream_type)));
 
-        if (stream->bytes_ == 0) stream->bytes_ = bytes;
+        if (stream_iter->bytes_ == 0) stream_iter->bytes_ = bytes;
     }
 
     // If the stream already has a list of fragments then find the last fragment
-    auto last_fragment = stream->fragments_;
+    _ASSERT(stream_iter != inode_data->streams_.end());
+    auto last_fragment = stream_iter->fragments_.rbegin();
 
-    if (last_fragment != nullptr) {
-        while (last_fragment->next_ != nullptr) last_fragment = last_fragment->next_;
+    if (last_fragment != stream_iter->fragments_.rend()) {
+        //while (last_fragment->next_ != nullptr) last_fragment = last_fragment->next_;
 
         if (starting_vcn != last_fragment->next_vcn_) {
             gui->show_debug(
@@ -272,7 +269,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
 
     // Walk through the RunData and add the extents
     uint32_t index = 0;
-    int64_t lcn = 0;
+    uint64_t lcn = 0;
     auto vcn = starting_vcn;
 
     if (run_data != nullptr)
@@ -346,26 +343,18 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
             and sparse files. */
 
             if (run_offset.value != 0) {
-                stream->clusters_ = stream->clusters_ + run_length.value;
+                stream_iter->clusters_ = stream_iter->clusters_ + run_length.value;
             }
 
             // Add the extent to the Fragments
-            const auto new_fragment = new FileFragment();
+            FileFragment new_fragment = {
+                    .lcn_ = lcn,
+                    .next_vcn_ = vcn,
+            };
 
-            new_fragment->lcn_ = lcn;
+            if (run_offset.value == 0) new_fragment.set_virtual();
 
-            if (run_offset.value == 0) new_fragment->lcn_ = VIRTUALFRAGMENT;
-
-            new_fragment->next_vcn_ = vcn;
-            new_fragment->next_ = nullptr;
-
-            if (stream->fragments_ == nullptr) {
-                stream->fragments_ = new_fragment;
-            } else {
-                if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
-            }
-
-            last_fragment = new_fragment;
+            stream_iter->fragments_.push_back(new_fragment);
         }
 
     return true;

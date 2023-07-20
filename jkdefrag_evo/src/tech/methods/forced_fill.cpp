@@ -48,20 +48,19 @@ void DefragRunner::forced_fill(DefragState &data) {
             uint64_t vcn = 0;
             uint64_t real_vcn = 0;
 
-            FileFragment *fragment;
-            for (fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
-                if (fragment->lcn_ != VIRTUALFRAGMENT) {
-                    if (fragment->lcn_ > highest_lcn && fragment->lcn_ < max_lcn) {
+            for (auto &fragment: item->fragments_) {
+                if (!fragment.is_virtual()) {
+                    if (fragment.lcn_ > highest_lcn && fragment.lcn_ < max_lcn) {
                         highest_item = item;
-                        highest_lcn = fragment->lcn_;
+                        highest_lcn = fragment.lcn_;
                         highest_vcn = real_vcn;
-                        highest_size = fragment->next_vcn_ - vcn;
+                        highest_size = fragment.next_vcn_ - vcn;
                     }
 
-                    real_vcn = real_vcn + fragment->next_vcn_ - vcn;
+                    real_vcn = real_vcn + fragment.next_vcn_ - vcn;
                 }
 
-                vcn = fragment->next_vcn_;
+                vcn = fragment.next_vcn_;
             }
         }
 

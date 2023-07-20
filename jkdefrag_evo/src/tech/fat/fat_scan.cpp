@@ -68,15 +68,12 @@ filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const U
 // the next cluster of the file.
 void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info,
                                  FileNode *item, uint64_t cluster) {
-    FileFragment *new_fragment;
-    FileFragment *last_fragment;
-
     int max_iterate;
 
     DefragGui *gui = DefragGui::get_instance();
 
     item->clusters_count_ = 0;
-    item->fragments_ = nullptr;
+    item->fragments_.clear();
 
     // If cluster is zero then return zero
     if (cluster == 0) return;
@@ -97,25 +94,19 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
         if (cluster > disk_info->countof_clusters_ + 1) break;
 
         // Increment the cluster counter
-        item->clusters_count_ = item->clusters_count_ + 1;
+        item->clusters_count_ += 1;
 
-        /* If this is a new fragment then create a record for the previous fragment. If not then
-            add the cluster to the counters and continue. */
+        // If this is a new fragment then create a record for the previous fragment.
+        // If not then add the cluster to the counters and continue
         if (cluster != last_cluster + 1 && last_cluster != 0) {
-            new_fragment = new FileFragment();
-
-            new_fragment->lcn_ = first_cluster - 2;
             vcn = vcn + last_cluster - first_cluster + 1;
-            new_fragment->next_vcn_ = vcn;
-            new_fragment->next_ = nullptr;
 
-            if (item->fragments_ == nullptr) {
-                item->fragments_ = new_fragment;
-            } else {
-                if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
-            }
+            FileFragment new_fragment = {
+                    .lcn_ = first_cluster - 2,
+                    .next_vcn_ = vcn,
+            };
 
-            last_fragment = new_fragment;
+            item->fragments_.push_back(new_fragment);
             first_cluster = cluster;
         }
 
@@ -138,6 +129,8 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
             case DiskType::FAT32:
                 cluster = disk_info->fat_data_.fat32[cluster] & 0xFFFFFFF;
                 break;
+            default:
+                _ASSERT(false); // should not occur
         }
     }
 
@@ -151,17 +144,12 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
 
     // Create the last fragment
     if (last_cluster != 0) {
-        new_fragment = new FileFragment();
-
-        new_fragment->lcn_ = first_cluster - 2;
         vcn = vcn + last_cluster - first_cluster + 1;
-        new_fragment->next_vcn_ = vcn;
-        new_fragment->next_ = nullptr;
 
-        if (item->fragments_ == nullptr) {
-            item->fragments_ = new_fragment;
-        } else {
-            if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
-        }
+        FileFragment new_fragment = {
+                .lcn_ = first_cluster - 2,
+                .next_vcn_ = vcn,
+        };
+        item->fragments_.push_back(new_fragment);
     }
 }

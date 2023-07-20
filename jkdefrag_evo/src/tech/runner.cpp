@@ -215,10 +215,8 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
         uint32_t extent_count_;
         uint64_t starting_vcn_;
 
-        struct {
-            uint64_t next_vcn_;
-            uint64_t lcn_;
-        } extents_[1000];
+        // TODO: Use std::array or vector, and modify the loading code to allocate only as needed
+        FileFragment extents_[1000];
     } extent_data{};
 
     BY_HANDLE_FILE_INFORMATION file_information;
@@ -229,12 +227,7 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
 
     // Initialize. If the item has an old list of fragments then delete it
     item->clusters_count_ = 0;
-
-    while (item->fragments_ != nullptr) {
-        last_fragment = item->fragments_->next_;
-        delete item->fragments_;
-        item->fragments_ = last_fragment;
-    }
+    item->fragments_.clear();
 
     // Fetch the date/times of the file
     if (item->creation_time_.count() == 0 &&
@@ -278,8 +271,8 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
         RetrieveParam.StartingVcn.QuadPart = vcn;
 
         error_code = DeviceIoControl(file_handle, FSCTL_GET_RETRIEVAL_POINTERS,
-                                     &RetrieveParam, sizeof RetrieveParam, &extent_data, sizeof extent_data, &w,
-                                     nullptr);
+                                     &RetrieveParam, sizeof RetrieveParam,
+                                     &extent_data, sizeof extent_data, &w, nullptr);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -293,7 +286,7 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
         save all fragments in memory. */
         for (uint32_t i = 0; i < extent_data.extent_count_; i++) {
             // Show debug message
-            if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
+            if (!extent_data.extents_[i].is_virtual()) {
                 // "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u"
                 gui->show_debug(
                         DebugLevel::DetailedFileInfo, nullptr,
@@ -309,24 +302,17 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
             There are two kinds of fragments: real and virtual. The latter do not
             occupy clusters on disk, but are information used by compressed
             and sparse files. */
-            if (extent_data.extents_[i].lcn_ != VIRTUALFRAGMENT) {
+            if (!extent_data.extents_[i].is_virtual()) {
                 item->clusters_count_ = item->clusters_count_ + extent_data.extents_[i].next_vcn_ - vcn;
             }
 
             // Add the fragment to the Fragments
+            FileFragment new_fragment = {
+                    .lcn_ = extent_data.extents_[i].lcn_,
+                    .next_vcn_ = extent_data.extents_[i].next_vcn_,
+            };
 
-            auto new_fragment = new FileFragment();
-            new_fragment->lcn_ = extent_data.extents_[i].lcn_;
-            new_fragment->next_vcn_ = extent_data.extents_[i].next_vcn_;
-            new_fragment->next_ = nullptr;
-
-            if (item->fragments_ == nullptr) {
-                item->fragments_ = new_fragment;
-            } else {
-                if (last_fragment != nullptr) last_fragment->next_ = new_fragment;
-            }
-
-            last_fragment = new_fragment;
+            item->fragments_.push_back(new_fragment);
 
             // The Vcn of the next fragment is the NextVcn field in this record
             vcn = extent_data.extents_[i].next_vcn_;
@@ -355,14 +341,14 @@ int DefragRunner::get_fragment_count(const FileNode *item) {
     uint64_t vcn = 0;
     uint64_t next_lcn = 0;
 
-    for (auto fragment = item->fragments_; fragment != nullptr; fragment = fragment->next_) {
-        if (fragment->lcn_ != VIRTUALFRAGMENT) {
-            if (next_lcn != 0 && fragment->lcn_ != next_lcn) fragments++;
+    for (auto &fragment: item->fragments_) {
+        if (!fragment.is_virtual()) {
+            if (next_lcn != 0 && fragment.lcn_ != next_lcn) fragments++;
 
-            next_lcn = fragment->lcn_ + fragment->next_vcn_ - vcn;
+            next_lcn = fragment.lcn_ + fragment.next_vcn_ - vcn;
         }
 
-        vcn = fragment->next_vcn_;
+        vcn = fragment.next_vcn_;
     }
 
     if (next_lcn != 0) fragments++;
@@ -385,15 +371,15 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
     uint64_t fragment_end = 0;
     uint64_t vcn = 0;
     uint64_t next_lcn = 0;
-    const FileFragment *fragment = item->fragments_;
+    auto fragment = item->fragments_.begin();
 
-    while (fragment != nullptr) {
+    while (fragment != item->fragments_.end()) {
         // Virtual fragments do not occupy space on disk and do not count as fragments
-        if (fragment->lcn_ != VIRTUALFRAGMENT) {
-            /* Treat aligned fragments as a single fragment. Windows will frequently
-            split files in fragments even though they are perfectly aligned on disk,
-            especially system files and very large files. The defragger treats these
-            files as unfragmented. */
+        if (!fragment->is_virtual()) {
+
+            // Treat aligned fragments as a single fragment.
+            // Windows will frequently split files in fragments even though they are perfectly aligned on disk,
+            // especially system files and very large files. The defragger treats these files as unfragmented.
             if (next_lcn != 0 && fragment->lcn_ != next_lcn) {
                 // If the fragment is above the block then return false, the block is not fragmented and we don't
                 // have to scan any further.
@@ -417,7 +403,7 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
 
         // Next fragment
         vcn = fragment->next_vcn_;
-        fragment = fragment->next_;
+        fragment++;
     }
 
     // Handle the last fragment
@@ -454,14 +440,13 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
     uint64_t vcn = 0;
     uint64_t real_vcn = 0;
 
-    const FileFragment *fragment = item->fragments_;
+    auto fragment = item->fragments_.begin();
 
-    while (fragment != nullptr) {
+    while (fragment != item->fragments_.end()) {
         // Ignore virtual fragments. They do not occupy space on disk and do not require colorization.
-        if (fragment->lcn_ == VIRTUALFRAGMENT) {
+        if (fragment->is_virtual()) {
             vcn = fragment->next_vcn_;
-            fragment = fragment->next_;
-
+            fragment++;
             continue;
         }
 
@@ -528,7 +513,7 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
         real_vcn = real_vcn + fragment->next_vcn_ - vcn;
 
         vcn = fragment->next_vcn_;
-        fragment = fragment->next_;
+        fragment++;
     }
 }
 

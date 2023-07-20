@@ -131,28 +131,7 @@ ScanNTFS::construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_
     return p1;
 }
 
-// Cleanup the Streams data in an inode_data struct. If CleanFragments is TRUE then
-// also cleanup the fragments.
-void ScanNTFS::cleanup_streams(InodeDataStruct *inode_data, const bool cleanup_fragments) {
-    const StreamStruct *stream = inode_data->streams_;
-
-    while (stream != nullptr) {
-        if (cleanup_fragments == TRUE) {
-            const FileFragment *fragment = stream->fragments_;
-
-            while (fragment != nullptr) {
-                const FileFragment *temp_fragment = fragment;
-                fragment = fragment->next_;
-
-                delete temp_fragment;
-            }
-        }
-
-        const StreamStruct *temp_stream = stream;
-        stream = stream->next_;
-
-        delete temp_stream;
-    }
-
-    inode_data->streams_ = nullptr;
-}
+//// Cleanup the Streams data in an inode_data struct
+//void ScanNTFS::cleanup_streams(InodeDataStruct *inode_data) {
+//    inode_data->streams_.clear();
+//}
