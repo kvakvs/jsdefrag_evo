@@ -37,7 +37,7 @@ void DefragRunner::fixup(DefragState &data) {
     for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
-        if (item->clusters_count_ == 0) continue;
+        if (item->clusters_count_.is_zero()) continue;
 
         data.phase_todo_ += item->clusters_count_;
     }
@@ -45,17 +45,11 @@ void DefragRunner::fixup(DefragState &data) {
     // [[maybe_unused]] micro64_t last_calc_time = system_time;
 
     // Exit if nothing to do
-    if (data.phase_todo_ == 0) return;
+    if (data.phase_todo_.is_zero()) return;
 
     // Walk through all files and move the files that need to be moved.
-    uint64_t gap_begin[3];
-    uint64_t gap_end[3];
-
-    int file_zone;
-    for (file_zone = 0; file_zone < 3; file_zone++) {
-        gap_begin[file_zone] = 0;
-        gap_end[file_zone] = 0;
-    }
+    Clusters64 gap_begin[(size_t) Zone::All_MaxValue] = {};
+    Clusters64 gap_end[(size_t) Zone::All_MaxValue] = {};
 
     auto next_item = Tree::smallest(data.item_tree_);
 
@@ -68,26 +62,22 @@ void DefragRunner::fixup(DefragState &data) {
         // Ignore items that are unmovable or excluded
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
-        if (item->clusters_count_ == 0) continue;
+        if (item->clusters_count_.is_zero()) continue;
 
         // Ignore items that do not need to be moved
-        file_zone = 1;
+        Zone file_zone = item->get_preferred_zone();
 
-        if (item->is_hog_) file_zone = 2;
-        if (item->is_dir_) file_zone = 0;
+        const auto item_lcn = item->get_item_lcn();
+        bool move_me = false;
 
-        const uint64_t item_lcn = item->get_item_lcn();
-
-        int move_me = false;
-
-        if (is_fragmented(item, 0, item->clusters_count_)) {
+        if (is_fragmented(item, Clusters64(0), item->clusters_count_)) {
             // "I am fragmented."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am fragmented.");
 
             move_me = true;
         }
 
-        if (move_me == false &&
+        if (!move_me &&
             ((item_lcn >= data.mft_excludes_[0].start_ && item_lcn < data.mft_excludes_[0].end_) ||
              (item_lcn >= data.mft_excludes_[1].start_ && item_lcn < data.mft_excludes_[1].end_) ||
              (item_lcn >= data.mft_excludes_[2].start_ && item_lcn < data.mft_excludes_[2].end_))
@@ -98,19 +88,19 @@ void DefragRunner::fixup(DefragState &data) {
             move_me = true;
         }
 
-        if (file_zone == 1 && item_lcn < data.zones_[1] && move_me == false) {
+        if (file_zone == Zone::RegularFiles && item_lcn < data.zones_[1] && !move_me) {
             // "I am a regular file in zone 1."
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a regular file in zone 1.");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a regular file in RegularFiles zone.");
             move_me = true;
         }
 
-        if (file_zone == 2 && item_lcn < data.zones_[2] && move_me == false) {
+        if (file_zone == Zone::SpaceHogs && item_lcn < data.zones_[2] && !move_me) {
             // "I am a spacehog in zone 1 or 2."
-            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a spacehog in zone 1 or 2.");
+            gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am a spacehog in RegularFiles or SpaceHogs zone.");
             move_me = true;
         }
 
-        if (move_me == false) {
+        if (!move_me) {
             data.clusters_done_ += item->clusters_count_;
             continue;
         }
@@ -132,10 +122,11 @@ void DefragRunner::fixup(DefragState &data) {
         }
 
         // If the file does not fit in the current gap then find another gap
-        if (item->clusters_count_ > gap_end[file_zone] - gap_begin[file_zone]) {
-            result = find_gap(data, data.zones_[file_zone], 0, item->clusters_count_, true, false,
-                              &gap_begin[file_zone],
-                              &gap_end[file_zone], false);
+        if (item->clusters_count_ > gap_end[(size_t) file_zone] - gap_begin[(size_t) file_zone]) {
+            result = find_gap(data, data.zones_[(size_t) file_zone], Clusters64(0),
+                              item->clusters_count_, true, false,
+                              PARAM_OUT gap_begin[(size_t) file_zone], PARAM_OUT gap_end[(size_t) file_zone],
+                              false);
 
             if (!result) {
                 // Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]"
@@ -143,22 +134,24 @@ void DefragRunner::fixup(DefragState &data) {
                         DebugLevel::Progress, item,
                         std::format(
                                 L"Cannot move file away because no gap is big enough: lcn=" NUM_FMT "[" NUM_FMT " clusters]",
-                                item->get_item_lcn(), item->clusters_count_));
+                                item->get_item_lcn().value(), item->clusters_count_.value())
+                );
 
-                gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
+                gap_end[(size_t) file_zone] = gap_begin[(size_t) file_zone]; // Force re-scan of gap
 
                 data.clusters_done_ += item->clusters_count_;
                 continue;
             }
         }
 
-        // Move the item.
-        result = move_item(data, item, gap_begin[file_zone], 0, item->clusters_count_, MoveDirection::Up);
+        // Move the item to file_zone
+        result = move_item(data, item, gap_begin[(size_t) file_zone], Clusters64(0), item->clusters_count_,
+                           MoveDirection::Up);
 
         if (result) {
-            gap_begin[file_zone] = gap_begin[file_zone] + item->clusters_count_;
+            gap_begin[(size_t) file_zone] = gap_begin[(size_t) file_zone] + item->clusters_count_;
         } else {
-            gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
+            gap_end[(size_t) file_zone] = gap_begin[(size_t) file_zone]; // Force re-scan of the gap
         }
 
         // Get new system time

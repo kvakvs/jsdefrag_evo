@@ -81,23 +81,23 @@ void DefragRunner::analyze_volume(DefragState &data) {
 
     // Update the diskmap with the colors
     data.clusters_done_ = data.phase_todo_;
-    gui->draw_cluster(data, 0, 0, DrawColor::Empty);
+    gui->draw_cluster(data, Clusters64(), Clusters64(), DrawColor::Empty);
 
     // Set up the progress counter and the file/dir counters
-    data.clusters_done_ = 0;
-    data.phase_todo_ = 0;
+    data.clusters_done_ = {};
+    data.phase_todo_ = {};
 
     {
         StopWatch watch_cf(L"analyze_volume: count files");
         for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
-            data.phase_todo_ += 1;
+            data.phase_todo_++;
         }
     }
 
     gui->show_analyze(data, nullptr);
 
     // Walk through all the items one by one
-    const auto update_every_n_clusters = std::max<uint64_t>(10000UL, data.total_clusters_ / 100000UL);
+    const auto update_every_n_clusters = std::max<uint64_t>(10000UL, data.total_clusters_.value() / 100000UL);
 
     {
         StopWatch watch1(L"analyze_volume: all files loop");
@@ -107,16 +107,16 @@ void DefragRunner::analyze_volume(DefragState &data) {
             analyze_volume_process_file(data, item, time_now);
 
             // Update the progress percentage
-            data.clusters_done_ += 1;
+            data.clusters_done_++;
 
-            if (data.clusters_done_ % update_every_n_clusters == 0) {
-                gui->draw_cluster(data, 0, 0, DrawColor::Empty);
+            if (data.clusters_done_.value() % update_every_n_clusters == 0) {
+                gui->draw_cluster(data, Clusters64(0), Clusters64(0), DrawColor::Empty);
             }
         }
     }
     // Force the percentage to 100%
     data.clusters_done_ = data.phase_todo_;
-    gui->draw_cluster(data, 0, 0, DrawColor::Empty);
+    gui->draw_cluster(data, Clusters64(0), Clusters64(0), DrawColor::Empty);
 
     // Calculate the begin of the zone's
     calculate_zones(data);
@@ -136,7 +136,7 @@ void DefragRunner::analyze_volume_process_file(DefragState &data, FileNode *item
     if (!Str::match_mask(item->get_long_path(), data.include_mask_.c_str()) &&
         !Str::match_mask(item->get_short_path(), data.include_mask_.c_str())) {
         item->is_excluded_ = true;
-        colorize_disk_item(data, item, 0, 0, false);
+        colorize_disk_item(data, item, Clusters64(0), Clusters64(0), false);
     }
 
     // Determine if the item is to be excluded by comparing its name with the Exclude masks.
@@ -145,7 +145,7 @@ void DefragRunner::analyze_volume_process_file(DefragState &data, FileNode *item
             if (Str::match_mask(item->get_long_path(), each_exclude.c_str()) ||
                 Str::match_mask(item->get_short_path(), each_exclude.c_str())) {
                 item->is_excluded_ = true;
-                colorize_disk_item(data, item, 0, 0, false);
+                colorize_disk_item(data, item, Clusters64(0), Clusters64(0), false);
                 break;
             }
         }
@@ -157,13 +157,13 @@ void DefragRunner::analyze_volume_process_file(DefragState &data, FileNode *item
          _wcsicmp(item->get_long_fn(), L"jkdefragcmd.log") == 0 ||
          _wcsicmp(item->get_long_fn(), L"jkdefragscreensaver.log") == 0)) {
         item->is_excluded_ = true;
-        colorize_disk_item(data, item, 0, 0, false);
+        colorize_disk_item(data, item, Clusters64(0), Clusters64(0), false);
     }
 
     // The item is a SpaceHog if it's larger than 50 megabytes, or last access time
     // is more than 30 days ago, or if it's filename matches a SpaceHog mask. */
     if (!item->is_excluded_ && !item->is_dir_) {
-        if (data.use_default_space_hogs_ && item->bytes_ > kilobytes(50)) {
+        if (data.use_default_space_hogs_ && item->bytes_ > kilobytes<uint64_t>(50)) {
             item->is_hog_ = true;
         } else if (data.use_default_space_hogs_ &&
                    data.use_last_access_time_ &&
@@ -180,7 +180,7 @@ void DefragRunner::analyze_volume_process_file(DefragState &data, FileNode *item
         }
 
         if (item->is_hog_) {
-            colorize_disk_item(data, item, 0, 0, false);
+            colorize_disk_item(data, item, Clusters64(0), Clusters64(0), false);
         }
     }
 

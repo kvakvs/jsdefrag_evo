@@ -21,61 +21,44 @@
  * \brief Load a directory from disk into a new memory buffer.
  * \return Return nullptr if error. Note: the caller owns the returned buffer.
  */
-BYTE *
-ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_info, const uint64_t start_cluster,
-                        uint64_t *out_length) {
-    std::unique_ptr<BYTE[]> buffer;
-    uint64_t fragment_length;
+std::unique_ptr<uint8_t> ScanFAT::load_directory(
+        const DefragState &data, const FatDiskInfoStruct *disk_info, const Clusters64 start_cluster, PARAM_OUT
+        Bytes64 &out_length) {
+
     OVERLAPPED g_overlapped;
     DWORD bytes_read;
-    int max_iterate;
-    wchar_t s1[BUFSIZ];
     DefragGui *gui = DefragGui::get_instance();
 
     // Reset the OutLength to zero, in case we exit for an error
-    if (out_length != nullptr) *out_length = 0;
+    PARAM_OUT out_length = {};
 
-    // If cluster is zero then return nullptr
-    if (start_cluster == 0) return nullptr;
+    if (start_cluster.is_zero()) return nullptr;
 
     // Count the size of the directory
-    uint64_t buffer_length = 0;
-    uint64_t cluster = start_cluster;
+    Bytes64 buffer_length = {};
+    Clusters64 cluster = start_cluster;
+    Clusters64 max_iterate = {};
 
-    for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
+    for (; max_iterate < disk_info->countof_clusters_ + Clusters64(1); max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list
-        if (data.disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
-        if (data.disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
-        if (data.disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT12 && cluster >= fat12_max_cluster) break;
+        if (data.disk_.type_ == DiskType::FAT16 && cluster >= fat16_max_cluster) break;
+        if (data.disk_.type_ == DiskType::FAT32 && cluster >= fat32_max_cluster) break;
 
         // Sanity check, test if the cluster is within the range of valid cluster numbers
-        if (cluster < 2) return nullptr;
-        if (cluster > disk_info->countof_clusters_ + 1) return nullptr;
+        if (cluster < Clusters64(2)) return nullptr;
+        if (cluster > disk_info->countof_clusters_ + Clusters64(1)) return nullptr;
 
         // Increment the BufferLength counter
-        buffer_length = buffer_length + disk_info->sectors_per_cluster_ * disk_info->bytes_per_sector_;
+        // 'sectors * 'bytes_per_sector = 'bytes; TODO: Unit whose type contains a fraction of bytes/sector
+        buffer_length += Bytes64(disk_info->sectors_per_cluster_.value() * disk_info->bytes_per_sector_.value());
 
         // Get next cluster from FAT
-        switch (data.disk_.type_) {
-            case DiskType::FAT12:
-                if ((cluster & 1) == 1) {
-                    cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] >> 4;
-                } else {
-                    cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] & 0xFFF;
-                }
-                break;
-
-            case DiskType::FAT16:
-                cluster = disk_info->fat_data_.fat16[cluster];
-                break;
-            case DiskType::FAT32:
-                cluster = disk_info->fat_data_.fat32[cluster] & 0xFFFFFFF;
-                break;
-        }
+        cluster = get_next_fat_cluster(data, disk_info, cluster);
     }
 
     // If too many iterations (infinite loop in FAT) then return nullptr
-    if (max_iterate >= disk_info->countof_clusters_ + 1) {
+    if (max_iterate >= disk_info->countof_clusters_ + Clusters64(1)) {
         gui->show_debug(DebugLevel::Progress, nullptr,
                         L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
 
@@ -83,41 +66,43 @@ ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_i
     }
 
     // Allocate buffer
-    if (buffer_length > UINT_MAX) {
+    if (buffer_length > Bytes64(UINT_MAX)) {
         gui->show_debug(DebugLevel::Progress, nullptr,
-                        std::format(L"Directory is too big, " NUM_FMT " bytes", buffer_length));
+                        std::format(L"Directory is too big, " NUM_FMT " bytes", buffer_length.value()));
 
         return nullptr;
     }
 
-    buffer = std::make_unique<BYTE[]>(buffer_length);
+    std::unique_ptr<uint8_t> buffer = std::make_unique<uint8_t>(buffer_length.value());
 
-    // Loop through the FAT cluster list and load all fragments from disk into the buffer.
-    uint64_t buffer_offset = 0;
+    // Loop through the FAT cluster list and load all fragments from the disk into the buffer.
+    Bytes64 buffer_offset = {};
     cluster = start_cluster;
 
-    uint64_t first_cluster = cluster;
-    uint64_t last_cluster = 0;
+    Clusters64 first_cluster = cluster;
+    Clusters64 last_cluster = {};
 
-    for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
+    for (max_iterate = {}; max_iterate < disk_info->countof_clusters_ + Clusters64(1); max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list
-        if (data.disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
-        if (data.disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
-        if (data.disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT12 && cluster >= fat12_max_cluster) break;
+        if (data.disk_.type_ == DiskType::FAT16 && cluster >= fat16_max_cluster) break;
+        if (data.disk_.type_ == DiskType::FAT32 && cluster >= fat32_max_cluster) break;
 
         // Sanity check, test if the cluster is within the range of valid cluster numbers
-        if (cluster < 2) break;
-        if (cluster > disk_info->countof_clusters_ + 1) break;
+        if (cluster < Clusters64(2)) break;
+        if (cluster > disk_info->countof_clusters_ + Clusters64(1)) break;
 
-        /* If this is a new fragment then load the previous fragment from disk. If not then
-        add to the counters and continue. */
-        if (cluster != last_cluster + 1 && last_cluster != 0) {
-            fragment_length =
-                    (last_cluster - first_cluster + 1) * disk_info->sectors_per_cluster_ * disk_info->bytes_per_sector_;
+        // If this is a new fragment then load the previous fragment from disk. If not then add to the counters and continue
+        if (cluster != last_cluster + Clusters64(1) && last_cluster) {
+            // 'clusters * ('sectors / 'cluster') * ('bytes / 'sector') = 'bytes
+            Bytes64 fragment_length = Bytes64((last_cluster - first_cluster + Clusters64(1)).value()
+                                              * disk_info->sectors_per_cluster_.value()
+                                              * disk_info->bytes_per_sector_.value());
             ULARGE_INTEGER trans;
             trans.QuadPart =
-                    (disk_info->first_data_sector_ + (first_cluster - 2) * disk_info->sectors_per_cluster_) *
-                    disk_info->bytes_per_sector_;
+                    (disk_info->first_data_sector_.as<ULONGLONG>() +
+                     (first_cluster.as<ULONGLONG>() - 2) * disk_info->sectors_per_cluster_.as<ULONGLONG>())
+                    * disk_info->bytes_per_sector_.as<ULONGLONG>();
 
             g_overlapped.Offset = trans.LowPart;
             g_overlapped.OffsetHigh = trans.HighPart;
@@ -125,10 +110,11 @@ ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_i
 
             gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                             std::format(L"Reading directory fragment, " NUM_FMT " bytes at offset=" NUM_FMT,
-                                        fragment_length, trans.QuadPart));
+                                        fragment_length.value(), trans.QuadPart));
 
-            BOOL result = ReadFile(data.disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
-                                   &bytes_read, &g_overlapped);
+            BOOL result = ReadFile(data.disk_.volume_handle_, buffer.get() + buffer_offset.value(),
+                                   fragment_length.as<DWORD>(), &bytes_read,
+                                   &g_overlapped);
 
             if (result == FALSE) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
@@ -136,39 +122,26 @@ ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_i
                 return nullptr;
             }
 
-            buffer_offset = buffer_offset + fragment_length;
+            buffer_offset += fragment_length;
             first_cluster = cluster;
         }
 
         last_cluster = cluster;
 
         // Get next cluster from FAT
-        switch (data.disk_.type_) {
-            case DiskType::FAT12:
-                if ((cluster & 1) == 1) {
-                    cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] >> 4;
-                } else {
-                    cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] & 0xFFF;
-                }
-
-                break;
-            case DiskType::FAT16:
-                cluster = disk_info->fat_data_.fat16[cluster];
-                break;
-            case DiskType::FAT32:
-                cluster = disk_info->fat_data_.fat32[cluster] & 0xFFFFFFF;
-                break;
-        }
+        cluster = get_next_fat_cluster(data, disk_info, cluster);
     }
 
     // Load the last fragment
-    if (last_cluster != 0) {
-        fragment_length =
-                (last_cluster - first_cluster + 1) * disk_info->sectors_per_cluster_ * disk_info->bytes_per_sector_;
+    if (last_cluster) {
+        Bytes64 fragment_length = Bytes64((last_cluster - first_cluster + Clusters64(1)).value()
+                                          * disk_info->sectors_per_cluster_.value()
+                                          * disk_info->bytes_per_sector_.value());
         ULARGE_INTEGER trans;
         trans.QuadPart =
-                (disk_info->first_data_sector_ + (first_cluster - 2) * disk_info->sectors_per_cluster_)
-                * disk_info->bytes_per_sector_;
+                (disk_info->first_data_sector_.value() +
+                 (first_cluster.value() - 2) * disk_info->sectors_per_cluster_.value())
+                * disk_info->bytes_per_sector_.value();
 
         g_overlapped.Offset = trans.LowPart;
         g_overlapped.OffsetHigh = trans.HighPart;
@@ -176,18 +149,21 @@ ScanFAT::load_directory(const DefragState &data, const FatDiskInfoStruct *disk_i
 
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(L"reading directory fragment, " NUM_FMT " bytes at offset=" NUM_FMT,
-                                    fragment_length, trans.QuadPart));
+                                    fragment_length.value(), trans.QuadPart));
 
-        BOOL result = ReadFile(data.disk_.volume_handle_, &buffer[buffer_offset], (uint32_t) fragment_length,
+        BOOL result = ReadFile(data.disk_.volume_handle_, buffer.get() + buffer_offset.value(),
+                               fragment_length.as<DWORD>(),
                                &bytes_read, &g_overlapped);
 
         if (result == FALSE) {
             gui->show_debug(DebugLevel::Progress, nullptr,
                             std::format(L"Error: {}", Str::system_error(GetLastError())));
-            return nullptr;
+            buffer.reset();
+            return buffer; // empty smart pointer = nullptr
         }
     }
 
-    if (out_length != nullptr) *out_length = buffer_length;
-    return buffer.release();
+    PARAM_OUT out_length = buffer_length;
+
+    return buffer;
 }

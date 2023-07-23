@@ -35,6 +35,21 @@ http://www.kessels.com/
 #include "types.h"
 #include "defrag_state.h"
 #include "file_node.h"
+#include "mem_util.h"
+
+enum class SortField {
+    Name,
+    Size,
+    LastAccess,
+    LastChange,
+    Created
+};
+
+enum class CompareResult : int {
+    FirstIsSmaller = -1,
+    Equal = 0,
+    FirstIsBigger = 1,
+};
 
 // The three running states.
 enum class RunningState {
@@ -65,13 +80,13 @@ struct DiskStruct {
 
     DiskType type_;
 
-    uint64_t mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
+    Clusters64 mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
 };
 
 // List of clusters used by the MFT
 struct ExcludesStruct {
-    uint64_t start_;
-    uint64_t end_;
+    Clusters64 start_;
+    Clusters64 end_;
 };
 
 class DefragRunner {
@@ -105,7 +120,7 @@ public:
     ///     the array is "DisableDefaults".
     /// \param run_state It is used by the stop_defrag() subroutine to stop_and_log the defragger. If the pointer is nullptr
     ///     then this feature is disabled.
-    void start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
+    void start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, Percentage speed, double free_space,
                            const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state);
 
     // Stop the defragger. Wait for a maximum of time_out milliseconds for the defragger to stop. If time_out is zero
@@ -115,7 +130,7 @@ public:
 
     static const wchar_t *stristr_w(const wchar_t *haystack, const wchar_t *needle);
 
-    static void show_hex(struct DefragState &data, const BYTE *buffer, uint64_t count);
+    static void show_hex(struct DefragState &data, const MemSlice &buffer);
 
     // static wchar_t** add_array_string(wchar_t** array, const wchar_t* new_string);
     std::wstring get_short_path(const DefragState &data, const FileNode *item);
@@ -124,12 +139,12 @@ public:
 
     static void slow_down(DefragState &data);
 
-    static int get_fragment_count(const FileNode *item);
+    static size_t get_fragment_count(const FileNode *item);
 
-    static bool is_fragmented(const FileNode *item, uint64_t offset, uint64_t size);
+    static bool is_fragmented(const FileNode *item, Clusters64 offset, Clusters64 size);
 
     void colorize_disk_item(DefragState &data, const FileNode *item,
-                            uint64_t busy_offset, uint64_t busy_size, int erase_from_screen) const;
+                            Clusters64 busy_offset, Clusters64 busy_size, bool erase_from_screen) const;
 
     static void call_show_status(DefragState &data, DefragPhase phase, Zone zone);
 
@@ -150,51 +165,50 @@ private:
 
     void append_to_long_path(const FileNode *item, std::wstring &path);
 
-    static uint64_t find_fragment_begin(const FileNode *item, uint64_t lcn);
+    static Clusters64 find_fragment_begin(const FileNode *item, Clusters64 lcn);
 
-    [[maybe_unused]] static FileNode *find_item_at_lcn(const DefragState &data, uint64_t lcn);
+    [[maybe_unused]] static FileNode *find_item_at_lcn(const DefragState &data, Clusters64 lcn);
 
     static HANDLE open_item_handle(const DefragState &data, const FileNode *item);
 
     static bool get_fragments(const DefragState &data, FileNode *item, HANDLE file_handle);
 
     static bool
-    find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
-             const uint64_t minimum_size,
-             const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
-             const bool ignore_mft_excludes);
+    find_gap(const DefragState &data, Clusters64 minimum_lcn, Clusters64 maximum_lcn, Clusters64 minimum_size,
+             bool must_fit,
+             bool find_highest_gap, PARAM_OUT Clusters64 &begin_lcn, PARAM_OUT Clusters64 &end_lcn,
+             bool ignore_mft_excludes);
 
     static void calculate_zones(DefragState &data);
 
     DWORD
-    move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item, uint64_t new_lcn,
-                    const uint64_t offset, const uint64_t size) const;
+    move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item, const Clusters64 new_lcn,
+                    const Clusters64 offset, const Clusters64 size) const;
 
     DWORD
-    move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item, uint64_t new_lcn,
-                           const uint64_t offset,
-                           const uint64_t size) const;
+    move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item, const Clusters64 new_lcn,
+                           const Clusters64 offset, const Clusters64 size) const;
 
-    bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, uint64_t new_lcn,
-                              uint64_t offset, uint64_t size, MoveStrategy strategy) const;
+    bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, Clusters64 new_lcn,
+                              Clusters64 offset, Clusters64 size, MoveStrategy strategy) const;
 
-    int move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, uint64_t new_lcn,
-                                 uint64_t offset, uint64_t size, MoveDirection direction) const;
+    int move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, Clusters64 new_lcn,
+                                 Clusters64 offset, Clusters64 size, MoveDirection direction) const;
 
-    bool move_item(DefragState &data, FileNode *item, uint64_t new_lcn, uint64_t offset,
-                   uint64_t size, MoveDirection direction) const;
+    bool move_item(DefragState &data, FileNode *item, Clusters64 new_lcn, Clusters64 offset,
+                   Clusters64 size, MoveDirection direction) const;
 
     static FileNode *
-    find_highest_item(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
+    find_highest_item(const DefragState &data, Clusters64 cluster_start, Clusters64 cluster_end,
                       Tree::Direction direction, Zone zone);
 
     static FileNode *
-    find_best_item(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
+    find_best_item(const DefragState &data, Clusters64 cluster_start, Clusters64 cluster_end,
                    Tree::Direction direction, Zone zone);
 
     [[maybe_unused]] void compare_items(DefragState &data, const FileNode *item) const;
 
-    int compare_items(FileNode *item_1, FileNode *item_2, int sort_field);
+    CompareResult compare_items(FileNode *item_1, FileNode *item_2, SortField sort_field);
 
     void scan_dir(DefragState &data, const wchar_t *mask, FileNode *parent_directory);
 
@@ -210,13 +224,13 @@ private:
 
     void forced_fill(DefragState &data);
 
-    void vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes);
+    void vacate(DefragState &data, Clusters64 lcn, Clusters64 clusters, BOOL ignore_mft_excludes);
 
     [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState &data);
 
     void optimize_volume(DefragState &data);
 
-    void optimize_sort(DefragState &data, int sort_field);
+    void optimize_sort(DefragState &data, SortField sort_field);
 
     void optimize_up(DefragState &data);
 

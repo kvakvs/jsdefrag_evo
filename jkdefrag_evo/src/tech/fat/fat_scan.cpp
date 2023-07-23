@@ -67,42 +67,42 @@ filetime64_t ScanFAT::convert_time(const USHORT date, const USHORT time, const U
 // - The FAT contains either an EOC mark (End Of Clusterchain) or the cluster number of
 // the next cluster of the file.
 void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info,
-                                 FileNode *item, uint64_t cluster) {
-    int max_iterate;
-
+                                 FileNode *item, Clusters64 cluster) {
     DefragGui *gui = DefragGui::get_instance();
 
-    item->clusters_count_ = 0;
+    item->clusters_count_ = {};
     item->fragments_.clear();
 
     // If cluster is zero then return zero
-    if (cluster == 0) return;
+    if (cluster.is_zero()) return;
 
     // Loop through the FAT cluster list, counting the clusters and creating items in the fragment list
-    uint64_t first_cluster = cluster;
-    uint64_t last_cluster = 0;
-    uint64_t vcn = 0;
+    Clusters64 first_cluster = cluster;
+    Clusters64 last_cluster = {};
+    Clusters64 vcn = {};
 
-    for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
+    Clusters64 max_iterate;
+
+    for (max_iterate = {}; max_iterate < disk_info->countof_clusters_ + Clusters64(1); max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list
-        if (data.disk_.type_ == DiskType::FAT12 && cluster >= 0xFF8) break;
-        if (data.disk_.type_ == DiskType::FAT16 && cluster >= 0xFFF8) break;
-        if (data.disk_.type_ == DiskType::FAT32 && cluster >= 0xFFFFFF8) break;
+        if (data.disk_.type_ == DiskType::FAT12 && cluster >= fat12_max_cluster) break;
+        if (data.disk_.type_ == DiskType::FAT16 && cluster >= fat16_max_cluster) break;
+        if (data.disk_.type_ == DiskType::FAT32 && cluster >= fat32_max_cluster) break;
 
         // Sanity check, test if the cluster is within the range of valid cluster numbers
-        if (cluster < 2) break;
-        if (cluster > disk_info->countof_clusters_ + 1) break;
+        if (cluster < Clusters64(2)) break;
+        if (cluster > disk_info->countof_clusters_ + Clusters64(1)) break;
 
         // Increment the cluster counter
-        item->clusters_count_ += 1;
+        item->clusters_count_++;
 
-        // If this is a new fragment then create a record for the previous fragment.
-        // If not then add the cluster to the counters and continue
-        if (cluster != last_cluster + 1 && last_cluster != 0) {
-            vcn = vcn + last_cluster - first_cluster + 1;
+        // If this is a new fragment, then create a record for the previous fragment.
+        // If not, then add the cluster to the counters and continue
+        if (cluster != last_cluster + Clusters64(1) && last_cluster) {
+            vcn += last_cluster - first_cluster + Clusters64(1);
 
             FileFragment new_fragment = {
-                    .lcn_ = first_cluster - 2,
+                    .lcn_ = first_cluster - Clusters64(2),
                     .next_vcn_ = vcn,
             };
 
@@ -113,29 +113,11 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
         last_cluster = cluster;
 
         // Get next cluster from FAT
-        switch (data.disk_.type_) {
-            case DiskType::FAT12:
-                if ((cluster & 1) == 1) {
-                    cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] >> 4;
-                } else {
-                    cluster = *(WORD *) &disk_info->fat_data_.fat12[cluster + cluster / 2] & 0xFFF;
-                }
-
-                break;
-
-            case DiskType::FAT16:
-                cluster = disk_info->fat_data_.fat16[cluster];
-                break;
-            case DiskType::FAT32:
-                cluster = disk_info->fat_data_.fat32[cluster] & 0xFFFFFFF;
-                break;
-            default:
-                _ASSERT(false); // should not occur
-        }
+        cluster = get_next_fat_cluster(data, disk_info, cluster);
     }
 
     // If too many iterations (infinite loop in FAT) then exit
-    if (max_iterate >= disk_info->countof_clusters_ + 1) {
+    if (max_iterate >= disk_info->countof_clusters_ + Clusters64(1)) {
         gui->show_debug(DebugLevel::Progress, nullptr,
                         L"Infinite loop in FAT detected, perhaps the disk is corrupted.");
 
@@ -143,13 +125,42 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
     }
 
     // Create the last fragment
-    if (last_cluster != 0) {
-        vcn = vcn + last_cluster - first_cluster + 1;
+    if (last_cluster) {
+        vcn += last_cluster - first_cluster + Clusters64(1);
 
         FileFragment new_fragment = {
-                .lcn_ = first_cluster - 2,
+                .lcn_ = first_cluster - Clusters64(2),
                 .next_vcn_ = vcn,
         };
         item->fragments_.push_back(new_fragment);
     }
+}
+
+Clusters64
+ScanFAT::get_next_fat_cluster(const DefragState &data, const FatDiskInfoStruct *disk_info, Clusters64 cluster) {
+    switch (data.disk_.type_) {
+        case DiskType::FAT12: {
+            auto fdata = disk_info->fat12_data();
+            auto next_p = (WORD *) &fdata[cluster.as<size_t>() + cluster.as<size_t>() / 2];
+
+            if (cluster.is_odd()) {
+                return Clusters64(*next_p >> 4);
+            } else {
+                return Clusters64(*next_p & 0xFFF);
+            }
+        }
+        case DiskType::FAT16: {
+            auto fdata = disk_info->fat16_data();
+
+            return Clusters64(fdata[cluster.as<size_t>()]);
+        }
+        case DiskType::FAT32: {
+            auto fdata = disk_info->fat32_data();
+
+            return Clusters64(fdata[cluster.as<size_t>()] & 0xFFFFFFF);
+        }
+        default: {
+        }
+    }
+    _ASSERT(false); // should not occur
 }

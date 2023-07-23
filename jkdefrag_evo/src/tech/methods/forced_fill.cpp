@@ -22,31 +22,31 @@ void DefragRunner::forced_fill(DefragState &data) {
     call_show_status(data, DefragPhase::ForcedFill, Zone::None); // "Phase 3: ForcedFill"
 
     // Walk through all the gaps
-    uint64_t gap_begin = 0;
-    uint64_t max_lcn = data.total_clusters_;
+    Clusters64 gap_begin = {};
+    Clusters64 max_lcn = data.total_clusters_;
 
     while (data.is_still_running()) {
         // Find the next gap. If there are no more gaps then exit
-        uint64_t gap_end;
-        auto result = find_gap(data, gap_begin, 0, 0, true, false,
-                               &gap_begin, &gap_end, false);
+        Clusters64 gap_end;
+        auto result = find_gap(data, gap_begin, Clusters64(0), Clusters64(0), true, false,
+                               PARAM_OUT gap_begin, PARAM_OUT gap_end, false);
 
         if (!result) break;
 
         // Find the item with the highest fragment on disk
         FileNode *highest_item = nullptr;
-        uint64_t highest_lcn = 0;
-        uint64_t highest_vcn = 0;
-        uint64_t highest_size = 0;
+        Clusters64 highest_lcn;
+        Clusters64 highest_vcn;
+        Clusters64 highest_size;
 
         FileNode *item;
         for (item = Tree::biggest(data.item_tree_); item != nullptr; item = Tree::prev(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
-            if (item->clusters_count_ == 0) continue;
+            if (item->clusters_count_.is_zero()) continue;
 
-            uint64_t vcn = 0;
-            uint64_t real_vcn = 0;
+            Clusters64 vcn;
+            Clusters64 real_vcn;
 
             for (auto &fragment: item->fragments_) {
                 if (!fragment.is_virtual()) {
@@ -70,7 +70,7 @@ void DefragRunner::forced_fill(DefragState &data) {
         if (highest_lcn <= gap_begin) break;
 
         // Move as much of the item into the gap as possible
-        uint64_t clusters = gap_end - gap_begin;
+        Clusters64 clusters = gap_end - gap_begin;
 
         if (clusters > highest_size) clusters = highest_size;
 

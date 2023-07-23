@@ -25,7 +25,11 @@ using namespace Gdiplus;
 
 #endif
 
+#include "numeral.h"
 #include "diskmap.h"
+#include "diskmap_color.h"
+#include "diskmap_cell.h"
+
 #include "constants.h"
 #include "defrag_gui.h"
 #include "runner.h"

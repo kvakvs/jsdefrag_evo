@@ -50,37 +50,34 @@ const wchar_t *DefragRunner::stristr_w(const wchar_t *haystack, const wchar_t *n
 }
 
 // Dump a block of data to standard output, for debugging purposes
-void DefragRunner::show_hex([[maybe_unused]] DefragState &data, const BYTE *buffer,
-                            const uint64_t count) {
+void DefragRunner::show_hex([[maybe_unused]] DefragState &data, const MemSlice &buffer) {
     DefragGui *gui = DefragGui::get_instance();
 
-    int j;
-
-    for (int i = 0; i < count; i = i + 16) {
+    for (Bytes64 i = {}; i < buffer.length(); i = i + Bytes64(16)) {
         std::wstring s1;
         s1.reserve(BUFSIZ);
-        s1 += std::format(NUM4_FMT L" {:4x}   ", i, i);
+        s1 += std::format(NUM4_FMT L" {:4x}   ", i.value(), i.value());
 
-        for (j = 0; j < 16; j++) {
-            if (j == 8) s1 += L" ";
+        for (Bytes64 j = {}; j < Bytes64(16); j++) {
+            if (j == Bytes64(8)) s1 += L" ";
 
-            if (j + i >= count) {
+            if (j + i >= buffer.length()) {
                 s1 += L"   ";
             } else {
-                s1 += std::format(L"{:x} ", buffer[i + j]);
+                s1 += std::format(L"{:x} ", buffer.read<uint8_t>(i + j));
             }
         }
 
         s1 += L" ";
 
-        for (j = 0; j < 16; j++) {
-            if (j + i >= count) {
+        for (Bytes64 j = {}; j < Bytes64(16); j++) {
+            if (j + i >= buffer.length()) {
                 s1 += L" ";
             } else {
-                if (buffer[i + j] < 32) {
+                if (buffer.read<uint8_t>(i + j) < 32) {
                     s1 += L".";
                 } else {
-                    s1 += std::format(L"{:c}", buffer[i + j]);
+                    s1 += std::format(L"{:c}", buffer.read<uint8_t>(i + j));
                 }
             }
         }
@@ -147,7 +144,7 @@ std::wstring DefragRunner::get_long_path(const DefragState &data, const FileNode
 // Slow the program down
 void DefragRunner::slow_down(DefragState &data) {
     // Sanity check
-    if (data.speed_ <= 0 || data.speed_ >= 100) return;
+    if (data.slowdown_percent_ <= Percentage(0) || data.slowdown_percent_ >= Percentage(100)) return;
 
     // Calculate the time we have to sleep so that the wall time is 100% and the actual running time is the "-s" parameter percentage
     auto now = Clock::now();
@@ -160,7 +157,7 @@ void DefragRunner::slow_down(DefragState &data) {
 
     // Sleep
     if (data.running_time_ > Clock::duration::zero()) {
-        Clock::duration delay = data.running_time_ * 100UL / data.speed_ - (now - data.start_time_);
+        Clock::duration delay = data.running_time_ * 100UL / data.slowdown_percent_.value() - (now - data.start_time_);
 
         if (delay > std::chrono::milliseconds(200)) delay = std::chrono::milliseconds(200);
         if (delay > Clock::duration::zero()) {
@@ -222,11 +219,11 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
     BY_HANDLE_FILE_INFORMATION file_information;
     FileFragment *last_fragment;
     uint32_t error_code;
-    DWORD w;
+    DWORD bytes_returned;
     DefragGui *gui = DefragGui::get_instance();
 
     // Initialize. If the item has an old list of fragments then delete it
-    item->clusters_count_ = 0;
+    item->clusters_count_ = {};
     item->fragments_.clear();
 
     // Fetch the date/times of the file
@@ -247,32 +244,31 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
     /* Ask Windows for the clustermap of the item and save it in memory.
     The buffer that is used to ask Windows for the clustermap has a
     fixed size, so we may have to loop a couple of times. */
-    uint64_t vcn = 0;
-    int max_loop = 1000;
+    Clusters64 vcn = {};
+    int loop_limit = 1000;
     last_fragment = nullptr;
 
     do {
-        /* I strongly suspect that the FSCTL_GET_RETRIEVAL_POINTERS system call
-        can sometimes return an empty bitmap and ERROR_MORE_DATA. That's not
-        very nice of Microsoft, because it causes an infinite loop. I've
-        therefore added a loop counter that will limit the loop to 1000
-        iterations. This means the defragger cannot handle files with more
-        than 100000 fragments, though. */
-        if (max_loop <= 0) {
+        // I strongly suspect that the FSCTL_GET_RETRIEVAL_POINTERS system call can sometimes return an empty bitmap and
+        // ERROR_MORE_DATA. That's not very nice of Microsoft, because it causes an infinite loop. I've therefore added
+        // a loop counter that will limit the loop to 1000 iterations. This means the defragger cannot handle files with
+        // more than 100000 fragments, though
+        if (loop_limit <= 0) {
             gui->show_debug(DebugLevel::Progress, nullptr, L"FSCTL_GET_RETRIEVAL_POINTERS error: Infinite loop");
 
             return false;
         }
 
-        max_loop = max_loop - 1;
+        loop_limit = loop_limit - 1;
 
         /* Ask Windows for the (next segment of the) clustermap of this file. If error
         then leave the loop. */
-        RetrieveParam.StartingVcn.QuadPart = vcn;
+        RetrieveParam.StartingVcn.QuadPart = vcn.as<LONGLONG>();
 
         error_code = DeviceIoControl(file_handle, FSCTL_GET_RETRIEVAL_POINTERS,
                                      &RetrieveParam, sizeof RetrieveParam,
-                                     &extent_data, sizeof extent_data, &w, nullptr);
+                                     &extent_data, sizeof extent_data, &bytes_returned,
+                                     nullptr);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -290,18 +286,18 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
                 // "Extent: Lcn=%I64u, Vcn=%I64u, NextVcn=%I64u"
                 gui->show_debug(
                         DebugLevel::DetailedFileInfo, nullptr,
-                        std::format(EXTENT_FMT, extent_data.extents_[i].lcn_, vcn, extent_data.extents_[i].next_vcn_));
+                        std::format(EXTENT_FMT, extent_data.extents_[i].lcn_.value(),
+                                    vcn.value(), extent_data.extents_[i].next_vcn_.value()));
             } else {
                 // "Extent (virtual): Vcn=%I64u, NextVcn=%I64u"
                 gui->show_debug(
                         DebugLevel::DetailedFileInfo, nullptr,
-                        std::format(VEXTENT_FMT, vcn, extent_data.extents_[i].next_vcn_));
+                        std::format(VEXTENT_FMT, vcn.value(), extent_data.extents_[i].next_vcn_.value()));
             }
 
-            /* Add the size of the fragment to the total number of clusters.
-            There are two kinds of fragments: real and virtual. The latter do not
-            occupy clusters on disk, but are information used by compressed
-            and sparse files. */
+            // Add the size of the fragment to the total number of clusters. There are two kinds of fragments:
+            // real and virtual. The latter do not occupy clusters on disk, but are information used by compressed
+            // and sparse files
             if (!extent_data.extents_[i].is_virtual()) {
                 item->clusters_count_ = item->clusters_count_ + extent_data.extents_[i].next_vcn_ - vcn;
             }
@@ -336,14 +332,14 @@ bool DefragRunner::get_fragments(const DefragState &data, FileNode *item, HANDLE
 }
 
 // Return the number of fragments in the item
-int DefragRunner::get_fragment_count(const FileNode *item) {
-    int fragments = 0;
-    uint64_t vcn = 0;
-    uint64_t next_lcn = 0;
+size_t DefragRunner::get_fragment_count(const FileNode *item) {
+    size_t fragments = 0;
+    Clusters64 vcn = {};
+    Clusters64 next_lcn = {};
 
     for (auto &fragment: item->fragments_) {
         if (!fragment.is_virtual()) {
-            if (next_lcn != 0 && fragment.lcn_ != next_lcn) fragments++;
+            if (next_lcn && fragment.lcn_ != next_lcn) fragments++;
 
             next_lcn = fragment.lcn_ + fragment.next_vcn_ - vcn;
         }
@@ -351,7 +347,7 @@ int DefragRunner::get_fragment_count(const FileNode *item) {
         vcn = fragment.next_vcn_;
     }
 
-    if (next_lcn != 0) fragments++;
+    if (next_lcn) fragments++;
 
     return fragments;
 }
@@ -364,13 +360,13 @@ Note: this function does not ask Windows for a fresh list of fragments,
 it only looks at cached information in memory.
 
 */
-bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, const uint64_t size) {
+bool DefragRunner::is_fragmented(const FileNode *item, const Clusters64 offset, const Clusters64 size) {
     // Walk through all fragments. If a fragment is found where either the begin or the end of the fragment is inside
     // the block then the file is fragmented and return true.
-    uint64_t fragment_begin = 0;
-    uint64_t fragment_end = 0;
-    uint64_t vcn = 0;
-    uint64_t next_lcn = 0;
+    Clusters64 fragment_begin = {};
+    Clusters64 fragment_end = {};
+    Clusters64 vcn = {};
+    Clusters64 next_lcn = {};
     auto fragment = item->fragments_.begin();
 
     while (fragment != item->fragments_.end()) {
@@ -380,7 +376,7 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
             // Treat aligned fragments as a single fragment.
             // Windows will frequently split files in fragments even though they are perfectly aligned on disk,
             // especially system files and very large files. The defragger treats these files as unfragmented.
-            if (next_lcn != 0 && fragment->lcn_ != next_lcn) {
+            if (next_lcn && fragment->lcn_ != next_lcn) {
                 // If the fragment is above the block then return false, the block is not fragmented and we don't
                 // have to scan any further.
                 if (fragment_begin >= offset + size) return false;
@@ -389,8 +385,8 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
                 // or the last cluster of the fragment is before the last cluster of the block,
                 // then the block is fragmented, return true.
                 if (fragment_begin > offset ||
-                    (fragment_end - 1 >= offset &&
-                     fragment_end - 1 < offset + size - 1)) {
+                    (fragment_end - Clusters64(1) >= offset &&
+                     fragment_end - Clusters64(1) < offset + size - Clusters64(1))) {
                     return true;
                 }
 
@@ -410,8 +406,8 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
     if (fragment_begin >= offset + size) return false;
 
     if (fragment_begin > offset ||
-        (fragment_end - 1 >= offset &&
-         fragment_end - 1 < offset + size - 1)) {
+        (fragment_end - Clusters64(1) >= offset &&
+         fragment_end - Clusters64(1) < offset + size - Clusters64(1))) {
         return true;
     }
 
@@ -429,16 +425,16 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
  * \param busy_size Number of clusters to be highlighted.
  * \param erase_from_screen true to undraw the file from the screen.
  */
-void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const uint64_t busy_offset,
-                                      const uint64_t busy_size, const int erase_from_screen) const {
+void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const Clusters64 busy_offset,
+                                      const Clusters64 busy_size, const bool erase_from_screen) const {
     DefragGui *gui = DefragGui::get_instance();
 
     // Determine if the item is fragmented.
-    const bool is_fragmented = this->is_fragmented(item, 0, item->clusters_count_);
+    const bool is_fragmented = this->is_fragmented(item, Clusters64(0), item->clusters_count_);
 
     // Walk through all the fragments of the file.
-    uint64_t vcn = 0;
-    uint64_t real_vcn = 0;
+    Clusters64 vcn = {};
+    Clusters64 real_vcn = {};
 
     auto fragment = item->fragments_.begin();
 
@@ -453,10 +449,10 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
         // Walk through all the segments of the file. A segment is usually the same as a fragment, but if a fragment spans across a boundary
         // then we must determine the color of the left and right parts individually. So we pretend the fragment is divided into segments
         // at the various possible boundaries.
-        uint64_t segment_begin = real_vcn;
+        Clusters64 segment_begin = real_vcn;
 
         while (segment_begin < real_vcn + fragment->next_vcn_ - vcn) {
-            uint64_t segment_end = real_vcn + fragment->next_vcn_ - vcn;
+            Clusters64 segment_end = real_vcn + fragment->next_vcn_ - vcn;
             DrawColor color;
 
             // Determine the color with which to draw this segment.
@@ -523,32 +519,33 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
     STARTING_LCN_INPUT_BUFFER bitmap_param;
 
     struct {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
+        Clusters64 starting_lcn_;
+        Clusters64 bitmap_size_;
         // Most efficient if power of 2 
-        BYTE buffer_[65536];
+        uint8_t buffer_[65536];
     } bitmap_data{};
 
     uint32_t error_code;
-    DWORD w;
+    DWORD bytes_returned;
     DefragGui *gui = DefragGui::get_instance();
 
     // Count the number of free gaps on the disk
     data.count_gaps_ = 0;
-    data.count_free_clusters_ = 0;
-    data.biggest_gap_ = 0;
+    data.count_free_clusters_ = {};
+    data.biggest_gap_ = {};
     data.count_gaps_less16_ = 0;
-    data.count_clusters_less16_ = 0;
+    data.count_clusters_less16_ = {};
 
-    uint64_t lcn = 0;
-    uint64_t cluster_start = 0;
+    Clusters64 lcn = {};
+    Clusters64 cluster_start = {};
     int prev_in_use = 1;
 
     do {
         // Fetch a block of cluster data
-        bitmap_param.StartingLcn.QuadPart = lcn;
+        bitmap_param.StartingLcn.QuadPart = lcn.as<LONGLONG>();
         error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
+                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
+                                     sizeof bitmap_data, &bytes_returned, nullptr);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -561,9 +558,7 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
         lcn = bitmap_data.starting_lcn_;
         int index = 0;
         BYTE mask = 1;
-        int index_max = sizeof bitmap_data.buffer_;
-
-        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
+        size_t index_max = clamp_above(sizeof bitmap_data.buffer_, bitmap_data.bitmap_size_.value() / 8);
 
         while (index < index_max) {
             int in_use = bitmap_data.buffer_[index] & mask;
@@ -579,7 +574,7 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
                 data.count_free_clusters_ = data.count_free_clusters_ + lcn - cluster_start;
                 if (data.biggest_gap_ < lcn - cluster_start) data.biggest_gap_ = lcn - cluster_start;
 
-                if (lcn - cluster_start < 16) {
+                if (lcn - cluster_start < Clusters64(16)) {
                     data.count_gaps_less16_ = data.count_gaps_less16_ + 1;
                     data.count_clusters_less16_ = data.count_clusters_less16_ + lcn - cluster_start;
                 }
@@ -596,18 +591,18 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
                 mask = mask << 1;
             }
 
-            lcn = lcn + 1;
+            lcn++;
         }
     } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
 
     if (prev_in_use == 0) {
-        data.count_gaps_ += 1;
+        data.count_gaps_++;
         data.count_free_clusters_ += lcn - cluster_start;
 
         if (data.biggest_gap_ < lcn - cluster_start) data.biggest_gap_ = lcn - cluster_start;
 
-        if (lcn - cluster_start < 16) {
-            data.count_gaps_less16_ += 1;
+        if (lcn - cluster_start < Clusters64(16)) {
+            data.count_gaps_less16_++;
             data.count_clusters_less16_ += lcn - cluster_start;
         }
     }
@@ -616,10 +611,10 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
     data.count_directories_ = 0;
     data.count_all_files_ = 0;
     data.count_fragmented_items_ = 0;
-    data.count_all_bytes_ = 0;
-    data.count_fragmented_bytes_ = 0;
-    data.count_all_clusters_ = 0;
-    data.count_fragmented_clusters_ = 0;
+    data.count_all_bytes_ = {};
+    data.count_fragmented_bytes_ = {};
+    data.count_all_clusters_ = {};
+    data.count_fragmented_clusters_ = {};
 
     for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
@@ -631,13 +626,13 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
         data.count_all_clusters_ += item->clusters_count_;
 
         if (item->is_dir_) {
-            data.count_directories_ += 1;
+            data.count_directories_++;
         } else {
-            data.count_all_files_ += 1;
+            data.count_all_files_++;
         }
 
         if (get_fragment_count(item) > 1) {
-            data.count_fragmented_items_ += 1;
+            data.count_fragmented_items_++;
             data.count_fragmented_bytes_ += item->bytes_;
             data.count_fragmented_clusters_ += item->clusters_count_;
         }
@@ -682,7 +677,7 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
             continue;
         }
 
-        if (item->clusters_count_ == 0) continue;
+        if (item->clusters_count_.is_zero()) continue;
 
         count = count + 1;
     }
@@ -697,9 +692,10 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
                 continue;
             }
 
-            if (item->clusters_count_ == 0) continue;
+            if (item->clusters_count_.is_zero()) continue;
 
-            sum += factor * (item->get_item_lcn() * 2 + item->clusters_count_);
+            auto t = item->get_item_lcn() * Clusters64(2) + item->clusters_count_;
+            sum += factor * t.as<decltype(sum)>();
             factor += 2;
         }
 
@@ -710,8 +706,8 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
 
     data.phase_ = phase;
     data.zone_ = zone;
-    data.clusters_done_ = 0;
-    data.phase_todo_ = 0;
+    data.clusters_done_ = {};
+    data.phase_todo_ = {};
 
     gui->show_status(data);
 }
@@ -747,15 +743,16 @@ void DefragRunner::defrag_all_drives_sync(DefragState &data, OptimizeMode mode) 
 }
 
 // Run the defragger/optimizer. See the .h file for a full explanation
-void DefragRunner::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, int speed, double free_space,
-                                     const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
+void
+DefragRunner::start_defrag_sync(const wchar_t *path, OptimizeMode optimize_mode, Percentage speed, double free_space,
+                                const Wstrings &excludes, const Wstrings &space_hogs, RunningState *run_state) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->log_detailed_progress(L"Defrag starting…");
 
     // Copy the input values to the data struct
     DefragState data{};
-    data.speed_ = speed;
+    data.slowdown_percent_ = speed;
     data.free_space_ = free_space;
     data.excludes_ = excludes;
 

@@ -117,10 +117,8 @@ void DefragGui::full_redraw_window(HDC dc) {
     // Reset the display idle timer (screen saver) and system idle timer (power saver)
     SetThreadExecutionState(ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 
-    if (progress_todo_ > 0) {
-        auto done = (double) ((double) progress_done_ / (double) progress_todo_);
-
-        if (done > 1.0) done = 1.0;
+    if (progress_todo_.value() > 0) {
+        auto done = std::min<double>(1.0, progress_done_.as<double>() / progress_todo_.as<double>());
 
         // Display percentage progress
         messages_[2] = std::format(FLT2_FMT L"%", 100.0 * done);
@@ -140,8 +138,8 @@ void DefragGui::full_redraw_window(HDC dc) {
 
     // 1 pixel on the other side of disk cluster map
     POINT diskmap_end = {
-            .x = diskmap_org.x + (int) color_map_.get_width() * square_size_ + 2,
-            .y = diskmap_org.y + (int) color_map_.get_height() * square_size_ + 2
+            .x = diskmap_org.x + color_map_.get_width().as<int>() * square_size_ + 2,
+            .y = diskmap_org.y + color_map_.get_height().as<int>() * square_size_ + 2
     };
 
     if (redraw_top_area_ || redraw_disk_map_) {
@@ -228,9 +226,9 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
 
     Pen pen(Color(210, 210, 210));
     Pen pen_empty(color_empty);
-    const size_t map_width = color_map_.get_width();
+    const auto map_width = color_map_.get_width();
 
-    for (size_t cell_index = 0; cell_index < color_map_.get_total_count(); cell_index++) {
+    for (Squares cell_index{}; cell_index < color_map_.get_total_count(); cell_index++) {
         auto &cell = color_map_.get_cell(cell_index);
 
         if (!cell.dirty) {
@@ -241,8 +239,8 @@ void DefragGui::paint_diskmap(Graphics *graphics) {
 
         // Integer x:y index in the disk map array (not screen position!)
         POINT map_xy = {
-                .x = (LONG) (cell_index % map_width),
-                .y = (LONG) (cell_index / map_width)
+                .x = cell_index.as<LONG>() % map_width.as<LONG>(),
+                .y = cell_index.as<LONG>() / map_width.as<LONG>()
         };
         // Screen position where to display the cell
         POINT cell_pos = {

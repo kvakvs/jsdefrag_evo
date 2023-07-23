@@ -19,71 +19,69 @@
 
 bool ScanNTFS::interpret_mft_record(
         DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array,
-        const uint64_t inode_number, const uint64_t max_inode,
-        PARAM_OUT std::list<FileFragment> &mft_data_fragments, PARAM_OUT uint64_t &mft_data_bytes,
-        PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments, PARAM_OUT uint64_t &mft_bitmap_bytes,
-        BYTE *buffer, const uint64_t buf_length
+        const Inode64 inode_number, const Inode64 max_inode,
+        PARAM_OUT std::list<FileFragment> &mft_data_fragments, PARAM_OUT Bytes64 &mft_data_bytes,
+        PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments, PARAM_OUT Bytes64 &mft_bitmap_bytes,
+        MUT MemSlice &buffer
 ) {
     DefragGui *gui = DefragGui::get_instance();
 
     // If the record is not in use then quietly exit
-    const FILE_RECORD_HEADER *file_record_header = (FILE_RECORD_HEADER *) buffer;
+    const auto file_record_header = buffer.ptr_to<FILE_RECORD_HEADER>(0);
 
     if ((file_record_header->flags_ & 1) != 1) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                        std::format(L"Inode " NUM_FMT " is not in use.", inode_number));
+                        std::format(L"Inode " NUM_FMT " is not in use.", inode_number.value()));
 
         return false;
     }
 
     // If the record has a BaseFileRecord then ignore it.
     // It is used by an AttributeAttributeList as an extension of another Inode, it's not an Inode by itself.
-    const uint64_t base_inode = (uint64_t) file_record_header->base_file_record_.inode_number_low_part_ +
-                                ((uint64_t) file_record_header->base_file_record_.inode_number_high_part_ << 32);
+    const Inode64 base_inode = Inode64(
+            (uint64_t) file_record_header->base_file_record_.inode_number_low_part_ +
+            ((uint64_t) file_record_header->base_file_record_.inode_number_high_part_ << 32));
 
-    if (base_inode != 0) {
+    if (base_inode) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                        std::format(L"Ignoring Inode " NUM_FMT ", it's an extension of Inode %I64u", inode_number,
-                                    base_inode));
+                        std::format(L"Ignoring Inode " NUM_FMT ", it's an extension of Inode %I64u",
+                                    inode_number.value(), base_inode.value()));
 
         return true;
     }
 
     gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                    std::format(L"Processing Inode " NUM_FMT "…", inode_number));
+                    std::format(L"Processing Inode " NUM_FMT "…", inode_number.value()));
 
     // Show a warning if the Flags have an unknown value
     if ((file_record_header->flags_ & 252) != 0) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                        std::format(L"  Inode " NUM_FMT " has Flags = {}", inode_number, file_record_header->flags_));
+                        std::format(L"  Inode " NUM_FMT " has Flags = {}", inode_number.value(),
+                                    file_record_header->flags_));
     }
 
-    /* I think the MFTRecordNumber should always be the inode_number, but it's an XP
-    extension and I'm not sure about Win2K.
-    Note: why is the MFTRecordNumber only 32 bit? Inode numbers are 48 bit. */
-    if (file_record_header->mft_record_number_ != inode_number) {
+    // I think the MFTRecordNumber should always be the inode_number,
+    // but it's an XP extension and I'm not sure about Win2K. Note: why is the MFTRecordNumber only 32 bit?
+    // Inode numbers are 48 bit.
+    if (Inode64(file_record_header->mft_record_number_) != inode_number) {
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
                         std::format(L"  Warning: Inode " NUM_FMT " contains a different MFTRecordNumber " NUM_FMT,
-                                    inode_number, file_record_header->mft_record_number_));
+                                    inode_number.value(), file_record_header->mft_record_number_));
     }
 
     // Sanity check
-    if (file_record_header->attribute_offset_ >= buf_length) {
-        gui->show_debug(
-                DebugLevel::Progress, nullptr,
-                std::format(
-                        L"Error: attributes in Inode " NUM_FMT " are outside the FILE record, the MFT may be corrupt.",
-                        inode_number));
+    if (file_record_header->attribute_offset_ >= buffer.length().as<USHORT>()) {
+        gui->show_debug(DebugLevel::Progress, nullptr, std::format(
+                L"Error: attributes in Inode {} are outside the FILE record, the MFT may be corrupt.",
+                inode_number));
 
         return false;
     }
 
-    if (file_record_header->bytes_in_use_ > buf_length) {
-        gui->show_debug(
-                DebugLevel::Progress, nullptr,
-                std::format(
-                        L"Error: in Inode " NUM_FMT " the record is bigger than the size of the buffer, the MFT may be corrupt.",
-                        inode_number));
+    if (file_record_header->bytes_in_use_ > buffer.length().as<ULONG>()) {
+        gui->show_debug(DebugLevel::Progress, nullptr, std::format(
+                L"Error: in Inode {} the record is bigger than the size of the buffer, the MFT may be corrupt.",
+                inode_number));
 
         return false;
     }
@@ -91,34 +89,35 @@ bool ScanNTFS::interpret_mft_record(
     // Initialize the InodeData struct
     InodeDataStruct inode_data{
             .inode_ = inode_number, // The Inode number
-            .parent_inode_ = 5, // The Inode number of the parent directory
+            .parent_inode_ = Inode64(5), // The Inode number of the parent directory
             .is_directory_ = (file_record_header->flags_ & 2) == 2,
             .long_filename_ = nullptr, // Long filename
             .short_filename_ = nullptr,// Short filename (8.3 DOS)
-            .bytes_ = 0, // Size of the $DATA stream
+            .bytes_ = {}, // Size of the $DATA stream
             .creation_time_ = {},
             .mft_change_time_ = {},
             .last_access_time_ = {},
             .mft_data_fragments_ = mft_data_fragments,
             .mft_data_bytes_ = mft_data_bytes,
             .mft_bitmap_fragments_ = mft_bitmap_fragments,
-            .mft_bitmap_bytes_ = 0,
+            .mft_bitmap_bytes_ = {},
     };
 
     // Make sure that directories are always created
     if (inode_data.is_directory_) {
-        translate_rundata_to_fragmentlist(data, &inode_data, L"$I30", ATTRIBUTE_TYPE::AttributeIndexAllocation, nullptr,
-                                          0,
-                                          0, 0);
+        auto empty_memv = MemSlice::empty();
+        translate_rundata_to_fragmentlist(data, &inode_data, L"$I30", ATTRIBUTE_TYPE::AttributeIndexAllocation,
+                                          empty_memv, Clusters64(0), Bytes64(0));
     }
 
     // Interpret the attributes
-    [[maybe_unused]] int result = process_attributes(data, disk_info, &inode_data,
-                                                     &buffer[file_record_header->attribute_offset_],
-                                                     buf_length - file_record_header->attribute_offset_, 65535, 0);
+    auto mem_view = MemSlice::from_ptr(buffer.get() + file_record_header->attribute_offset_,
+                                       buffer.length() - Bytes64(file_record_header->attribute_offset_));
+    [[maybe_unused]] int result = process_attributes(
+            data, disk_info, &inode_data, mem_view, 65535, 0);
 
     // Save the mft_data_fragments, mft_data_bytes, mft_bitmap_fragments, and MftBitmapBytes
-    if (inode_number == 0) {
+    if (inode_number.is_zero()) {
         mft_data_fragments = inode_data.mft_data_fragments_;
         mft_data_bytes = inode_data.mft_data_bytes_;
         mft_bitmap_fragments = inode_data.mft_bitmap_fragments_;
@@ -138,12 +137,11 @@ bool ScanNTFS::interpret_mft_record(
                                                           inode_data.long_filename_.get(),
                                                           &*stream_iter);
         item->set_names(L"", long_fn_constructed.c_str(), nullptr, short_fn_constructed.c_str());
-
         item->bytes_ = inode_data.bytes_;
 
         if (stream_iter != inode_data.streams_.end()) item->bytes_ = stream_iter->bytes_;
 
-        item->clusters_count_ = 0;
+        item->clusters_count_ = {};
 
         if (stream_iter != inode_data.streams_.end()) item->clusters_count_ = stream_iter->clusters_;
 
@@ -162,10 +160,10 @@ bool ScanNTFS::interpret_mft_record(
 
         // Increment counters
         if (item->is_dir_) {
-            data.count_directories_ += 1;
+            data.count_directories_++;
         }
 
-        data.count_all_files_ += 1;
+        data.count_all_files_++;
 
         if (stream_iter != inode_data.streams_.end() && stream_iter->stream_type_ == ATTRIBUTE_TYPE::AttributeData) {
             data.count_all_bytes_ += inode_data.bytes_;
@@ -174,7 +172,7 @@ bool ScanNTFS::interpret_mft_record(
         if (stream_iter != inode_data.streams_.end()) data.count_all_clusters_ += stream_iter->clusters_;
 
         if (DefragRunner::get_fragment_count(item.get()) > 1) {
-            data.count_fragmented_items_ += 1;
+            data.count_fragmented_items_++;
             data.count_fragmented_bytes_ += inode_data.bytes_;
 
             if (stream_iter != inode_data.streams_.end()) {
@@ -193,16 +191,17 @@ bool ScanNTFS::interpret_mft_record(
 
         if (inode_array != nullptr
             && inode_number < max_inode
-            && (inode_array[inode_number] == nullptr
-                || (inode_array[inode_number]->have_long_fn()
+            && (inode_array[inode_number.value()] == nullptr
+                || (inode_array[inode_number.value()]->have_long_fn()
                     && last_created_item->have_long_fn()
-                    && wcscmp(inode_array[inode_number]->get_long_fn(), last_created_item->get_long_fn()) > 0))) {
-            inode_array[inode_number] = last_created_item;
+                    &&
+                    wcscmp(inode_array[inode_number.value()]->get_long_fn(), last_created_item->get_long_fn()) > 0))) {
+            inode_array[inode_number.value()] = last_created_item;
         }
 
         // Draw the item on the screen.
         gui->show_analyze(data, last_created_item);
-        defrag_lib_->colorize_disk_item(data, last_created_item, 0, 0, false);
+        defrag_lib_->colorize_disk_item(data, last_created_item, Clusters64(0), Clusters64(0), false);
 
         stream_iter++;
     };
@@ -217,61 +216,55 @@ bool ScanNTFS::interpret_mft_record(
     return true;
 }
 
-/*
-
-Fixup the raw MFT data that was read from disk. Return TRUE if everything is ok,
-FALSE if the MFT data is corrupt (this can also happen when we have read a
-record past the end of the MFT, maybe it has shrunk while we were processing).
-
-- To protect against disk failure, the last 2 bytes of every sector in the MFT are
-not stored in the sector itself, but in the "Usa" array in the header (described
-by UsaOffset and UsaCount). The last 2 bytes are copied into the array and the
-Update Sequence Number is written in their place.
-
-- The Update Sequence Number is stored in the first item (item zero) of the "Usa"
-array.
-
-- The number of bytes per sector is defined in the $Boot record.
-
-*/
-
-bool ScanNTFS::fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
-                                 const uint64_t buf_length) const {
+// Fixup the raw MFT data that was read from disk. Return TRUE if everything is ok,
+// FALSE if the MFT data is corrupt (this can also happen when we have read a
+// record past the end of the MFT, maybe it has shrunk while we were processing).
+//
+// - To protect against disk failure, the last 2 bytes of every sector in the MFT are
+// not stored in the sector itself, but in the "Usa" array in the header (described
+// by UsaOffset and UsaCount). The last 2 bytes are copied into the array and the
+// Update Sequence Number is written in their place.
+//
+// - The Update Sequence Number is stored in the first item (item zero) of the "Usa"
+// array.
+//
+// - The number of bytes per sector is defined in the $Boot record.
+bool
+ScanNTFS::fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *disk_info, const MemSlice &buffer) const {
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check.
-    if (buffer == nullptr) return false;
-    if (buf_length < sizeof(NTFS_RECORD_HEADER)) return false;
+    if (!buffer) return false;
+    if (buffer.length() < Bytes64(sizeof(NTFS_RECORD_HEADER))) return false;
 
     // If this is not a FILE record then return FALSE.
-    if (memcmp(buffer, "FILE", 4) != 0) {
+    if (memcmp(buffer.get(), "FILE", 4) != 0) {
         gui->show_debug(
                 DebugLevel::Progress, nullptr,
                 L"This is not a valid MFT record, it does not begin with FILE (maybe trying to read past the end?).");
 
-        DefragRunner::show_hex(data, buffer, buf_length);
+        DefragRunner::show_hex(data, buffer);
 
         return false;
     }
 
-    /* Walk through all the sectors and restore the last 2 bytes with the value
-    from the Usa array. If we encounter bad sector data then return with FALSE. */
-    const auto buffer_w = (WORD *) buffer;
-    const auto record_header = (NTFS_RECORD_HEADER *) buffer;
-    const auto update_sequence_array = (WORD *) &buffer[record_header->usa_offset_];
-    const auto increment = (uint32_t) (disk_info->bytes_per_sector_ / sizeof(USHORT));
+    // Walk through all the sectors and restore the last 2 bytes with the value
+    // from the Usa array. If we encounter bad sector data then return with FALSE
+    const auto buffer_words = buffer.ptr_to<WORD>(0);
+    const auto buffer_NTFS_RH = buffer.ptr_to<NTFS_RECORD_HEADER>(0);
+    const auto update_sequence_array = buffer.ptr_to<WORD>(buffer_NTFS_RH->usa_offset_);
+    const auto increment = (uint32_t) (disk_info->bytes_per_sector_.value() / sizeof(USHORT));
     uint32_t index = increment - 1;
 
-    for (USHORT i = 1; i < record_header->usa_count_; i++) {
+    for (USHORT i = 1; i < buffer_NTFS_RH->usa_count_; i++) {
         // Check if we are inside the buffer
-        if (index * sizeof(WORD) >= buf_length) {
+        if (Bytes64(index * sizeof(WORD)) >= buffer.length()) {
             gui->show_debug(DebugLevel::Progress, nullptr,
                             L"Warning: USA data indicates that data is missing, the MFT may be corrupt.");
         }
 
-        /* Check if the last 2 bytes of the sector contain the Update Sequence Number.
-        If not then return FALSE. */
-        if (buffer_w[index] != update_sequence_array[0]) {
+        // Check if the last 2 bytes of the sector contain the Update Sequence Number. If not then return FALSE.
+        if (buffer_words[index] != update_sequence_array[0]) {
             gui->show_debug(
                     DebugLevel::Progress, nullptr,
                     L"Error: USA fixup word is not equal to the Update Sequence Number, the MFT may be corrupt.");
@@ -280,7 +273,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *di
         }
 
         // Replace the last 2 bytes in the sector with the value from the Usa array
-        buffer_w[index] = update_sequence_array[i];
+        buffer_words[index] = update_sequence_array[i];
         index = index + increment;
     }
 

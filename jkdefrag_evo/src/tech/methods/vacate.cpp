@@ -22,11 +22,12 @@
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then
 // skip them. Then move files upward until the gap is bigger than clusters, or when we
 // encounter an unmovable file.
-void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
+void DefragRunner::vacate(DefragState &data, Clusters64 lcn, Clusters64 clusters, BOOL ignore_mft_excludes) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                    std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT, clusters, lcn));
+                    std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT,
+                                clusters.value(), lcn.value()));
 
     // Sanity check
     if (lcn >= data.total_clusters_) {
@@ -38,19 +39,19 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
     // Determine the point to above which we will be moving the data. We want at least the
     // end of the zone if everything was perfectly optimized, so data will not be moved
     // again and again.
-    uint64_t move_to = lcn + clusters;
+    Clusters64 move_to = lcn + clusters;
 
     switch (data.zone_) {
-        case Zone::ZoneFirst:
+        case Zone::Directories:
             move_to = data.zones_[1];
             break;
-        case Zone::ZoneCommon:
+        case Zone::RegularFiles:
             move_to = data.zones_[2];
             break;
-        case Zone::ZoneLast:
+        case Zone::SpaceHogs:
             // Zone 2: end of disk minus all the free space
             move_to = data.total_clusters_ - data.count_free_clusters_ +
-                      (uint64_t) (data.total_clusters_ * 2.0 * data.free_space_ / 100.0);
+                      Clusters64(data.total_clusters_.value() * 2 * data.free_space_ / 100);
             break;
         default:
             break;
@@ -58,28 +59,29 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
 
     if (move_to < lcn + clusters) move_to = lcn + clusters;
 
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(L"move_to = " NUM_FMT, move_to));
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+            L"move_to = " NUM_FMT, move_to.value()));
 
     // Loop forever
-    uint64_t move_gap_begin = 0;
-    uint64_t move_gap_end = 0;
-    uint64_t done_until = lcn;
+    Clusters64 move_gap_begin = {};
+    Clusters64 move_gap_end = {};
+    Clusters64 done_until = lcn;
 
     while (data.is_still_running()) {
         // Find the first movable data fragment at or above the done_until lcn. If there is nothing
         // then return, we have reached the end of the disk.
         FileNode *bigger_item = nullptr;
-        uint64_t bigger_begin = 0;
-        uint64_t bigger_end;
-        uint64_t bigger_real_vcn;
+        Clusters64 bigger_begin = {};
+        Clusters64 bigger_end;
+        Clusters64 bigger_real_vcn;
 
         for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
-            if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
+            if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_.is_zero()) {
                 continue;
             }
 
-            uint64_t vcn = 0;
-            uint64_t real_vcn = 0;
+            Clusters64 vcn = {};
+            Clusters64 real_vcn = {};
 
             for (auto &fragment: item->fragments_) {
                 if (!fragment.is_virtual()) {
@@ -99,48 +101,47 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
                 vcn = fragment.next_vcn_;
             }
 
-            if (bigger_begin != 0 && bigger_begin == lcn) break;
+            if (bigger_begin && bigger_begin == lcn) break;
         }
 
         if (bigger_item == nullptr) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                            std::format(L"No data found above LCN=" NUM_FMT, lcn));
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                    L"No data found above LCN=" NUM_FMT, lcn.value()));
 
             return;
         }
 
-        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                        std::format(L"Data found at LCN=" NUM_FMT ", {}", bigger_begin, bigger_item->get_long_path()));
+        gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                L"Data found at LCN=" NUM_FMT ", {}", bigger_begin.value(), bigger_item->get_long_path()));
 
         // Find the first gap above the lcn
-        uint64_t test_gap_begin;
-        uint64_t test_gap_end;
-        bool result = find_gap(data, lcn, 0, 0, true, false,
-                               &test_gap_begin, &test_gap_end, ignore_mft_excludes);
+        Clusters64 test_gap_begin;
+        Clusters64 test_gap_end;
+        bool result = find_gap(data, lcn, Clusters64(0), Clusters64(0), true, false,
+                               PARAM_OUT test_gap_begin, PARAM_OUT test_gap_end, ignore_mft_excludes);
 
         if (!result) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                            std::format(L"No gaps found above LCN=" NUM_FMT, lcn));
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                    L"No gaps found above LCN=" NUM_FMT, lcn.value()));
             return;
         }
 
         // Exit if the end of the first gap is below the first movable item, the gap cannot be expanded.
         if (test_gap_end < bigger_begin) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                            std::format(
-                                    L"Cannot expand the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) any further.",
-                                    test_gap_begin, test_gap_end, test_gap_end - test_gap_begin));
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                    L"Cannot expand the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) any further.",
+                    test_gap_begin.value(), test_gap_end.value(), (test_gap_end - test_gap_begin).value()
+            ));
             return;
         }
 
-        /* Exit if the first movable item is at the end of the gap and the gap is big enough,
-        no need to enlarge any further. */
+        // Exit if the first movable item is at the end of the gap and the gap is big enough, no need to enlarge any further
         if (test_gap_end == bigger_begin && test_gap_end - test_gap_begin >= clusters) {
-            gui->show_debug(
-                    DebugLevel::DetailedGapFilling, nullptr,
-                    std::format(
-                            L"Finished vacating, the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) is now bigger than " NUM_FMT " clusters.",
-                            test_gap_begin, test_gap_end, test_gap_end - test_gap_begin, clusters));
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                    L"Finished vacating, the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) is now bigger than " NUM_FMT " clusters.",
+                    test_gap_begin.value(), test_gap_end.value(), (test_gap_end - test_gap_begin).value(),
+                    clusters.value()
+            ));
 
             return;
         }
@@ -158,27 +159,27 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
 
             // First try to find a gap above the move_to point
             if (move_to < data.total_clusters_ && move_to >= bigger_end) {
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                        L"Finding gap above move_to=" NUM_FMT, move_to.value()));
 
-                result = find_gap(data, move_to, 0, bigger_end - bigger_begin, true, false, &move_gap_begin,
-                                  &move_gap_end,
-                                  FALSE);
+                result = find_gap(data, move_to, Clusters64(0), bigger_end - bigger_begin,
+                                  true, false, PARAM_OUT move_gap_begin, PARAM_OUT move_gap_end,
+                                  false);
             }
 
             // If no gap was found then try to find a gap as high on disk as possible, but above the item.
             if (!result) {
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                std::format(L"Finding gap from end of disk above bigger_end=" NUM_FMT, bigger_end));
+                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(
+                        L"Finding gap from end of disk above bigger_end=" NUM_FMT, bigger_end.value()));
 
-                result = find_gap(data, bigger_end, 0, bigger_end - bigger_begin, true, true, &move_gap_begin,
-                                  &move_gap_end, FALSE);
+                result = find_gap(data, bigger_end, Clusters64(0), bigger_end - bigger_begin,
+                                  true, true, PARAM_OUT move_gap_begin, PARAM_OUT move_gap_end,
+                                  false);
             }
 
             // If no gap was found then exit, we cannot move the item.
             if (!result) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"No gap found.");
-
                 return;
             }
         }
@@ -214,31 +215,34 @@ void DefragRunner::set_up_unusable_cluster_list(DefragState &data) {
         // Note: NtfsData.TotalClusters.QuadPart should be exactly the same
         // as the Data->TotalClusters that was determined in the previous block.
 
-        data.bytes_per_cluster_ = ntfs_data.BytesPerCluster;
+        data.bytes_per_cluster_ = Bytes64PerCluster(ntfs_data.BytesPerCluster);
 
-        data.mft_excludes_[0].start_ = ntfs_data.MftStartLcn.QuadPart;
-        data.mft_excludes_[0].end_ = ntfs_data.MftStartLcn.QuadPart +
-                                     ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
-        data.mft_excludes_[1].start_ = ntfs_data.MftZoneStart.QuadPart;
-        data.mft_excludes_[1].end_ = ntfs_data.MftZoneEnd.QuadPart;
-        data.mft_excludes_[2].start_ = ntfs_data.Mft2StartLcn.QuadPart;
-        data.mft_excludes_[2].end_ = ntfs_data.Mft2StartLcn.QuadPart +
-                                     ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster;
+        data.mft_excludes_[0].start_ = Clusters64(ntfs_data.MftStartLcn.QuadPart);
+        data.mft_excludes_[0].end_ = Clusters64(ntfs_data.MftStartLcn.QuadPart +
+                                                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster);
+        data.mft_excludes_[1].start_ = Clusters64(ntfs_data.MftZoneStart.QuadPart);
+        data.mft_excludes_[1].end_ = Clusters64(ntfs_data.MftZoneEnd.QuadPart);
+        data.mft_excludes_[2].start_ = Clusters64(ntfs_data.Mft2StartLcn.QuadPart);
+        data.mft_excludes_[2].end_ = Clusters64(ntfs_data.Mft2StartLcn.QuadPart +
+                                                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster);
 
         // Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d"
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(
-                                L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT ", MftValidDataLength=" NUM_FMT,
-                                ntfs_data.MftStartLcn.QuadPart, ntfs_data.MftZoneStart.QuadPart,
-                                ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
-                                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster));
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(
+                L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT ", MftValidDataLength=" NUM_FMT,
+                ntfs_data.MftStartLcn.QuadPart, ntfs_data.MftZoneStart.QuadPart,
+                ntfs_data.MftZoneEnd.QuadPart, ntfs_data.Mft2StartLcn.QuadPart,
+                ntfs_data.MftValidDataLength.QuadPart / ntfs_data.BytesPerCluster
+        ));
 
         // Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d"
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 0, data.mft_excludes_[0].start_, 0, data.mft_excludes_[0].end_));
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 1, data.mft_excludes_[1].start_, 1, data.mft_excludes_[1].end_));
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 2, data.mft_excludes_[2].start_, 2, data.mft_excludes_[2].end_));
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(
+                MFT_EXCL_FMT, 0, data.mft_excludes_[0].start_.value(), data.mft_excludes_[0].end_.value()
+        ));
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(
+                MFT_EXCL_FMT, 1, data.mft_excludes_[1].start_.value(), data.mft_excludes_[1].end_.value()
+        ));
+        gui->show_debug(DebugLevel::DetailedProgress, nullptr, std::format(
+                MFT_EXCL_FMT, 2, data.mft_excludes_[2].start_.value(), data.mft_excludes_[2].end_.value()
+        ));
     }
 }

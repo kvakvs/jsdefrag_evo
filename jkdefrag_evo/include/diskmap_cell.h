@@ -15,10 +15,6 @@
  http://www.kessels.com/
  */
 
-//
-// Created by Dmytro on 20-Jul-23.
-//
-
 #pragma once
 
 // Represents state of a disk cluster, used for coloring the diskmap. Dirty requires a redraw.

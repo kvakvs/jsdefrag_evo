@@ -21,34 +21,33 @@
 void DefragRunner::optimize_volume(DefragState &data) {
     FileNode *item;
 
-    uint64_t gap_begin;
-    uint64_t gap_end;
-
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
     if (data.item_tree_ == nullptr) return;
 
     // Process all the zones
-    for (int zone_i = 0; zone_i < (int) Zone::ZoneAll_MaxValue; zone_i++) {
+    for (int zone_i = 0; zone_i < (int) Zone::All_MaxValue; zone_i++) {
         auto zone = (Zone) zone_i;
 
         call_show_status(data, DefragPhase::ZoneFastOpt, zone); // "Zone N: Fast Optimize"
 
         // Walk through all the gaps
-        gap_begin = data.zones_[(size_t) zone];
+        Clusters64 gap_begin = data.zones_[(size_t) zone];
+        Clusters64 gap_end;
         int retry = 0;
 
         while (data.is_still_running()) {
             // Find the next gap
-            auto result = find_gap(data, gap_begin, 0, 0, true, false,
-                                   &gap_begin, &gap_end, false);
+            auto result = find_gap(data, gap_begin, Clusters64(0), Clusters64(0),
+                                   true, false, PARAM_OUT gap_begin, PARAM_OUT gap_end,
+                                   false);
 
             if (!result) break;
 
             // Update the progress counter: the number of clusters in all the files
             // above the gap. Exit if there are no more files
-            uint64_t phase_temp = 0;
+            Clusters64 phase_temp = {};
 
             for (item = Tree::biggest(data.item_tree_); item != nullptr; item = Tree::prev(item)) {
                 if (item->get_item_lcn() < gap_end) break;
@@ -58,11 +57,11 @@ void DefragRunner::optimize_volume(DefragState &data) {
                 auto preferred_zone = item->get_preferred_zone();
                 if (preferred_zone != zone) continue;
 
-                phase_temp = phase_temp + item->clusters_count_;
+                phase_temp += item->clusters_count_;
             }
 
             data.phase_todo_ += phase_temp;
-            if (phase_temp == 0) break;
+            if (phase_temp.is_zero()) break;
 
             // Loop until the gap is filled. First look for combinations of files that perfectly
             // fill the gap. If no combination can be found, or if there are fewer files than
@@ -88,7 +87,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
                 if (item == nullptr) break;
 
                 // Move the item
-                result = move_item(data, item, gap_begin, 0, item->clusters_count_, MoveDirection::Up);
+                result = move_item(data, item, gap_begin, Clusters64(0), item->clusters_count_, MoveDirection::Up);
 
                 if (result) {
                     gap_begin = gap_begin + item->clusters_count_;
@@ -102,8 +101,10 @@ void DefragRunner::optimize_volume(DefragState &data) {
             // If the gap could not be filled then skip
             if (gap_begin < gap_end) {
                 // Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]"
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                std::format(SKIPPING_GAP_FMT, gap_begin, gap_end - gap_begin));
+                gui->show_debug(
+                        DebugLevel::DetailedGapFilling, nullptr,
+                        std::format(SKIPPING_GAP_FMT, gap_begin.value(), (gap_end - gap_begin).value())
+                );
                 gap_begin = gap_end;
                 retry = 0;
             }

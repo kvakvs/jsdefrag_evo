@@ -15,8 +15,10 @@ include_directories(${INCL})
 
 set(HEADER_FILES
         ${INCL}/app.h
+        ${INCL}/numeral.h
         ${INCL}/diskmap.h
         ${INCL}/diskmap_cell.h
+        ${INCL}/diskmap_color.h
         ${INCL}/constants.h
         ${INCL}/defrag_gui.h
         ${INCL}/runner.h

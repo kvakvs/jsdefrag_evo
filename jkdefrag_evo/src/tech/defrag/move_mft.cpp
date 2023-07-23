@@ -25,15 +25,6 @@
 //    higher on the disk.
 [[maybe_unused]] void DefragRunner::move_mft_to_begin_of_disk(DefragState &data) {
     FileNode *item;
-
-    uint64_t lcn;
-    uint64_t gap_begin;
-    uint64_t gap_end;
-    uint64_t clusters;
-    uint64_t clusters_done;
-
-    OSVERSIONINFO os_version;
-
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::Progress, nullptr, L"Moving the MFT to the beginning of the volume.");
@@ -47,6 +38,7 @@
     }
 
     // The Microsoft defragmentation api only supports moving the MFT on Vista
+    OSVERSIONINFO os_version;
     ZeroMemory(&os_version, sizeof(OSVERSIONINFO));
 
     os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
@@ -82,25 +74,28 @@
     }
 #endif
 
-    lcn = 0;
-    gap_begin = 0;
-    gap_end = 0;
-    clusters_done = data.disk_.mft_locked_clusters_;
+    Clusters64 lcn;
+    Clusters64 gap_begin;
+    Clusters64 gap_end = {};
+    Clusters64 clusters;
+    Clusters64 clusters_done = data.disk_.mft_locked_clusters_;
 
     while (data.is_still_running() && clusters_done < item->clusters_count_) {
         if (clusters_done > data.disk_.mft_locked_clusters_) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                            std::format(L"Partially placed, " NUM_FMT " clusters more to do",
-                                        item->clusters_count_ - clusters_done));
+            gui->show_debug(
+                    DebugLevel::DetailedGapFilling, nullptr,
+                    std::format(L"Partially placed, " NUM_FMT " clusters more to do",
+                                (item->clusters_count_ - clusters_done).value())
+            );
         }
 
-        /* Call the Vacate() function to make a gap at Lcn big enough to hold the MFT.
-        The Vacate() function may not be able to move whatever is now at the Lcn, so
-        after calling it we have to locate the first gap after the Lcn. */
-        if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
+        // Call the Vacate() function to make a gap at Lcn big enough to hold the MFT. The Vacate() function may not be
+        // able to move whatever is now at the Lcn, so after calling it we have to locate the first gap after the Lcn.
+        if (gap_begin + item->clusters_count_ - clusters_done + Clusters64(16) > gap_end) {
             vacate(data, lcn, item->clusters_count_ - clusters_done, TRUE);
 
-            auto result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
+            auto result = find_gap(data, lcn, Clusters64(0), Clusters64(0),
+                                   true, false, PARAM_OUT gap_begin, PARAM_OUT gap_end, true);
 
             if (!result) return; // No gaps found, exit
         }
@@ -111,13 +106,11 @@
 
         if (clusters > gap_end - gap_begin) {
             clusters = gap_end - gap_begin;
-            /* It looks like a partial move only succeeds if the number of clusters is a
-            multiple of 8. */
-            clusters = clusters - clusters % 8;
+            // It looks like a partial move only succeeds if the number of clusters is a multiple of 8
+            clusters = clusters - clusters % Clusters64(8);
 
-            if (clusters == 0) {
+            if (clusters.is_zero()) {
                 lcn = gap_end;
-
                 continue;
             }
         }
@@ -128,8 +121,8 @@
         if (result) {
             gap_begin = gap_begin + clusters;
         } else {
-            result = find_gap(data, gap_begin, 0, 0, true, false,
-                              &gap_begin, &gap_end, true);
+            result = find_gap(data, gap_begin, Clusters64(0), Clusters64(0), true, false,
+                              PARAM_OUT gap_begin, PARAM_OUT gap_end, true);
 
             if (!result) return; // No gaps found, exit
         }
@@ -138,10 +131,10 @@
         clusters_done = clusters_done + clusters;
     }
 
-    // Make the MFT unmovable. We don't want it moved again by any other subroutine
+    // Make the MFT unmovable. We don't want it to be moved again by any other subroutine
     item->is_unmovable_ = true;
 
-    colorize_disk_item(data, item, 0, 0, false);
+    colorize_disk_item(data, item, Clusters64(0), Clusters64(0), false);
     calculate_zones(data);
 
     // Note: The MftExcludes do not change by moving the MFT

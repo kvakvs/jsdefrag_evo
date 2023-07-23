@@ -2,7 +2,7 @@
 
 #include <memory>
 
-constexpr size_t MFT_BUFFER_SIZE = kilobytes(256); // 256 KB seems to be the optimum
+constexpr auto MFT_BUFFER_SIZE = kilobytes(256uLL); // 256 KB seems to be the optimum
 
 struct INODE_REFERENCE {
     ULONG inode_number_low_part_;
@@ -298,13 +298,13 @@ struct StreamStruct {
     std::wstring stream_name_;
     ATTRIBUTE_TYPE stream_type_;
     std::list<FileFragment> fragments_; // The fragments of the stream
-    uint64_t clusters_; // Total number of clusters
-    uint64_t bytes_; // Total number of bytes
+    Clusters64 clusters_; // Total number of clusters
+    Bytes64 bytes_; // Total number of bytes
 };
 
 struct InodeDataStruct {
-    uint64_t inode_; // The Inode number
-    uint64_t parent_inode_; // The Inode number of the parent directory
+    Inode64 inode_; // The Inode number
+    Inode64 parent_inode_; // The Inode number of the parent directory
 
     bool is_directory_;
 
@@ -313,7 +313,7 @@ struct InodeDataStruct {
     // Short filename (8.3 DOS); TODO: use std::wstring
     std::unique_ptr<wchar_t[]> short_filename_;
 
-    uint64_t bytes_; // Total number of bytes
+    Bytes64 bytes_; // Total number of bytes
     micro64_t creation_time_;
     micro64_t mft_change_time_;
     micro64_t last_access_time_;
@@ -321,25 +321,25 @@ struct InodeDataStruct {
     std::list<StreamStruct> streams_; // List of StreamStruct
     std::list<FileFragment> mft_data_fragments_; // The Fragments of the $MFT::$DATA stream
 
-    uint64_t mft_data_bytes_; // Length of the $MFT::$DATA
+    Bytes64 mft_data_bytes_; // Length of the $MFT::$DATA
 
     std::list<FileFragment> mft_bitmap_fragments_; // The Fragments of the $MFT::$BITMAP stream
 
-    uint64_t mft_bitmap_bytes_; // Length of the $MFT::$BITMAP
+    Bytes64 mft_bitmap_bytes_; // Length of the $MFT::$BITMAP
 };
 
 struct NtfsDiskInfoStruct {
-    uint64_t bytes_per_sector_;
-    uint64_t sectors_per_cluster_;
-    uint64_t total_sectors_;
-    uint64_t mft_start_lcn_;
-    uint64_t mft2_start_lcn_;
-    uint64_t bytes_per_mft_record_;
-    uint64_t clusters_per_index_record_;
+    Bytes64PerSector bytes_per_sector_;
+    Sectors64PerCluster sectors_per_cluster_;
+    Sectors64 total_sectors_;
+    Clusters64 mft_start_lcn_;
+    Clusters64 mft2_start_lcn_;
+    Bytes64 bytes_per_mft_record_;
+    Clusters64 clusters_per_index_record_;
 
     struct {
-        BYTE buffer_[MFT_BUFFER_SIZE];
-        uint64_t offset_;
+        uint8_t buffer_[MFT_BUFFER_SIZE.value()];
+        Bytes64 offset_;
         int age_;
     } buffers_[3];
 };
@@ -356,29 +356,27 @@ public:
     bool analyze_ntfs_volume(DefragState &data);
 
 private:
-    bool analyze_ntfs_volume_read_bootblock(DefragState &data, MemReader<uint8_t> &buff);
+    bool analyze_ntfs_volume_read_bootblock(DefragState &data, MUT MemSlice &buff);
 
-    bool analyze_ntfs_volume_read_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MemReader<uint8_t> &buff);
+    bool analyze_ntfs_volume_read_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MUT MemSlice &buff);
 
-    bool analyze_ntfs_volume_extract_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MemReader<uint8_t> &buff,
+    bool analyze_ntfs_volume_extract_mft(DefragState &data, NtfsDiskInfoStruct &disk_info, MUT MemSlice &buff,
                                          PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments,
-                                         PARAM_OUT uint64_t &bitmap_bytes, PARAM_OUT uint64_t &mft_data_bytes,
+                                         PARAM_OUT Bytes64 &bitmap_bytes, PARAM_OUT Bytes64 &mft_data_bytes,
                                          PARAM_OUT std::list<FileFragment> &mft_data_fragments);
 
     static const wchar_t *stream_type_names(ATTRIBUTE_TYPE stream_type);
 
-    bool fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *disk_info, BYTE *buffer,
-                           uint64_t buf_length) const;
+    bool fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *disk_info, const MemSlice &buffer) const;
 
     static BYTE *read_non_resident_data(
-            const DefragState &data, const NtfsDiskInfoStruct *disk_info, const BYTE *run_data,
-            uint32_t run_data_length, uint64_t offset, uint64_t wanted_length);
+            const DefragState &data, const NtfsDiskInfoStruct *disk_info, const MemSlice &run_data,
+            Bytes64 offset, Bytes64 wanted_length);
 
     static bool translate_rundata_to_fragmentlist(
             const DefragState &data, InodeDataStruct *inode_data,
             const wchar_t *stream_name, ATTRIBUTE_TYPE stream_type,
-            const BYTE *run_data, uint32_t run_data_length, uint64_t starting_vcn,
-            uint64_t bytes);
+            MemSlice &run_data, Clusters64 starting_vcn, Bytes64 bytes);
 
     static void cleanup_streams(InodeDataStruct *inode_data);
 
@@ -386,19 +384,18 @@ private:
     construct_stream_name(const wchar_t *file_name_1, const wchar_t *file_name_2, const StreamStruct *stream);
 
     bool process_attributes(
-            DefragState &data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
-            uint64_t buf_length, USHORT instance, int depth);
+            DefragState &data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, const MemSlice &buffer,
+            USHORT instance, int depth);
 
     void process_attribute_list(
-            DefragState &data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, BYTE *buffer,
-            uint64_t buf_length, int depth);
+            DefragState &data, NtfsDiskInfoStruct *disk_info, InodeDataStruct *inode_data, const MemSlice &buffer,
+            int depth);
 
     bool interpret_mft_record(
-            DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array, uint64_t inode_number,
-            uint64_t max_inode, PARAM_OUT std::list<FileFragment> &mft_data_fragments, PARAM_OUT
-            uint64_t &mft_data_bytes, PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments, PARAM_OUT
-            uint64_t &mft_bitmap_bytes, BYTE *buffer, uint64_t buf_length
-    );
+            DefragState &data, NtfsDiskInfoStruct *disk_info, FileNode **inode_array, Inode64 inode_number,
+            Inode64 max_inode, PARAM_OUT std::list<FileFragment> &mft_data_fragments, PARAM_OUT
+            Bytes64 &mft_data_bytes, PARAM_OUT std::list<FileFragment> &mft_bitmap_fragments, PARAM_OUT
+            Bytes64 &mft_bitmap_bytes, MUT MemSlice &buffer);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanNTFS> instance_;

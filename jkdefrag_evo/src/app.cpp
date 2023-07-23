@@ -148,7 +148,7 @@ void DefragApp::defrag_thread() {
     // Setup the defaults
     OptimizeMode optimize_mode = OptimizeMode::AnalyzeFixupFastopt;
     // Range 0...100 
-    int speed = 100;
+    auto speed = Percentage(100);
     double free_space = 1;
     Wstrings excludes;
     Wstrings space_hogs;
@@ -208,13 +208,9 @@ void DefragApp::defrag_thread() {
             match_argument_with_space(
                     i, argc, argv, L"-s",
                     [&](const wchar_t *arg) {
-                        speed = _wtol(arg);
-
-                        if (speed < 5 || speed > 100) {
-                            Log::log_always(L"Error: the number after the \"-s\" commandline argument is invalid. "
-                                            "Using the default 100.");
-                            speed = 100;
-                        }
+                        speed = clamp(Percentage(_wtol(arg)),
+                                      Percentage(5),
+                                      Percentage(100));
 
                         Log::log_always(std::format(L"Commandline argument '-s' accepted, slowing down to {}%", speed));
                     },

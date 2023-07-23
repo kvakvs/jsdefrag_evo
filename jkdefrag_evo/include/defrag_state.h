@@ -54,7 +54,7 @@ public:
     std::vector<std::wstring> space_hogs_{};
 
     // Begin (LCN) of the zones
-    uint64_t zones_[4] = {};
+    Clusters64 zones_[4] = {};
 
     // List of clusters reserved for the MFT
     ExcludesStruct mft_excludes_[3] = {};
@@ -64,19 +64,19 @@ public:
      */
 
     // Size of the volume, in clusters. 
-    uint64_t total_clusters_{};
+    Clusters64 total_clusters_{};
     // Number of bytes per cluster.
-    uint64_t bytes_per_cluster_{};
+    Bytes64PerCluster bytes_per_cluster_{};
 
     /*
      * Counters updated before/after every Phase.
      */
 
-    uint64_t count_free_clusters_; // Number of free clusters
+    Clusters64 count_free_clusters_; // Number of free clusters
     uint64_t count_gaps_; // Number of gaps
-    uint64_t biggest_gap_; // Size of biggest gap, in clusters
+    Clusters64 biggest_gap_; // Size of biggest gap, in clusters
     uint64_t count_gaps_less16_; // Number of gaps smaller than 16 clusters
-    uint64_t count_clusters_less16_; // Number of clusters in gaps that are smaller than 16 clusters
+    Clusters64 count_clusters_less16_; // Number of clusters in gaps that are smaller than 16 clusters
 
     //
     // Counters updated after every Phase, but not before Phase 1 (analyze).
@@ -89,13 +89,13 @@ public:
     // Number of fragmented files
     uint64_t count_fragmented_items_{};
     // Bytes in analysed files
-    uint64_t count_all_bytes_{};
+    Bytes64 count_all_bytes_{};
     // Bytes in fragmented files
-    uint64_t count_fragmented_bytes_{};
+    Bytes64 count_fragmented_bytes_{};
     // Clusters in analysed files
-    uint64_t count_all_clusters_{};
+    Clusters64 count_all_clusters_{};
     // Clusters in fragmented files
-    uint64_t count_fragmented_clusters_{};
+    Clusters64 count_fragmented_clusters_{};
     // Between end and begin of files
     double average_distance_ = 0.0;
 
@@ -104,12 +104,12 @@ public:
     //
 
     // Number of items to do in this Phase
-    uint64_t phase_todo_{};
+    Clusters64 phase_todo_{};
     // Number of items already done in this Phase
-    uint64_t clusters_done_{};
+    Clusters64 clusters_done_{};
 
     // Variables used to throttle the speed; Speed as a percentage 1..100
-    uint64_t speed_{};
+    Percentage slowdown_percent_{};
 
     Clock::time_point start_time_{};
     Clock::duration running_time_{};

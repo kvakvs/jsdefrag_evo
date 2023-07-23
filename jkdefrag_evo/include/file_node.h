@@ -9,8 +9,8 @@
 
 // File fragment descriptor, stored as a list of file fragments; TODO: std::forward_list
 struct FileFragment {
-    uint64_t lcn_; // Logical cluster number, location on disk
-    uint64_t next_vcn_; // Virtual cluster number of next fragment
+    Clusters64 lcn_; // Logical cluster number, location on disk
+    Clusters64 next_vcn_; // Virtual cluster number of next fragment
 
     void set_virtual() {
         lcn_ = VIRTUALFRAGMENT;
@@ -21,7 +21,7 @@ struct FileFragment {
     }
 
 private:
-    static constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
+    static constexpr Clusters64 VIRTUALFRAGMENT = Clusters64(std::numeric_limits<Clusters64::Storage>::max());
 };
 
 
@@ -35,16 +35,10 @@ public:
 
     virtual ~FileNode();
 
-    // Tree node location type
-    using TreeLcn = uint64_t;
-//    using TreeLcn = struct {
-//        uint64_t lcn;
-//    };
-
     // Return the location on disk (LCN, Logical Cluster Number) of an item
-    [[nodiscard]] TreeLcn get_item_lcn() const {
+    [[nodiscard]] Clusters64 get_item_lcn() const {
         // Sanity check
-        if (this == nullptr) return 0;
+        if (this == nullptr) return {};
 
         auto fragment = fragments_.begin();
 
@@ -54,13 +48,13 @@ public:
         }
 
         // Return 0 if the fragment list end was reached without finding a real fragment
-        return fragment == fragments_.end() ? 0 : fragment->lcn_;
+        return fragment == fragments_.end() ? Clusters64() : fragment->lcn_;
     }
 
     [[nodiscard]] Zone get_preferred_zone() const {
-        if (is_dir_) return Zone::ZoneFirst;
-        if (is_hog_) return Zone::ZoneLast;
-        return Zone::ZoneCommon;
+        if (is_dir_) return Zone::Directories;
+        if (is_hog_) return Zone::SpaceHogs;
+        return Zone::RegularFiles;
     }
 
 public:
@@ -70,8 +64,8 @@ public:
     // Next bigger item
     FileNode *bigger_;
 
-    uint64_t bytes_;
-    uint64_t clusters_count_;
+    Bytes64 bytes_;
+    Clusters64 clusters_count_;
     filetime64_t creation_time_;
     filetime64_t mft_change_time_;
     filetime64_t last_access_time_;
@@ -81,7 +75,7 @@ public:
     std::list<FileFragment> fragments_;
 
     // The Inode number of the parent directory
-    uint64_t parent_inode_;
+    Inode64 parent_inode_;
 
     FileNode *parent_directory_;
 

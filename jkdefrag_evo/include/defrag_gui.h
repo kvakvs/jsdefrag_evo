@@ -17,7 +17,7 @@ public:
 
     void clear_screen(std::wstring &&text);
 
-    void draw_cluster(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
+    void draw_cluster(const DefragState &data, Clusters64 cluster_start, Clusters64 cluster_end, DrawColor color);
 
     void show_debug(DebugLevel level, const FileNode *item, std::wstring &&text);
 
@@ -37,7 +37,8 @@ public:
 
     void show_analyze_update_item_text(const FileNode *item);
 
-    void show_move(const FileNode *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
+    void
+    show_move(const FileNode *item, Clusters64 clusters, Clusters64 from_lcn, Clusters64 to_lcn, Clusters64 from_vcn);
 
     void show_diskmap(DefragState &data);
 
@@ -101,9 +102,9 @@ private:
     Clock::time_point progress_time_{};
 
     // Number of clusters to do
-    uint64_t progress_todo_{};
+    Clusters64 progress_todo_{};
     // Number of clusters already done
-    uint64_t progress_done_{};
+    Clusters64 progress_done_{};
 
     //
     // graphics data

@@ -6,13 +6,13 @@ enum class Zone {
     // Used as no-value
     None = -1,
     // Beginning zone, suitable for storing directories
-    ZoneFirst = 0,
+    Directories = 0,
     // Everything else
-    ZoneCommon = 1,
+    RegularFiles = 1,
     // Zone for space hogs, rare modified large files
-    ZoneLast = 2,
+    SpaceHogs = 2,
     // Marks "All Zones" in some contexts. Used as stop-value in for-loops not a real value
-    ZoneAll_MaxValue = 3,
+    All_MaxValue = 3,
 };
 
 std::wstring zone_to_str(Zone zone);
@@ -58,41 +58,6 @@ enum class OptimizeMode {
 #define APP_NAME "JkDefragEvo"
 #define APP_NAME_W L"JkDefragEvo"
 
-constexpr COLORREF display_colors[9] = {
-        RGB(240, 240, 240),     // 0 Empty         - Empty diskspace
-        RGB(160, 160, 160),     // 1 Allocated     - Used diskspace / system files
-        RGB(128, 128, 128),     // 2 Unfragmented  - Unfragmented files
-        RGB(128, 0, 0),         // 3 Unmovable     - Unmovable files
-        RGB(200, 60, 60),       // 4 Fragmented    - Fragmented files
-        RGB(255, 160, 0),       // 5 Busy          - Busy color
-        RGB(220, 0, 180),       // 6 Mft           - MFT reserved zones
-        RGB(80, 80, 200),       // 7 SpaceHog      - Large files, rarely changed
-};
-
-// The colors used by the defragger
-enum class DrawColor : uint8_t {
-    // Empty diskspace
-    Empty = 0,
-    // Used diskspace / system files
-    Allocated,
-    // Unfragmented files
-    Unfragmented,
-    // Unmovable files, or files we decided to not move
-    Unmovable,
-    // Fragmented files
-    Fragmented,
-    // Busy color
-    Busy,
-    // MFT reserved zones
-    Mft,
-    // Spacehogs
-    SpaceHog,
-    // Background color
-    // Background
-    // Not a real color, used for counting the enum values
-    MaxValue,
-};
-
 enum class MoveStrategy {
     Whole,
     InFragments,
@@ -119,7 +84,7 @@ enum class MoveDirection {
 #define EXTENT_FMT              L"Extent: Lcn=" NUM_FMT ", Vcn=" NUM_FMT ", NextVcn=" NUM_FMT
 #define VEXTENT_FMT             L"Extent (virtual): Vcn=" NUM_FMT ", NextVcn=" NUM_FMT
 #define SKIPPING_GAP_FMT        L"Skipping gap, cannot fill: " NUM_FMT " [" NUM_FMT " clusters]"
-#define MFT_EXCL_FMT            L"MftExcludes[{}].Start=" NUM_FMT ", MftExcludes[{}].End=" NUM_FMT
+#define MFT_EXCL_FMT            L"MftExcludes[{}] start..end = " NUM_FMT ".." NUM_FMT
 
 #define SUMMARY_HEADER          L"Fragments Bytes            Clusters     Name"
 #define SUMMARY_DASH_LINE       L"--------- ---------------- ------------ -----"
@@ -129,5 +94,6 @@ enum class MoveDirection {
 #define CMD_EXECUTABLE_NAME     "jkdefragcmd.exe"
 #define SCREENSAVER_NAME        "jkdefragscreensaver.exe"
 
+#define MUT                     /* marks mutable param */
 #define PARAM_OUT               /* output param */
 #define PARAM_MOVE              /* value is to be std::move'd into here */

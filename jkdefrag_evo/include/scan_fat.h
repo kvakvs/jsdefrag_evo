@@ -94,20 +94,47 @@ enum {
 
 // Struct used by the scanner to store disk information from the bootblock
 struct FatDiskInfoStruct {
-    uint64_t bytes_per_sector_;
-    uint64_t sectors_per_cluster_;
-    uint64_t total_sectors_;
-    uint64_t root_dir_sectors_;
-    uint64_t first_data_sector_;
-    uint64_t fat_sz_;
-    uint64_t data_sec_;
-    uint64_t countof_clusters_;
+    explicit FatDiskInfoStruct(DiskType disk_type) : disk_type_(disk_type) {}
 
-    union {
-        BYTE *fat12;
-        USHORT *fat16;
-        ULONG *fat32;
-    } fat_data_;
+    FatDiskInfoStruct() = default;
+
+public:
+    DiskType disk_type_;
+
+    Bytes64PerSector bytes_per_sector_;
+    Sectors64PerCluster sectors_per_cluster_;
+    Sectors64 total_sectors_;
+    Sectors64 root_dir_sectors_;
+    Sectors64 first_data_sector_;
+    Sectors64 fat_sz_;
+    Sectors64 data_sec_;
+    Clusters64 countof_clusters_;
+
+    [[nodiscard]] BYTE *fat12_data() const {
+        _ASSERT(disk_type_ == DiskType::FAT12);
+        return fat_data_.get();
+    }
+
+    [[nodiscard]] USHORT *fat16_data() const {
+        _ASSERT(disk_type_ == DiskType::FAT16);
+        return (USHORT *) fat_data_.get();
+    }
+
+    [[nodiscard]] ULONG *fat32_data() const {
+        _ASSERT(disk_type_ == DiskType::FAT32);
+        return (ULONG *) fat_data_.get();
+    }
+
+    void allocate_fat_data(Bytes64 size) {
+        fat_data_ = std::make_unique<uint8_t>(size.value());
+    }
+
+//    void free_fat_data() {
+//        fat_data_.reset();
+//    }
+
+private:
+    std::unique_ptr<uint8_t> fat_data_;
 };
 
 class ScanFAT {
@@ -124,20 +151,29 @@ public:
 private:
     static uint8_t calculate_short_name_check_sum(const UCHAR *name);
 
-    static filetime64_t convert_time(const USHORT date, const USHORT time, const USHORT time10);
+    static filetime64_t convert_time(USHORT date, const USHORT time, const USHORT time10);
 
     static void make_fragment_list(const DefragState &data, const FatDiskInfoStruct *disk_info, FileNode *item,
-                                   uint64_t cluster);
+                                   Clusters64 cluster);
 
-    static BYTE *load_directory(
-            const DefragState &data, const FatDiskInfoStruct *disk_info, uint64_t start_cluster,
-            uint64_t *out_length);
+    static std::unique_ptr<uint8_t> load_directory(
+            const DefragState &data, const FatDiskInfoStruct *disk_info, Clusters64 start_cluster,
+            PARAM_OUT Bytes64 &out_length);
 
-    void analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_info, BYTE *buffer, uint64_t length,
+    void analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_info, const MemSlice &buffer,
                                FileNode *parent_directory);
+
+    // Get the next cluster in the FAT chain
+    static Clusters64
+    get_next_fat_cluster(const DefragState &data, const FatDiskInfoStruct *disk_info, Clusters64 cluster);
 
     // static member that is an instance of itself
     inline static std::unique_ptr<ScanFAT> instance_;
 
+
     DefragRunner *defrag_lib_;
+
+    static constexpr Clusters64 fat12_max_cluster = Clusters64(0xFF8);
+    static constexpr Clusters64 fat16_max_cluster = Clusters64(0xFFF8);
+    static constexpr Clusters64 fat32_max_cluster = Clusters64(0xFFFFFF8);
 };

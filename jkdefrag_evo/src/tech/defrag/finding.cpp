@@ -31,15 +31,19 @@
  * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
  *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
  */
+//
 // TODO: Very slow, improve search algorithm
-bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
-                            const uint64_t minimum_size, const int must_fit, const bool find_highest_gap,
-                            uint64_t *begin_lcn, uint64_t *end_lcn, const bool ignore_mft_excludes) {
+//
+bool
+DefragRunner::find_gap(const DefragState &data, const Clusters64 minimum_lcn, Clusters64 maximum_lcn,
+                       const Clusters64 minimum_size, const bool must_fit, const bool find_highest_gap,
+                       PARAM_OUT Clusters64 &begin_lcn, PARAM_OUT Clusters64 &end_lcn,
+                       const bool ignore_mft_excludes) {
     StopWatch clock_fg(L"find_gap", true);
     STARTING_LCN_INPUT_BUFFER bitmap_param;
     struct {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
+        Clusters64 starting_lcn_;
+        Clusters64 bitmap_size_;
         BYTE buffer_[65536]; // Most efficient if binary multiple
     } bitmap_data{};
 
@@ -51,17 +55,17 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
     if (minimum_lcn >= data.total_clusters_) return false;
 
     // Main loop to walk through the entire clustermap
-    uint64_t lcn = minimum_lcn;
-    uint64_t cluster_start = 0;
+    Clusters64 lcn = minimum_lcn;
+    Clusters64 cluster_start;
     int prev_in_use = 1;
-    uint64_t highest_begin_lcn = 0;
-    uint64_t highest_end_lcn = 0;
-    uint64_t largest_begin_lcn = 0;
-    uint64_t largest_end_lcn = 0;
+    Clusters64 highest_begin_lcn;
+    Clusters64 highest_end_lcn;
+    Clusters64 largest_begin_lcn;
+    Clusters64 largest_end_lcn;
 
     do {
         // Fetch a block of cluster data. If error then return false
-        bitmap_param.StartingLcn.QuadPart = lcn;
+        bitmap_param.StartingLcn.QuadPart = lcn.as<LONGLONG>();
         error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                      &bitmap_param, sizeof bitmap_param, &bitmap_data,
                                      sizeof bitmap_data, &w, nullptr);
@@ -83,17 +87,14 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
 
         // Sanity check
         if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) return false;
-        if (maximum_lcn == 0) maximum_lcn = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
+        if (maximum_lcn.is_zero()) maximum_lcn = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
 
         // Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the
-        // criteria then return it's LCN (Logical Cluster Number)
+        //  criteria, then return its LCN (Logical Cluster Number)
         lcn = bitmap_data.starting_lcn_;
-        int index = 0;
-        BYTE mask = 1;
-
-        int index_max = sizeof bitmap_data.buffer_;
-
-        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
+        uint8_t mask = 1;
+        size_t index = 0;
+        size_t index_max = clamp_above(sizeof bitmap_data.buffer_, bitmap_data.bitmap_size_.value() / 8);
 
         while (index < index_max && lcn < maximum_lcn) {
             if (lcn >= minimum_lcn) {
@@ -109,17 +110,16 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
                     // Show debug message: "Gap found: LCN=%I64d, Size=%I64d"
                     gui->show_debug(
                             DebugLevel::DetailedGapFinding, nullptr,
-                            std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
+                            std::format(GAP_FOUND_FMT, cluster_start.value(), (lcn - cluster_start).value())
+                    );
 
                     // If the gap is bigger/equal than the mimimum size then return it,
                     // or remember it, depending on the FindHighestGap parameter. */
                     if (cluster_start >= minimum_lcn &&
                         lcn - cluster_start >= minimum_size) {
                         if (!find_highest_gap) {
-                            if (begin_lcn != nullptr) *begin_lcn = cluster_start;
-
-                            if (end_lcn != nullptr) *end_lcn = lcn;
-
+                            PARAM_OUT begin_lcn = cluster_start;
+                            PARAM_OUT end_lcn = lcn;
                             return true;
                         }
 
@@ -128,7 +128,7 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
                     }
 
                     // Remember the largest gap on the volume
-                    if (largest_begin_lcn == 0 ||
+                    if (largest_begin_lcn.is_zero() ||
                         largest_end_lcn - largest_begin_lcn < lcn - cluster_start) {
                         largest_begin_lcn = cluster_start;
                         largest_end_lcn = lcn;
@@ -147,7 +147,7 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
                 mask = mask << 1;
             }
 
-            lcn = lcn + 1;
+            lcn++;
         }
     } while (error_code == ERROR_MORE_DATA &&
              lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_ &&
@@ -157,13 +157,12 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
     if (prev_in_use == 0) {
         // Show debug message: "Gap found: LCN=%I64d, Size=%I64d"
         gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                        std::format(GAP_FOUND_FMT, cluster_start, lcn - cluster_start));
+                        std::format(GAP_FOUND_FMT, cluster_start.value(), (lcn - cluster_start).value()));
 
         if (cluster_start >= minimum_lcn && lcn - cluster_start >= minimum_size) {
             if (!find_highest_gap) {
-                if (begin_lcn != nullptr) *begin_lcn = cluster_start;
-                if (end_lcn != nullptr) *end_lcn = lcn;
-
+                PARAM_OUT begin_lcn = cluster_start;
+                PARAM_OUT end_lcn = lcn;
                 return true;
             }
 
@@ -172,7 +171,7 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
         }
 
         // Remember the largest gap on the volume
-        if (largest_begin_lcn == 0 ||
+        if (largest_begin_lcn.is_zero() ||
             largest_end_lcn - largest_begin_lcn < lcn - cluster_start) {
             largest_begin_lcn = cluster_start;
             largest_end_lcn = lcn;
@@ -180,18 +179,16 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
     }
 
     // If the FindHighestGap flag is true then return the highest gap we have found
-    if (find_highest_gap && highest_begin_lcn != 0) {
-        if (begin_lcn != nullptr) *begin_lcn = highest_begin_lcn;
-        if (end_lcn != nullptr) *end_lcn = highest_end_lcn;
-
+    if (find_highest_gap && highest_begin_lcn) {
+        PARAM_OUT begin_lcn = highest_begin_lcn;
+        PARAM_OUT end_lcn = highest_end_lcn;
         return true;
     }
 
     // If the MustFit flag is false then return the largest gap we have found
-    if (must_fit == false && largest_begin_lcn != 0) {
-        if (begin_lcn != nullptr) *begin_lcn = largest_begin_lcn;
-        if (end_lcn != nullptr) *end_lcn = largest_end_lcn;
-
+    if (!must_fit && largest_begin_lcn) {
+        PARAM_OUT begin_lcn = largest_begin_lcn;
+        PARAM_OUT end_lcn = largest_end_lcn;
         return true;
     }
 
@@ -205,19 +202,20 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
  * \param zone 0=only directories, 1=only regular files, 2=only space hogs, 3=all
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
-FileNode *DefragRunner::find_highest_item(const DefragState &data, const uint64_t cluster_start,
-                                          const uint64_t cluster_end, const Tree::Direction direction,
+FileNode *DefragRunner::find_highest_item(const DefragState &data, const Clusters64 cluster_start,
+                                          const Clusters64 cluster_end, const Tree::Direction direction,
                                           const Zone zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     // "Looking for highest-fit %I64d[%I64d]"
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                    std::format(L"Looking for highest-fit start=" NUM_FMT " [" NUM_FMT " clusters]",
-                                cluster_start, cluster_end - cluster_start));
+    gui->show_debug(
+            DebugLevel::DetailedGapFilling, nullptr,
+            std::format(L"Looking for highest-fit start=" NUM_FMT " [" NUM_FMT " clusters]",
+                        cluster_start.value(), (cluster_end - cluster_start).value())
+    );
 
-    /* Walk backwards through all the items on disk and select the first
-    file that fits inside the free block. If we find an exact match then
-    immediately return it. */
+    // Walk backwards through all the items on the disk and select the first file that fits inside the free block.
+    // If we find an exact match, then immediately return it.
     const auto step_direction =
             direction == Tree::Direction::First ? Tree::StepDirection::StepForward : Tree::StepDirection::StepBack;
 
@@ -226,7 +224,7 @@ FileNode *DefragRunner::find_highest_item(const DefragState &data, const uint64_
          item = Tree::next_prev(item, step_direction)) {
         const auto item_lcn = item->get_item_lcn();
 
-        if (item_lcn == 0) continue;
+        if (item_lcn.is_zero()) continue;
 
         if (direction == 1) {
             if (item_lcn < cluster_end) return nullptr;
@@ -237,7 +235,7 @@ FileNode *DefragRunner::find_highest_item(const DefragState &data, const uint64_
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
-        if (zone != Zone::ZoneAll_MaxValue) {
+        if (zone != Zone::All_MaxValue) {
             auto preferred_zone = item->get_preferred_zone();
             if (zone != preferred_zone) continue;
         }
@@ -250,36 +248,26 @@ FileNode *DefragRunner::find_highest_item(const DefragState &data, const uint64_
     return nullptr;
 }
 
-/*
-
-Find the highest item on disk that fits inside the gap (cluster start - cluster
-end), and combined with other items will perfectly fill the gap. Return nullptr if
-no perfect fit could be found. The subroutine will limit it's running time to 0.5
-seconds.
-Direction=0      Search for files below the gap.
-Direction=1      Search for files above the gap.
-Zone=0           Only search the directories.
-Zone=1           Only search the regular files.
-Zone=2           Only search the SpaceHogs.
-Zone=3           Search all items.
-
-*/
-FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t cluster_start,
-                                       const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
-    __timeb64 time{};
+// Find the highest item on disk that fits inside the gap (cluster start - cluster end), and combined with other items
+// will perfectly fill the gap. Return nullptr if no perfect fit could be found. The subroutine will limit it's running
+// time to 0.5 seconds.
+// Direction=0 - Search for files below the gap.
+// Direction=1 - Search for files above the gap.
+FileNode *DefragRunner::find_best_item(const DefragState &data, const Clusters64 cluster_start,
+                                       const Clusters64 cluster_end, const Tree::Direction direction, const Zone zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                     std::format(L"Looking for perfect fit start=" NUM_FMT " [" NUM_FMT " clusters]",
-                                cluster_start, cluster_end - cluster_start));
+                                cluster_start.value(), (cluster_end - cluster_start).value()));
 
     // Walk backwards through all the items on disk and select the first item that
     // fits inside the free block, and combined with other items will fill the gap
     // perfectly. If we find an exact match then immediately return it.
     const Clock::time_point max_time = Clock::now() + std::chrono::milliseconds(500);
     FileNode *first_item = nullptr;
-    uint64_t gap_size = cluster_end - cluster_start;
-    uint64_t total_items_size = 0;
+    Clusters64 gap_size = cluster_end - cluster_start;
+    Clusters64 total_items_size = {};
 
     const auto step_direction =
             direction == Tree::Direction::First ? Tree::StepDirection::StepForward : Tree::StepDirection::StepBack;
@@ -290,15 +278,15 @@ FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t c
         // If we have passed the top of the gap then...
         const auto item_lcn = item->get_item_lcn();
 
-        if (item_lcn == 0) continue;
+        if (item_lcn.is_zero()) continue;
 
         if ((direction == 1 && item_lcn < cluster_end) ||
             (direction == 0 && item_lcn > cluster_end)) {
             // If we did not find an item that fits inside the gap then exit
             if (first_item == nullptr) break;
 
-            /* Exit if the total size of all the items is less than the size of the gap.
-            We know that we can never find a perfect fit. */
+            // Exit if the total size of all the items is less than the size of the gap. We know that we can never
+            // find a perfect fit
             if (total_items_size < cluster_end - cluster_start) {
                 gui->show_debug(
                         DebugLevel::DetailedGapFilling, nullptr,
@@ -319,7 +307,7 @@ FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t c
             item = first_item;
             first_item = nullptr;
             gap_size = cluster_end - cluster_start;
-            total_items_size = 0;
+            total_items_size = {};
 
             continue;
         }
@@ -328,7 +316,7 @@ FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t c
         if (item->is_unmovable_) continue;
         if (item->is_excluded_) continue;
 
-        if (zone != Zone::ZoneAll_MaxValue) {
+        if (zone != Zone::All_MaxValue) {
             auto preferred_zone = item->get_preferred_zone();
             if (zone != preferred_zone) continue;
         }
@@ -365,13 +353,14 @@ FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t c
 
 // Return the LCN of the fragment that contains a cluster at the LCN. If the
 // item has no fragment that occupies the LCN then return zero.
-uint64_t DefragRunner::find_fragment_begin(const FileNode *item, const uint64_t lcn) {
+Clusters64 DefragRunner::find_fragment_begin(const FileNode *item, const Clusters64 lcn) {
     // Sanity check
-    if (item == nullptr || lcn == 0) return 0;
+    if (item == nullptr || lcn.is_zero()) return Clusters64(0);
 
     // Walk through all the fragments of the item. If a fragment is found that contains the LCN then return
     // the begin of that fragment
-    uint64_t vcn = 0;
+    Clusters64 vcn = {};
+
     for (const auto &fragment: item->fragments_) {
         if (!fragment.is_virtual()) {
             if (lcn >= fragment.lcn_ &&
@@ -384,16 +373,12 @@ uint64_t DefragRunner::find_fragment_begin(const FileNode *item, const uint64_t 
     }
 
     // Not found: return zero
-    return 0;
+    return Clusters64(0);
 }
 
-/*
-
-Search the list for the item that occupies the cluster at the LCN. Return a
-pointer to the item. If not found then return nullptr.
-
-*/
-[[maybe_unused]] FileNode *DefragRunner::find_item_at_lcn(const DefragState &data, const uint64_t lcn) {
+// Search the list for the item that occupies the cluster at the LCN. Return a
+// pointer to the item. If not found then return nullptr.
+[[maybe_unused]] FileNode *DefragRunner::find_item_at_lcn(const DefragState &data, const Clusters64 lcn) {
     /* Locate the item by descending the sorted tree in memory. If found then
     return the item. */
     FileNode *item = data.item_tree_;
@@ -413,7 +398,7 @@ pointer to the item. If not found then return nullptr.
     /* Walk through all the fragments of all the items in the sorted tree. If a
     fragment is found that occupies the LCN then return a pointer to the item. */
     for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
-        if (find_fragment_begin(item, lcn) != 0) return item;
+        if (find_fragment_begin(item, lcn)) return item;
     }
 
     // LCN not found, return nullptr

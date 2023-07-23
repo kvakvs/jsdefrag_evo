@@ -106,7 +106,7 @@ namespace Tree {
             ins = here;
             found = 0;
 
-            if (const uint64_t here_lcn = here->get_item_lcn(); here_lcn > new_lcn) {
+            if (const Clusters64 here_lcn = here->get_item_lcn(); here_lcn > new_lcn) {
                 found = 1;
                 here = here->smaller_;
             } else {
