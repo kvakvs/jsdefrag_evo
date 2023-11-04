@@ -34,12 +34,13 @@ set(HEADER_FILES
         )
 set(SOURCE_FILES
         ${SRC}/app.cpp
-        ${SRC}/app_debug.cpp
         ${SRC}/defrag_log.cpp
         ${SRC}/main.cpp
         ${SRC}/precompiled_header.cpp
-        ${SRC}/str_util.cpp
-        ${SRC}/time_util.cpp
+
+        ${SRC}/util/app_debug.cpp
+        ${SRC}/util/str_util.cpp
+        ${SRC}/util/time_util.cpp
 
         ${SRC}/gui/diskmap.cpp
         ${SRC}/gui/defrag_gui.cpp

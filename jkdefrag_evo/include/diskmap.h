@@ -44,6 +44,8 @@ private:
         return square_index * cluster_count_ / square_count_;
     }
 
+    [[maybe_unused]] double downscale_ratio_;
+
     // Number of disk clusters
     uint64_t cluster_count_;
 
