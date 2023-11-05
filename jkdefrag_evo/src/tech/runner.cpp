@@ -357,14 +357,8 @@ int DefragRunner::get_fragment_count(const FileNode *item) {
     return fragments;
 }
 
-/*
-
-Return true if the block in the item starting at Offset with Size clusters
-is fragmented, otherwise return false.
-Note: this function does not ask Windows for a fresh list of fragments,
-it only looks at cached information in memory.
-
-*/
+/// Return true if the block in the item starting at Offset with Size clusters is fragmented, otherwise return false.
+/// Note: this function does not ask Windows for a fresh list of fragments, it only looks at cached information in memory.
 bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, const uint64_t size) {
     // Walk through all fragments. If a fragment is found where either the begin or the end of the fragment is inside
     // the block then the file is fragmented and return true.
@@ -420,18 +414,8 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
     return false;
 }
 
-/**
- * \brief Colorize an item (file, directory) on the screen in the proper color (fragmented, unfragmented, unmovable,
- * empty). If specified then highlight part of the item. If Undraw=true then remove the item from the screen.
- * Note: the offset and size of the highlight block is in absolute clusters, not virtual clusters.
- * \param data 
- * \param item 
- * \param busy_offset Number of first cluster to be highlighted. 
- * \param busy_size Number of clusters to be highlighted.
- * \param erase_from_screen true to undraw the file from the screen.
- */
-void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const uint64_t busy_offset,
-                                      const uint64_t busy_size, const int erase_from_screen) const {
+void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const vcn64_t busy_offset,
+                                      const count64_t busy_size, const bool erase_from_screen) const {
     DefragGui *gui = DefragGui::get_instance();
 
     // Determine if the item is fragmented.
@@ -541,8 +525,8 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
     defrag_state.count_gaps_less16_ = 0;
     defrag_state.count_clusters_less16_ = 0;
 
-    Lcn lcn = 0;
-    Lcn cluster_start = 0;
+    lcn64_t lcn = 0;
+    lcn64_t cluster_start = 0;
     int prev_in_use = 1;
 
     do {

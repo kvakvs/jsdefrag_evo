@@ -64,7 +64,7 @@ public:
      */
 
     // Size of the volume, in clusters. 
-    LcnCount total_clusters_{};
+    count64_t total_clusters_{};
     // Number of bytes per cluster.
     uint64_t bytes_per_cluster_{};
 
@@ -72,9 +72,9 @@ public:
      * Counters updated before/after every Phase.
      */
 
-    LcnCount count_free_clusters_; // Number of free clusters
+    count64_t count_free_clusters_; // Number of free clusters
     uint64_t count_gaps_; // Number of gaps
-    LcnCount biggest_gap_; // Size of biggest gap, in clusters
+    count64_t biggest_gap_; // Size of biggest gap, in clusters
     uint64_t count_gaps_less16_; // Number of gaps smaller than 16 clusters
     uint64_t count_clusters_less16_; // Number of clusters in gaps that are smaller than 16 clusters
 

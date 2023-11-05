@@ -7,10 +7,11 @@
 #include <optional>
 #include <list>
 
-// File fragment descriptor, stored as a list of file fragments; TODO: std::forward_list
+/// File fragment descriptor, stored as a list of file fragments
+// TODO: Storage as std::forward_list
 struct FileFragment {
-    Lcn lcn_; // Logical cluster number, location on disk
-    Vcn next_vcn_; // Virtual cluster number of next fragment
+    lcn64_t lcn_; // Logical cluster number, location on disk
+    vcn64_t next_vcn_; // Virtual cluster number of next fragment
 
     void set_virtual() {
         lcn_ = VIRTUALFRAGMENT;
@@ -21,11 +22,11 @@ struct FileFragment {
     }
 
 private:
-    static constexpr Vcn VIRTUALFRAGMENT = std::numeric_limits<Vcn>::max();
+    static constexpr vcn64_t VIRTUALFRAGMENT = std::numeric_limits<vcn64_t>::max();
 };
 
 
-// List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
+/// List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
 struct FileNode {
 public:
     void set_names(const wchar_t *long_path, const wchar_t *long_filename, const wchar_t *short_path,
@@ -64,14 +65,14 @@ public:
     }
 
 public:
-    FileNode *parent_;
+    FileNode *parent_ = nullptr;
     // Next smaller item
-    FileNode *smaller_;
+    FileNode *smaller_ = nullptr;
     // Next bigger item
-    FileNode *bigger_;
+    FileNode *bigger_ = nullptr;
 
     uint64_t bytes_;
-    uint64_t clusters_count_;
+    count64_t clusters_count_;
     filetime64_t creation_time_;
     filetime64_t mft_change_time_;
     filetime64_t last_access_time_;
@@ -81,7 +82,7 @@ public:
     std::list<FileFragment> fragments_;
 
     // The Inode number of the parent directory
-    uint64_t parent_inode_;
+    inode_t parent_inode_;
 
     FileNode *parent_directory_;
 

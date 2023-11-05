@@ -48,8 +48,8 @@ void DefragRunner::fixup(DefragState &data) {
     if (data.phase_todo_ == 0) return;
 
     // Walk through all files and move the files that need to be moved.
-    Lcn gap_begin[3];
-    Lcn gap_end[3];
+    lcn64_t gap_begin[3];
+    lcn64_t gap_end[3];
 
     int file_zone;
     for (file_zone = 0; file_zone < 3; file_zone++) {

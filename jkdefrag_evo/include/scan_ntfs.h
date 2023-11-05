@@ -377,7 +377,7 @@ private:
     static bool translate_rundata_to_fragmentlist(
             const DefragState &data, InodeDataStruct *inode_data,
             const wchar_t *stream_name, ATTRIBUTE_TYPE stream_type,
-            const BYTE *run_data, const uint32_t run_data_length, const Vcn starting_vcn,
+            const BYTE *run_data, const uint32_t run_data_length, const vcn64_t starting_vcn,
             const uint64_t bytes);
 
     static void cleanup_streams(InodeDataStruct *inode_data);

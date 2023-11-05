@@ -59,8 +59,8 @@ void DefragRunner::defragment(DefragState &data) {
         // If the disk is full then show a message and exit.
         auto file_zone = item->get_preferred_zone();
 
-        Lcn gap_begin;
-        Lcn gap_end;
+        lcn64_t gap_begin;
+        lcn64_t gap_end;
         auto result = find_gap(data, data.zones_[(size_t) file_zone], 0, item->clusters_count_,
                                false, false, &gap_begin, &gap_end, false);
 

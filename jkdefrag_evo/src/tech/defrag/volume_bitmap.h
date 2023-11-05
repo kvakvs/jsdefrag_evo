@@ -19,9 +19,9 @@ public:
     VolumeBitmap() = default;
 
     /// Fetch a block of cluster data. If error then return false
-    DWORD read(HANDLE handle, Lcn start_lcn);
+    DWORD read(HANDLE handle, lcn64_t start_lcn);
 
-    [[nodiscard]] Lcn starting_lcn() const { return (Lcn)bitmap_data.starting_lcn_; }
+    [[nodiscard]] lcn64_t starting_lcn() const { return (lcn64_t)bitmap_data.starting_lcn_; }
 
     [[nodiscard]] uint64_t bitmap_size() const { return (size_t)bitmap_data.bitmap_size_; }
 

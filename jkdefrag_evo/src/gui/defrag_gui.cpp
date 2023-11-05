@@ -453,8 +453,8 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
     clear_screen({});
 
     // Show the map of all the clusters in use
-    Lcn lcn = 0;
-    Lcn cluster_start = 0;
+    lcn64_t lcn = 0;
+    lcn64_t cluster_start = 0;
     int prev_in_use = 1;
 
     StopWatch clock1(L"show_diskmap: load and repaint");

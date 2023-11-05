@@ -22,7 +22,7 @@
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then
 // skip them. Then move files upward until the gap is bigger than clusters, or when we
 // encounter an unmovable file.
-void DefragRunner::vacate(DefragState &data, Lcn lcn, LcnCount clusters, BOOL ignore_mft_excludes) {
+void DefragRunner::vacate(DefragState &data, lcn64_t lcn, count64_t clusters, BOOL ignore_mft_excludes) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
@@ -61,25 +61,25 @@ void DefragRunner::vacate(DefragState &data, Lcn lcn, LcnCount clusters, BOOL ig
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(L"move_to = " NUM_FMT, move_to));
 
     // Loop forever
-    Lcn move_gap_begin = 0;
-    Lcn move_gap_end = 0;
+    lcn64_t move_gap_begin = 0;
+    lcn64_t move_gap_end = 0;
     auto done_until = lcn;
 
     while (data.is_still_running()) {
         // Find the first movable data fragment at or above the done_until lcn. If there is nothing
         // then return, we have reached the end of the disk.
         FileNode *bigger_item = nullptr;
-        Lcn bigger_begin = 0;
-        Lcn bigger_end;
-        Vcn bigger_real_vcn;
+        lcn64_t bigger_begin = 0;
+        lcn64_t bigger_end;
+        vcn64_t bigger_real_vcn;
 
         for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
                 continue;
             }
 
-            Vcn vcn = 0;
-            Vcn real_vcn = 0;
+            vcn64_t vcn = 0;
+            vcn64_t real_vcn = 0;
 
             for (auto &fragment: item->fragments_) {
                 if (!fragment.is_virtual()) {
@@ -113,8 +113,8 @@ void DefragRunner::vacate(DefragState &data, Lcn lcn, LcnCount clusters, BOOL ig
                         std::format(L"Data found at LCN=" NUM_FMT ", {}", bigger_begin, bigger_item->get_long_path()));
 
         // Find the first gap above the lcn
-        Lcn test_gap_begin;
-        Lcn test_gap_end;
+        lcn64_t test_gap_begin;
+        lcn64_t test_gap_end;
         bool result = find_gap(data, lcn, 0, 0, true, false,
                                &test_gap_begin, &test_gap_end, ignore_mft_excludes);
 

@@ -89,10 +89,6 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path
     data.disk_.mount_point_slash_.clear();
 }
 
-// Try to change our permissions, so we can access special files and directories
-// such as "C:\System Volume Information". If this does not succeed then quietly
-// continue, we'll just have to do with whatever permissions we have.
-// SE_BACKUP_NAME = Backup and Restore Privileges.
 void DefragRunner::try_request_privileges() {
     HANDLE process_token_handle;
     LUID take_ownership_value;
