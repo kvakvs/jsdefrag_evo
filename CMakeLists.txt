@@ -14,6 +14,7 @@ set(RSRC ${PROJECT_SOURCE_DIR}/jkdefrag_evo/resource)
 include_directories(${INCL})
 
 set(HEADER_FILES
+        ${INCL}/result/result.h
         ${INCL}/app.h
         ${INCL}/diskmap.h
         ${INCL}/diskmap_cell.h

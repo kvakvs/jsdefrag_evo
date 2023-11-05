@@ -37,16 +37,7 @@ bool DefragRunner::find_gap(const DefragState &defrag_state, const Lcn minimum_l
                             const LcnCount minimum_size, const int must_fit, const bool find_highest_gap,
                             Lcn *begin_lcn, Lcn *end_lcn, const bool ignore_mft_excludes) {
     StopWatch clock_fg(L"find_gap", true);
-//    STARTING_LCN_INPUT_BUFFER bitmap_param;
     VolumeBitmap volume_bitmap;
-//    struct {
-//        uint64_t starting_lcn_;
-//        uint64_t bitmap_size_;
-//        BYTE buffer_[DRIVE_BITMAP_READ_SIZE]; // Most efficient if binary multiple
-//    } bitmap_data{};
-
-//    uint32_t error_code;
-//    DWORD bytes_returned;
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
@@ -64,10 +55,6 @@ bool DefragRunner::find_gap(const DefragState &defrag_state, const Lcn minimum_l
 
     do {
         // Fetch a block of cluster data. If error then return false
-//        bitmap_param.StartingLcn.QuadPart = lcn;
-//        error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-//                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
-//                                     sizeof bitmap_data, &bytes_returned, nullptr);
         error_code = volume_bitmap.read(defrag_state.disk_.volume_handle_, lcn);
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {

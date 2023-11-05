@@ -2,7 +2,6 @@
 
 #include <Windows.h>
 #include <cstdint>
-//#include "constants.h"
 
 static constexpr size_t DRIVE_BITMAP_READ_SIZE = 1ULL << 16;
 
@@ -17,14 +16,18 @@ class VolumeBitmap {
     DWORD bytes_returned;
 
 public:
-    VolumeBitmap() {
-    }
+    VolumeBitmap() = default;
 
+    /// Fetch a block of cluster data. If error then return false
     DWORD read(HANDLE handle, Lcn start_lcn);
-    Lcn starting_lcn() const { return (Lcn)bitmap_data.starting_lcn_; }
-    uint64_t bitmap_size() const { return (size_t)bitmap_data.bitmap_size_; }
-    constexpr size_t buffer_size() const { return sizeof(bitmap_data.buffer_); }
-    decltype(auto) buffer(size_t index) const {
+
+    [[nodiscard]] Lcn starting_lcn() const { return (Lcn)bitmap_data.starting_lcn_; }
+
+    [[nodiscard]] uint64_t bitmap_size() const { return (size_t)bitmap_data.bitmap_size_; }
+
+    [[nodiscard]] constexpr size_t buffer_size() const { return sizeof(bitmap_data.buffer_); }
+
+    [[nodiscard]] decltype(auto) buffer(size_t index) const {
         return bitmap_data.buffer_[index];
     }
 };
