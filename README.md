@@ -67,7 +67,7 @@ For example:  `JkDefrag.exe -a 7 -d 2 -q c: d:`
 * 2 = Defragment only, do not optimize.
 * 3 = Defragment and fast optimize [recommended].
 * 5 = Force together.
-* 6 = Move to end of disk.
+* 6 = Move to end_ of disk.
 * 7 = Optimize by sorting all files by name (folder + filename).
 * 8 = Optimize by sorting all files by size (smallest first).
 * 9 = Optimize by sorting all files by last access (newest first).
@@ -203,7 +203,7 @@ programs that scan all files on disk) do not change that time.
 Intended for partition resizing. All movable files are moved to the beginning of the disk, even if it  
 means fragmenting them to fill gaps that cannot be filled otherwise.
 
-**Move to end of disk**
+**Move to end_ of disk**
 
-Move all the files to the end of the disk, making more room at the beginning of the disk. Intended for
+Move all the files to the end_ of the disk, making more room at the beginning of the disk. Intended for
 big and rarely used files such as log files, backup archives, installation files, and such. 

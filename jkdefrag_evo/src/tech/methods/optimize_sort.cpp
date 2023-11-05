@@ -24,9 +24,7 @@
 // SortField=3    Date/Time LastChange
 // SortField=4    Date/Time Creation
 void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
-    lcn64_t gap_begin;
-    lcn64_t gap_end;
-
+    lcn_extent_t gap;
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
@@ -45,9 +43,6 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
         FileNode *previous_item = nullptr;
 
         uint64_t lcn = data.zones_[(size_t) data.zone_];
-
-        gap_begin = 0;
-        gap_end = 0;
 
         while (data.is_still_running()) {
             // Find the next item that we want to place
@@ -109,44 +104,49 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                 /* Call the Vacate() function to make a gap at Lcn big enough to hold the item.
                 The Vacate() function may not be able to move whatever is now at the Lcn, so
                 after calling it we have to locate the first gap after the Lcn. */
-                if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
-                    vacate(data, lcn, item->clusters_count_ - clusters_done + minimum_vacate, FALSE);
+                if (gap.begin() + item->clusters_count_ - clusters_done + 16 > gap.end()) {
+                    vacate(data, lcn_extent_t::with_length(lcn, item->clusters_count_ - clusters_done + minimum_vacate),
+                           false);
 
-                    auto result = find_gap(data, lcn, 0, 0, true, false,
-                                           &gap_begin, &gap_end, false);
-
-                    if (!result) return; // No gaps found, exit
+                    auto result = find_gap(data, lcn, 0, 0, true, false, false);
+                    if (result.has_value()) {
+                        gap = result.value();
+                    } else {
+                        return; // No gaps found, exit
+                    }
                 }
 
                 /* If the gap is not big enough to hold the entire item then calculate how much
                 of the item will fit in the gap. */
                 uint64_t clusters = item->clusters_count_ - clusters_done;
 
-                if (clusters > gap_end - gap_begin) {
-                    clusters = gap_end - gap_begin;
+                if (clusters > gap.length()) {
+                    clusters = gap.length();
 
-                    /* It looks like a partial move only succeeds if the number of clusters is a
-                    multiple of 8. */
+                    // It looks like a partial move only succeeds if the number of clusters is a multiple of 8.
                     clusters = clusters - clusters % 8;
 
                     if (clusters == 0) {
-                        lcn = gap_end;
+                        lcn = gap.end();
                         continue;
                     }
                 }
 
                 // Move the item to the gap
-                auto result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
+                auto result = move_item(data, item, gap.begin(), clusters_done, clusters, MoveDirection::Up);
 
                 if (result) {
-                    gap_begin = gap_begin + clusters;
+                    gap.shift_begin(clusters);
                 } else {
-                    result = find_gap(data, gap_begin, 0, 0, true,
-                                      false, &gap_begin, &gap_end, false);
-                    if (!result) return; // No gaps found, exit.
+                    auto result2 = find_gap(data, gap.begin(), 0, 0, true, false, false);
+                    if (result2.has_value()) {
+                        gap = result2.value();
+                    } else {
+                        return; // No gaps found, exit.
+                    }
                 }
 
-                lcn = gap_begin;
+                lcn = gap.begin();
                 clusters_done = clusters_done + clusters;
             }
         }

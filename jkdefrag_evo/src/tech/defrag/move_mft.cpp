@@ -27,8 +27,8 @@
     FileNode *item;
 
     lcn64_t lcn;
-    lcn64_t gap_begin;
-    lcn64_t gap_end;
+//    lcn64_t gap_begin;
+//    lcn64_t gap_end;
     count64_t clusters;
     count64_t clusters_done;
 
@@ -83,8 +83,7 @@
 #endif
 
     lcn = 0;
-    gap_begin = 0;
-    gap_end = 0;
+    lcn_extent_t gap;
     clusters_done = data.disk_.mft_locked_clusters_;
 
     while (data.is_still_running() && clusters_done < item->clusters_count_) {
@@ -97,44 +96,49 @@
         /* Call the Vacate() function to make a gap at Lcn big enough to hold the MFT.
         The Vacate() function may not be able to move whatever is now at the Lcn, so
         after calling it we have to locate the first gap after the Lcn. */
-        if (gap_begin + item->clusters_count_ - clusters_done + 16 > gap_end) {
-            vacate(data, lcn, item->clusters_count_ - clusters_done, TRUE);
+        if (gap.begin() + item->clusters_count_ - clusters_done + 16 > gap.end()) {
+            vacate(data, lcn_extent_t::with_length(lcn, item->clusters_count_ - clusters_done), true);
 
-            auto result = find_gap(data, lcn, 0, 0, true, false, &gap_begin, &gap_end, TRUE);
-
-            if (!result) return; // No gaps found, exit
+            auto result = find_gap(data, lcn, 0, 0, true, false, true);
+            if (result.has_value()) {
+                gap = result.value();
+            } else {
+                // No gaps found, exit
+                return;
+            }
         }
 
-        /* If the gap is not big enough to hold the entire MFT then calculate how much
-        will fit in the gap. */
+        // If the gap is not big enough to hold the entire MFT then calculate how much will fit in the gap.
         clusters = item->clusters_count_ - clusters_done;
 
-        if (clusters > gap_end - gap_begin) {
-            clusters = gap_end - gap_begin;
-            /* It looks like a partial move only succeeds if the number of clusters is a
-            multiple of 8. */
+        if (clusters > gap.length()) {
+            clusters = gap.length();
+            // It looks like a partial move only succeeds if the number of clusters is a multiple of 8.
             clusters = clusters - clusters % 8;
 
             if (clusters == 0) {
-                lcn = gap_end;
+                lcn = gap.end();
 
                 continue;
             }
         }
 
         // Move the MFT to the gap
-        auto result = move_item(data, item, gap_begin, clusters_done, clusters, MoveDirection::Up);
+        auto result = move_item(data, item, gap.begin(), clusters_done, clusters, MoveDirection::Up);
 
         if (result) {
-            gap_begin = gap_begin + clusters;
+            gap.shift(clusters);
         } else {
-            result = find_gap(data, gap_begin, 0, 0, true, false,
-                              &gap_begin, &gap_end, true);
-
-            if (!result) return; // No gaps found, exit
+            auto result2 = find_gap(data, gap.begin(), 0, 0, true, false, true);
+            if (result2.has_value()) {
+                gap = result2.value();
+            } else {
+                // No gaps found, exit
+                return;
+            }
         }
 
-        lcn = gap_begin;
+        lcn = gap.begin();
         clusters_done = clusters_done + clusters;
     }
 

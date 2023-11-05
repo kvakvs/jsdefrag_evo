@@ -336,14 +336,12 @@ DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE fil
  * \param offset Number of first cluster to be moved
  * \param size Number of clusters to be moved
  * \param direction 0: move up, 1: move down
- * \return true if success, false if failed to move without fragmenting the
-item
+ * \return true if success, false if failed to move without fragmenting the item
  */
-int DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle,
+bool DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle,
                                            lcn64_t new_lcn, lcn64_t offset, count64_t size,
                                            const MoveDirection direction) const {
-    lcn64_t cluster_start;
-    lcn64_t cluster_end;
+    lcn_extent_t cluster;
 
     DefragGui *gui = DefragGui::get_instance();
 
@@ -351,9 +349,10 @@ int DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HA
     const auto old_lcn = item->get_item_lcn();
 
     // Move the Item to the requested LCN. If error then return false
-    int result = move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::Whole);
-
-    if (result == false) return false;
+    {
+        auto result = move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::Whole);
+        if (!result) return false;
+    }
     if (*data.running_ != RunningState::RUNNING) return false;
 
     // If the block is not fragmented then return true
@@ -364,41 +363,51 @@ int DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HA
 
     // Find another gap on disk for the item
     switch (direction) {
-        case MoveDirection::Up:
-            cluster_start = old_lcn + item->clusters_count_;
+        case MoveDirection::Up: {
+            lcn64_t cluster_start = old_lcn + item->clusters_count_;
 
             if (cluster_start + item->clusters_count_ >= new_lcn &&
                 cluster_start < new_lcn + item->clusters_count_) {
                 cluster_start = new_lcn + item->clusters_count_;
             }
 
-            result = find_gap(data, cluster_start, 0, size, true,
-                              false, &cluster_start, &cluster_end, false);
+            auto result2 = find_gap(data, cluster_start, 0, size, true, false, false);
+            if (result2.has_value()) {
+                cluster = result2.value();
+            } else {
+                return false;
+            }
             break;
-        case MoveDirection::Down:
-            result = find_gap(data, data.zones_[1], old_lcn, size, true,
-                              true, &cluster_start, &cluster_end, false);
+        }
+        case MoveDirection::Down: {
+            auto result3 = find_gap(data, data.zones_[1], old_lcn, size, true, true, false);
+            if (result3.has_value()) {
+                cluster = result3.value();
+            } else {
+                return false;
+            }
             break;
+        }
     }
-
-    if (result == false) return false;
 
     // Add the size of the item to the width of the progress bar, we have discovered that we have more work to do.
     data.phase_todo_ += size;
 
     // Move the item to the other gap using strategy InFragments.
     switch (direction) {
-        case MoveDirection::Up:
-            result = move_item_with_strat(data, item, file_handle, cluster_start, offset, size,
+        case MoveDirection::Up: {
+            auto result = move_item_with_strat(data, item, file_handle, cluster.begin(), offset, size,
                                           MoveStrategy::InFragments);
+            if (!result) return false;
             break;
-        case MoveDirection::Down:
-            result = move_item_with_strat(data, item, file_handle, cluster_end - size, offset, size,
+        }
+        case MoveDirection::Down: {
+            auto result = move_item_with_strat(data, item, file_handle, cluster.end() - size, offset, size,
                                           MoveStrategy::InFragments);
+            if (!result) return false;
             break;
+        }
     }
-
-    if (result == false) return false;
 
     // If the block is still fragmented then return false.
     if (is_fragmented(item, offset, size)) {
@@ -413,7 +422,5 @@ int DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HA
     data.phase_todo_ += size;
 
     // Strategy 1 has helped. Move the Item again to where we want it, but this time use strategy InFragments.
-    result = move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::InFragments);
-
-    return result;
+    return move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::InFragments);
 }

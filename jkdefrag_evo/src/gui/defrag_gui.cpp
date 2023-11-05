@@ -503,12 +503,16 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
             if (lcn == 0) prev_in_use = in_use;
 
             // At the beginning and end of an Exclude draw the cluster
-            if (lcn == defrag_state.mft_excludes_[0].start_ || lcn == defrag_state.mft_excludes_[0].end_ ||
-                lcn == defrag_state.mft_excludes_[1].start_ || lcn == defrag_state.mft_excludes_[1].end_ ||
-                lcn == defrag_state.mft_excludes_[2].start_ || lcn == defrag_state.mft_excludes_[2].end_) {
-                if (lcn == defrag_state.mft_excludes_[0].end_ ||
-                    lcn == defrag_state.mft_excludes_[1].end_ ||
-                    lcn == defrag_state.mft_excludes_[2].end_) {
+            if (lcn == defrag_state.mft_excludes_[0].begin()
+                || lcn == defrag_state.mft_excludes_[0].end()
+                || lcn == defrag_state.mft_excludes_[1].begin()
+                || lcn == defrag_state.mft_excludes_[1].end()
+                || lcn == defrag_state.mft_excludes_[2].begin()
+                || lcn == defrag_state.mft_excludes_[2].end()) {
+
+                if (lcn == defrag_state.mft_excludes_[0].end() ||
+                    lcn == defrag_state.mft_excludes_[1].end() ||
+                    lcn == defrag_state.mft_excludes_[2].end()) {
                     draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Unmovable);
                 } else if (prev_in_use == 0) {
                     draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Empty);
@@ -563,9 +567,9 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
     StopWatch clock2(L"show_diskmap: show MFT zones");
 
     for (auto &mft_exclude: defrag_state.mft_excludes_) {
-        if (mft_exclude.start_ <= 0) continue;
+        if (mft_exclude.begin() <= 0) continue;
 
-        draw_cluster(defrag_state, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
+        draw_cluster(defrag_state, mft_exclude.begin(), mft_exclude.end(), DrawColor::Mft);
     }
 
     clock2.stop_and_log();

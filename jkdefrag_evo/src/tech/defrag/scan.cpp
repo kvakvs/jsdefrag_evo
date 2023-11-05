@@ -80,16 +80,13 @@ void DefragRunner::calculate_zones(DefragState &data) {
         for (auto zone = 0; zone <= 2; zone++) size_of_unmovable_fragments[zone] = 0;
 
         // The MFT reserved areas are counted as unmovable data
-        for (auto i = 0; i < 3; i++) {
-            if (data.mft_excludes_[i].start_ < zone_end[0]) {
-                size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0]
-                                                 + data.mft_excludes_[i].end_ - data.mft_excludes_[i].start_;
-            } else if (data.mft_excludes_[i].start_ < zone_end[1]) {
-                size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1]
-                                                 + data.mft_excludes_[i].end_ - data.mft_excludes_[i].start_;
-            } else if (data.mft_excludes_[i].start_ < zone_end[2]) {
-                size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2]
-                                                 + data.mft_excludes_[i].end_ - data.mft_excludes_[i].start_;
+        for (auto mft_exclude: data.mft_excludes_) {
+            if (mft_exclude.begin() < zone_end[0]) {
+                size_of_unmovable_fragments[0] += mft_exclude.length();
+            } else if (mft_exclude.begin() < zone_end[1]) {
+                size_of_unmovable_fragments[1] += mft_exclude.length();
+            } else if (mft_exclude.begin() < zone_end[2]) {
+                size_of_unmovable_fragments[2] += mft_exclude.length();
             }
         }
 
@@ -107,16 +104,16 @@ void DefragRunner::calculate_zones(DefragState &data) {
 
             for (auto &frag: item->fragments_) {
                 if (!frag.is_virtual()) {
-                    if ((frag.lcn_ < data.mft_excludes_[0].start_ || frag.lcn_ >= data.mft_excludes_[0].end_)
-                        && (frag.lcn_ < data.mft_excludes_[1].start_ || frag.lcn_ >= data.mft_excludes_[1].end_)
-                        && (frag.lcn_ < data.mft_excludes_[2].start_ || frag.lcn_ >= data.mft_excludes_[2].end_)) {
+                    if (!data.mft_excludes_[0].contains(frag.lcn_)
+                        && !data.mft_excludes_[1].contains(frag.lcn_)
+                        && !data.mft_excludes_[2].contains(frag.lcn_)) {
 
                         if (frag.lcn_ < zone_end[0]) {
-                            size_of_unmovable_fragments[0] = size_of_unmovable_fragments[0] + frag.next_vcn_ - vcn;
+                            size_of_unmovable_fragments[0] += frag.next_vcn_ - vcn;
                         } else if (frag.lcn_ < zone_end[1]) {
-                            size_of_unmovable_fragments[1] = size_of_unmovable_fragments[1] + frag.next_vcn_ - vcn;
+                            size_of_unmovable_fragments[1] += frag.next_vcn_ - vcn;
                         } else if (frag.lcn_ < zone_end[2]) {
-                            size_of_unmovable_fragments[2] = size_of_unmovable_fragments[2] + frag.next_vcn_ - vcn;
+                            size_of_unmovable_fragments[2] += frag.next_vcn_ - vcn;
                         }
                     }
 

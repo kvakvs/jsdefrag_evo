@@ -35,6 +35,7 @@ http://www.kessels.com/
 #include "types.h"
 #include "defrag_state.h"
 #include "file_node.h"
+#include "extent.h"
 
 // The three running states.
 enum class RunningState {
@@ -65,14 +66,14 @@ struct DiskStruct {
 
     DiskType type_;
 
-    uint64_t mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
+    count64_t mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
 };
 
 // List of clusters used by the MFT
-struct ExcludesStruct {
-    uint64_t start_;
-    uint64_t end_;
-};
+//struct ExcludesStruct {
+//    uint64_t start_;
+//    uint64_t end_;
+//};
 
 class DefragRunner {
 public:
@@ -172,10 +173,23 @@ private:
 
     static bool get_fragments(const DefragState &data, FileNode *item, HANDLE file_handle);
 
-    static bool
+    /**
+     * \brief Look for a gap, a block of empty clusters on the volume.
+     * \param minimum_lcn Start scanning for gaps at this location. If there is a gap at this location then return it. Zero is the begin of the disk.
+     * \param maximum_lcn Stop scanning for gaps at this location. Zero is the end of the disk.
+     * \param minimum_size The gap must have at least this many contiguous free clusters. Zero will match any gap, so will return the first gap at or above MinimumLcn.
+     * \param must_fit if true then only return a gap that is bigger/equal than the MinimumSize. If false then return a gap bigger/equal than MinimumSize,
+     *      or if no such gap is found return the largest gap on the volume (above MinimumLcn).
+     * \param find_highest_gap if false then return the lowest gap that is bigger/equal than the MinimumSize. If true then return the highest gap.
+     * \param begin_lcn out: LCN of begin of cluster
+     * \param end_lcn out: LCN of end of cluster
+     * \param ignore_mft_excludes
+     * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
+     *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
+     */
+    static std::optional<lcn_extent_t>
     find_gap(const DefragState &defrag_state, lcn64_t minimum_lcn, lcn64_t maximum_lcn,
-             count64_t minimum_size, int must_fit, bool find_highest_gap, lcn64_t *begin_lcn, lcn64_t *end_lcn,
-             bool ignore_mft_excludes);
+             count64_t minimum_size, int must_fit, bool find_highest_gap, bool ignore_mft_excludes);
 
     static void calculate_zones(DefragState &data);
 
@@ -190,19 +204,17 @@ private:
     bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
                               lcn64_t offset, count64_t size, MoveStrategy strategy) const;
 
-    int move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                                 lcn64_t offset, count64_t size, MoveDirection direction) const;
+    bool move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
+                                  lcn64_t offset, count64_t size, MoveDirection direction) const;
 
     bool move_item(DefragState &data, FileNode *item, lcn64_t new_lcn, lcn64_t offset,
                    count64_t size, MoveDirection direction) const;
 
     static FileNode *
-    find_highest_item(const DefragState &data, lcn64_t cluster_start, lcn64_t cluster_end,
-                      Tree::Direction direction, Zone zone);
+    find_highest_item(const DefragState &data, lcn_extent_t gap, Tree::Direction direction, Zone zone);
 
     static FileNode *
-    find_best_item(const DefragState &data, lcn64_t cluster_start, lcn64_t cluster_end,
-                   Tree::Direction direction, Zone zone);
+    find_best_item(const DefragState &data, lcn_extent_t gap, Tree::Direction direction, Zone zone);
 
     [[maybe_unused]] void compare_items(DefragState &data, const FileNode *item) const;
 
@@ -222,7 +234,7 @@ private:
 
     void forced_fill(DefragState &data);
 
-    void vacate(DefragState &data, lcn64_t lcn, count64_t clusters, BOOL ignore_mft_excludes);
+    void vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_excludes);
 
     [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState &data);
 

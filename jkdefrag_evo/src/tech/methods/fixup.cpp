@@ -48,14 +48,13 @@ void DefragRunner::fixup(DefragState &data) {
     if (data.phase_todo_ == 0) return;
 
     // Walk through all files and move the files that need to be moved.
-    lcn64_t gap_begin[3];
-    lcn64_t gap_end[3];
+    lcn_extent_t gap[3];
 
-    int file_zone;
-    for (file_zone = 0; file_zone < 3; file_zone++) {
-        gap_begin[file_zone] = 0;
-        gap_end[file_zone] = 0;
-    }
+//    int file_zone;
+//    for (file_zone = 0; file_zone < 3; file_zone++) {
+//        gap_begin[file_zone] = 0;
+//        gap_end[file_zone] = 0;
+//    }
 
     auto next_item = Tree::smallest(data.item_tree_);
 
@@ -71,12 +70,12 @@ void DefragRunner::fixup(DefragState &data) {
         if (item->clusters_count_ == 0) continue;
 
         // Ignore items that do not need to be moved
-        file_zone = 1;
+        auto file_zone = 1;
 
         if (item->is_hog_) file_zone = 2;
         if (item->is_dir_) file_zone = 0;
 
-        const uint64_t item_lcn = item->get_item_lcn();
+        const lcn64_t item_lcn = item->get_item_lcn();
 
         int move_me = false;
 
@@ -88,11 +87,8 @@ void DefragRunner::fixup(DefragState &data) {
         }
 
         if (move_me == false &&
-            ((item_lcn >= data.mft_excludes_[0].start_ && item_lcn < data.mft_excludes_[0].end_) ||
-             (item_lcn >= data.mft_excludes_[1].start_ && item_lcn < data.mft_excludes_[1].end_) ||
-             (item_lcn >= data.mft_excludes_[2].start_ && item_lcn < data.mft_excludes_[2].end_))
-            && (data.disk_.type_ != DiskType::NTFS
-                || !Str::match_mask(item->get_long_path(), L"?:\\$MFT"))) {
+            (data.mft_excludes_[0].contains(item_lcn) || data.mft_excludes_[1].contains(item_lcn) || data.mft_excludes_[2].contains(item_lcn))
+            && (data.disk_.type_ != DiskType::NTFS || !Str::match_mask(item->get_long_path(), L"?:\\$MFT"))) {
             // "I am in MFT reserved space."
             gui->show_debug(DebugLevel::DetailedFileInfo, item, L"I am in MFT reserved space.");
             move_me = true;
@@ -116,10 +112,8 @@ void DefragRunner::fixup(DefragState &data) {
         }
 
         // Ignore files that have been modified less than 15 minutes ago
-        bool result;
-
         if (!item->is_dir_) {
-            result = GetFileAttributesExW(item->get_long_path(), GetFileExInfoStandard, &attributes);
+            auto result = GetFileAttributesExW(item->get_long_path(), GetFileExInfoStandard, &attributes);
 
             if (result != 0) {
                 const filetime64_t file_time = from_FILETIME(attributes.ftLastWriteTime);
@@ -132,12 +126,13 @@ void DefragRunner::fixup(DefragState &data) {
         }
 
         // If the file does not fit in the current gap then find another gap
-        if (item->clusters_count_ > gap_end[file_zone] - gap_begin[file_zone]) {
-            result = find_gap(data, data.zones_[file_zone], 0, item->clusters_count_, true, false,
-                              &gap_begin[file_zone],
-                              &gap_end[file_zone], false);
+        if (item->clusters_count_ > gap[file_zone].length()) {
 
-            if (!result) {
+            auto result = find_gap(data, data.zones_[file_zone], 0, item->clusters_count_, true, false, false);
+
+            if (result.has_value()) {
+                gap[file_zone] = result.value();
+            } else {
                 // Show debug message: "Cannot move item away because no gap is big enough: %I64d[%lu]"
                 gui->show_debug(
                         DebugLevel::Progress, item,
@@ -145,7 +140,7 @@ void DefragRunner::fixup(DefragState &data) {
                                 L"Cannot move file away because no gap is big enough: lcn=" NUM_FMT "[" NUM_FMT " clusters]",
                                 item->get_item_lcn(), item->clusters_count_));
 
-                gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
+                gap[file_zone].length(0); // Force re-scan of gap
 
                 data.clusters_done_ += item->clusters_count_;
                 continue;
@@ -153,12 +148,12 @@ void DefragRunner::fixup(DefragState &data) {
         }
 
         // Move the item.
-        result = move_item(data, item, gap_begin[file_zone], 0, item->clusters_count_, MoveDirection::Up);
+        auto result4 = move_item(data, item, gap[file_zone].begin(), 0, item->clusters_count_, MoveDirection::Up);
 
-        if (result) {
-            gap_begin[file_zone] = gap_begin[file_zone] + item->clusters_count_;
+        if (result4) {
+            gap[file_zone].shift_begin(item->clusters_count_);
         } else {
-            gap_end[file_zone] = gap_begin[file_zone]; // Force re-scan of gap
+            gap[file_zone].length(0); // Force re-scan of gap
         }
 
         // Get new system time

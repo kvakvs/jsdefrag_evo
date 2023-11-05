@@ -14,21 +14,22 @@ set(RSRC ${PROJECT_SOURCE_DIR}/jkdefrag_evo/resource)
 include_directories(${INCL})
 
 set(HEADER_FILES
-        ${INCL}/result/result.h
         ${INCL}/app.h
-        ${INCL}/diskmap.h
-        ${INCL}/diskmap_cell.h
         ${INCL}/constants.h
         ${INCL}/defrag_gui.h
-        ${INCL}/runner.h
         ${INCL}/defrag_log.h
         ${INCL}/defrag_state.h
+        ${INCL}/diskmap.h
+        ${INCL}/diskmap_cell.h
+        ${INCL}/extent.h
         ${INCL}/file_node.h
         ${INCL}/mem_util.h
         ${INCL}/precompiled_header.h
-        ${INCL}/str_util.h
+        ${INCL}/result/result.h
+        ${INCL}/runner.h
         ${INCL}/scan_fat.h
         ${INCL}/scan_ntfs.h
+        ${INCL}/str_util.h
         ${INCL}/time_util.h
         ${INCL}/tree.h
         ${INCL}/types.h

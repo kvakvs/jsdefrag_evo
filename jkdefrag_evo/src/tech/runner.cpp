@@ -468,15 +468,16 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
                 color = DrawColor::Empty;
 
                 for (auto &mft_exclude: data.mft_excludes_) {
-                    if (fragment->lcn_ + segment_begin - real_vcn < mft_exclude.start_ &&
-                        fragment->lcn_ + segment_end - real_vcn > mft_exclude.start_) {
-                        segment_end = real_vcn + mft_exclude.start_ - fragment->lcn_;
+                    if (fragment->lcn_ + segment_begin - real_vcn < mft_exclude.begin() &&
+                        fragment->lcn_ + segment_end - real_vcn > mft_exclude.begin()) {
+                        segment_end = real_vcn + mft_exclude.begin() - fragment->lcn_;
                     }
 
-                    if (fragment->lcn_ + segment_begin - real_vcn >= mft_exclude.start_ &&
-                        fragment->lcn_ + segment_begin - real_vcn < mft_exclude.end_) {
-                        if (fragment->lcn_ + segment_end - real_vcn > mft_exclude.end_) {
-                            segment_end = real_vcn + mft_exclude.end_ - fragment->lcn_;
+                    if (fragment->lcn_ + segment_begin - real_vcn >= mft_exclude.begin()
+                    && fragment->lcn_ + segment_begin - real_vcn < mft_exclude.end()) {
+
+                        if (fragment->lcn_ + segment_end - real_vcn > mft_exclude.end()) {
+                            segment_end = real_vcn + mft_exclude.end() - fragment->lcn_;
                         }
 
                         color = DrawColor::Mft;
@@ -556,9 +557,9 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
         while (index < index_max) {
             auto in_use{volume_bitmap.buffer(index) & mask};
 
-            if ((lcn >= defrag_state.mft_excludes_[0].start_ && lcn < defrag_state.mft_excludes_[0].end_) ||
-                (lcn >= defrag_state.mft_excludes_[1].start_ && lcn < defrag_state.mft_excludes_[1].end_) ||
-                (lcn >= defrag_state.mft_excludes_[2].start_ && lcn < defrag_state.mft_excludes_[2].end_)) {
+            if ((lcn >= defrag_state.mft_excludes_[0].begin() && lcn < defrag_state.mft_excludes_[0].end())
+            || (lcn >= defrag_state.mft_excludes_[1].begin() && lcn < defrag_state.mft_excludes_[1].end())
+            || (lcn >= defrag_state.mft_excludes_[2].begin() && lcn < defrag_state.mft_excludes_[2].end())) {
                 in_use = 1;
             }
 

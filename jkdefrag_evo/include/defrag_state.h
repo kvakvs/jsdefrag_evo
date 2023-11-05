@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "runner.h"
+#include "extent.h"
 
 // The big data struct that holds all the defragger's variables for a single thread
 class DefragState {
@@ -54,10 +55,10 @@ public:
     std::vector<std::wstring> space_hogs_{};
 
     // Begin (LCN) of the zones
-    uint64_t zones_[4] = {};
+    lcn64_t zones_[4] = {};
 
     // List of clusters reserved for the MFT
-    ExcludesStruct mft_excludes_[3] = {};
+    lcn_extent_t mft_excludes_[3] = {};
 
     /*
      * Counters filled before Phase 1.

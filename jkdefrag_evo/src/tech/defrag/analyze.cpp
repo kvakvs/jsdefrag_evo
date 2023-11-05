@@ -44,7 +44,7 @@ void DefragRunner::analyze_volume_read_fs(DefragState &data) {
         data.phase_todo_ = data.total_clusters_ - data.count_free_clusters_;
 
         for (auto &mft_exclude: data.mft_excludes_) {
-            data.phase_todo_ -= (mft_exclude.end_ - mft_exclude.start_);
+            data.phase_todo_ -= mft_exclude.length();
         }
 
         // Scan all the files

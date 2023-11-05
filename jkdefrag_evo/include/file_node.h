@@ -37,7 +37,7 @@ public:
     virtual ~FileNode();
 
     // Tree node location type
-    using TreeLcn = uint64_t;
+    using TreeLcn = lcn64_t;
 //    using TreeLcn = struct {
 //        uint64_t lcn;
 //    };
