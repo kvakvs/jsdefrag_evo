@@ -131,7 +131,7 @@ public:
     void colorize_disk_item(DefragState &data, const FileNode *item,
                             uint64_t busy_offset, uint64_t busy_size, int erase_from_screen) const;
 
-    static void call_show_status(DefragState &data, DefragPhase phase, Zone zone);
+    static void call_show_status(DefragState &defrag_state, DefragPhase phase, Zone zone);
 
 private:
     static void try_request_privileges();
@@ -159,37 +159,36 @@ private:
     static bool get_fragments(const DefragState &data, FileNode *item, HANDLE file_handle);
 
     static bool
-    find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
-             const uint64_t minimum_size,
-             const int must_fit, const bool find_highest_gap, uint64_t *begin_lcn, uint64_t *end_lcn,
+    find_gap(const DefragState &defrag_state, const Lcn minimum_lcn, Lcn maximum_lcn,
+             const LcnCount minimum_size,
+             const int must_fit, const bool find_highest_gap, Lcn *begin_lcn, Lcn *end_lcn,
              const bool ignore_mft_excludes);
 
     static void calculate_zones(DefragState &data);
 
     DWORD
-    move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item, uint64_t new_lcn,
-                    const uint64_t offset, const uint64_t size) const;
+    move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item, Lcn new_lcn,
+                    const Lcn offset, const LcnCount size) const;
 
     DWORD
-    move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item, uint64_t new_lcn,
-                           const uint64_t offset,
-                           const uint64_t size) const;
+    move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item, Lcn new_lcn,
+                           const Lcn offset, const LcnCount size) const;
 
-    bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, uint64_t new_lcn,
-                              uint64_t offset, uint64_t size, MoveStrategy strategy) const;
+    bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, Lcn new_lcn,
+                              Lcn offset, LcnCount size, MoveStrategy strategy) const;
 
-    int move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, uint64_t new_lcn,
-                                 uint64_t offset, uint64_t size, MoveDirection direction) const;
+    int move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, const Lcn new_lcn,
+                                 const Lcn offset, const Lcn size, const MoveDirection direction) const;
 
-    bool move_item(DefragState &data, FileNode *item, uint64_t new_lcn, uint64_t offset,
-                   uint64_t size, MoveDirection direction) const;
+    bool move_item(DefragState &data, FileNode *item, Lcn new_lcn, Lcn offset,
+                   LcnCount size, MoveDirection direction) const;
 
     static FileNode *
-    find_highest_item(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
+    find_highest_item(const DefragState &data, Lcn cluster_start, Lcn cluster_end,
                       Tree::Direction direction, Zone zone);
 
     static FileNode *
-    find_best_item(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
+    find_best_item(const DefragState &data, Lcn cluster_start, Lcn cluster_end,
                    Tree::Direction direction, Zone zone);
 
     [[maybe_unused]] void compare_items(DefragState &data, const FileNode *item) const;
@@ -210,7 +209,7 @@ private:
 
     void forced_fill(DefragState &data);
 
-    void vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes);
+    void vacate(DefragState &data, Lcn lcn, LcnCount clusters, BOOL ignore_mft_excludes);
 
     [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState &data);
 

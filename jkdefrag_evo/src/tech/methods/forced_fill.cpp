@@ -22,12 +22,12 @@ void DefragRunner::forced_fill(DefragState &data) {
     call_show_status(data, DefragPhase::ForcedFill, Zone::None); // "Phase 3: ForcedFill"
 
     // Walk through all the gaps
-    uint64_t gap_begin = 0;
-    uint64_t max_lcn = data.total_clusters_;
+    Lcn gap_begin = 0;
+    Lcn max_lcn = data.total_clusters_;
 
     while (data.is_still_running()) {
         // Find the next gap. If there are no more gaps then exit
-        uint64_t gap_end;
+        Lcn gap_end;
         auto result = find_gap(data, gap_begin, 0, 0, true, false,
                                &gap_begin, &gap_end, false);
 
@@ -35,9 +35,9 @@ void DefragRunner::forced_fill(DefragState &data) {
 
         // Find the item with the highest fragment on disk
         FileNode *highest_item = nullptr;
-        uint64_t highest_lcn = 0;
-        uint64_t highest_vcn = 0;
-        uint64_t highest_size = 0;
+        Lcn highest_lcn = 0;
+        Vcn highest_vcn = 0;
+        LcnCount highest_size = 0;
 
         FileNode *item;
         for (item = Tree::biggest(data.item_tree_); item != nullptr; item = Tree::prev(item)) {
@@ -45,8 +45,8 @@ void DefragRunner::forced_fill(DefragState &data) {
             if (item->is_excluded_) continue;
             if (item->clusters_count_ == 0) continue;
 
-            uint64_t vcn = 0;
-            uint64_t real_vcn = 0;
+            Vcn vcn = 0;
+            Vcn real_vcn = 0;
 
             for (auto &fragment: item->fragments_) {
                 if (!fragment.is_virtual()) {

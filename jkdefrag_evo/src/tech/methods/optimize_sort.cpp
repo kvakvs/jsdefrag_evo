@@ -24,8 +24,8 @@
 // SortField=3    Date/Time LastChange
 // SortField=4    Date/Time Creation
 void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
-    uint64_t gap_begin;
-    uint64_t gap_end;
+    Lcn gap_begin;
+    Lcn gap_end;
 
     DefragGui *gui = DefragGui::get_instance();
 

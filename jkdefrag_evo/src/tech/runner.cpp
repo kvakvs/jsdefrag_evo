@@ -17,6 +17,7 @@
 
 #include "precompiled_header.h"
 #include "defrag_state.h"
+#include "defrag/volume_bitmap.h"
 
 #include <memory>
 #include <optional>
@@ -518,37 +519,38 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
 }
 
 // Update some numbers in the DefragData
-void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, const Zone zone) {
+void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase phase, const Zone zone) {
     FileNode *item;
-    STARTING_LCN_INPUT_BUFFER bitmap_param;
+//    STARTING_LCN_INPUT_BUFFER bitmap_param;
 
-    struct {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
-        // Most efficient if power of 2 
-        BYTE buffer_[65536];
-    } bitmap_data{};
-
-    uint32_t error_code;
-    DWORD w;
+//    struct {
+//        uint64_t starting_lcn_;
+//        uint64_t bitmap_size_;
+//        // Most efficient if power of 2
+//        BYTE buffer_[DRIVE_BITMAP_READ_SIZE];
+//    } bitmap_data{};
+    VolumeBitmap volume_bitmap;
+    DWORD error_code;
+//    DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
     // Count the number of free gaps on the disk
-    data.count_gaps_ = 0;
-    data.count_free_clusters_ = 0;
-    data.biggest_gap_ = 0;
-    data.count_gaps_less16_ = 0;
-    data.count_clusters_less16_ = 0;
+    defrag_state.count_gaps_ = 0;
+    defrag_state.count_free_clusters_ = 0;
+    defrag_state.biggest_gap_ = 0;
+    defrag_state.count_gaps_less16_ = 0;
+    defrag_state.count_clusters_less16_ = 0;
 
-    uint64_t lcn = 0;
-    uint64_t cluster_start = 0;
+    Lcn lcn = 0;
+    Lcn cluster_start = 0;
     int prev_in_use = 1;
 
     do {
         // Fetch a block of cluster data
-        bitmap_param.StartingLcn.QuadPart = lcn;
-        error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
+//        bitmap_param.StartingLcn.QuadPart = lcn;
+//        error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+//                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
+        error_code = volume_bitmap.read(defrag_state.disk_.volume_handle_, lcn);
 
         if (error_code != 0) {
             error_code = NO_ERROR;
@@ -558,30 +560,32 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
-        lcn = bitmap_data.starting_lcn_;
+        lcn = volume_bitmap.starting_lcn();
         int index = 0;
         BYTE mask = 1;
-        int index_max = sizeof bitmap_data.buffer_;
+        int index_max = volume_bitmap.buffer_size();
 
-        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
+        if (volume_bitmap.bitmap_size() / 8 < index_max) {
+            index_max = (int) (volume_bitmap.bitmap_size() / 8);
+        }
 
         while (index < index_max) {
-            int in_use = bitmap_data.buffer_[index] & mask;
+            auto in_use{volume_bitmap.buffer(index) & mask};
 
-            if ((lcn >= data.mft_excludes_[0].start_ && lcn < data.mft_excludes_[0].end_) ||
-                (lcn >= data.mft_excludes_[1].start_ && lcn < data.mft_excludes_[1].end_) ||
-                (lcn >= data.mft_excludes_[2].start_ && lcn < data.mft_excludes_[2].end_)) {
+            if ((lcn >= defrag_state.mft_excludes_[0].start_ && lcn < defrag_state.mft_excludes_[0].end_) ||
+                (lcn >= defrag_state.mft_excludes_[1].start_ && lcn < defrag_state.mft_excludes_[1].end_) ||
+                (lcn >= defrag_state.mft_excludes_[2].start_ && lcn < defrag_state.mft_excludes_[2].end_)) {
                 in_use = 1;
             }
 
             if (prev_in_use == 0 && in_use != 0) {
-                data.count_gaps_ = data.count_gaps_ + 1;
-                data.count_free_clusters_ = data.count_free_clusters_ + lcn - cluster_start;
-                if (data.biggest_gap_ < lcn - cluster_start) data.biggest_gap_ = lcn - cluster_start;
+                defrag_state.count_gaps_ = defrag_state.count_gaps_ + 1;
+                defrag_state.count_free_clusters_ = defrag_state.count_free_clusters_ + lcn - cluster_start;
+                if (defrag_state.biggest_gap_ < lcn - cluster_start) defrag_state.biggest_gap_ = lcn - cluster_start;
 
                 if (lcn - cluster_start < 16) {
-                    data.count_gaps_less16_ = data.count_gaps_less16_ + 1;
-                    data.count_clusters_less16_ = data.count_clusters_less16_ + lcn - cluster_start;
+                    defrag_state.count_gaps_less16_ = defrag_state.count_gaps_less16_ + 1;
+                    defrag_state.count_clusters_less16_ = defrag_state.count_clusters_less16_ + lcn - cluster_start;
                 }
             }
 
@@ -598,48 +602,49 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
 
             lcn = lcn + 1;
         }
-    } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
+    } while (error_code == ERROR_MORE_DATA
+             && lcn < volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size());
 
     if (prev_in_use == 0) {
-        data.count_gaps_ += 1;
-        data.count_free_clusters_ += lcn - cluster_start;
+        defrag_state.count_gaps_ += 1;
+        defrag_state.count_free_clusters_ += lcn - cluster_start;
 
-        if (data.biggest_gap_ < lcn - cluster_start) data.biggest_gap_ = lcn - cluster_start;
+        if (defrag_state.biggest_gap_ < lcn - cluster_start) defrag_state.biggest_gap_ = lcn - cluster_start;
 
         if (lcn - cluster_start < 16) {
-            data.count_gaps_less16_ += 1;
-            data.count_clusters_less16_ += lcn - cluster_start;
+            defrag_state.count_gaps_less16_ += 1;
+            defrag_state.count_clusters_less16_ += lcn - cluster_start;
         }
     }
 
     // Walk through all files and update the counters
-    data.count_directories_ = 0;
-    data.count_all_files_ = 0;
-    data.count_fragmented_items_ = 0;
-    data.count_all_bytes_ = 0;
-    data.count_fragmented_bytes_ = 0;
-    data.count_all_clusters_ = 0;
-    data.count_fragmented_clusters_ = 0;
+    defrag_state.count_directories_ = 0;
+    defrag_state.count_all_files_ = 0;
+    defrag_state.count_fragmented_items_ = 0;
+    defrag_state.count_all_bytes_ = 0;
+    defrag_state.count_fragmented_bytes_ = 0;
+    defrag_state.count_all_clusters_ = 0;
+    defrag_state.count_fragmented_clusters_ = 0;
 
-    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
         }
 
-        data.count_all_bytes_ += item->bytes_;
-        data.count_all_clusters_ += item->clusters_count_;
+        defrag_state.count_all_bytes_ += item->bytes_;
+        defrag_state.count_all_clusters_ += item->clusters_count_;
 
         if (item->is_dir_) {
-            data.count_directories_ += 1;
+            defrag_state.count_directories_ += 1;
         } else {
-            data.count_all_files_ += 1;
+            defrag_state.count_all_files_ += 1;
         }
 
         if (get_fragment_count(item) > 1) {
-            data.count_fragmented_items_ += 1;
-            data.count_fragmented_bytes_ += item->bytes_;
-            data.count_fragmented_clusters_ += item->clusters_count_;
+            defrag_state.count_fragmented_items_ += 1;
+            defrag_state.count_fragmented_bytes_ += item->bytes_;
+            defrag_state.count_fragmented_clusters_ += item->clusters_count_;
         }
     }
 
@@ -676,7 +681,7 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
     */
     int64_t count = 0;
 
-    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
@@ -691,7 +696,7 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
         int64_t factor = 1 - count;
         int64_t sum = 0;
 
-        for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
             if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
                  _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;
@@ -703,17 +708,17 @@ void DefragRunner::call_show_status(DefragState &data, const DefragPhase phase, 
             factor += 2;
         }
 
-        data.average_distance_ = sum / (double) (count * (count - 1));
+        defrag_state.average_distance_ = sum / (double) (count * (count - 1));
     } else {
-        data.average_distance_ = 0;
+        defrag_state.average_distance_ = 0;
     }
 
-    data.phase_ = phase;
-    data.zone_ = zone;
-    data.clusters_done_ = 0;
-    data.phase_todo_ = 0;
+    defrag_state.phase_ = phase;
+    defrag_state.zone_ = zone;
+    defrag_state.clusters_done_ = 0;
+    defrag_state.phase_todo_ = 0;
 
-    gui->show_status(data);
+    gui->show_status(defrag_state);
 }
 
 void DefragRunner::defrag_all_drives_sync(DefragState &data, OptimizeMode mode) {

@@ -16,6 +16,7 @@
  */
 
 #include "precompiled_header.h"
+#include "volume_bitmap.h"
 
 /**
  * \brief Look for a gap, a block of empty clusters on the volume.
@@ -32,45 +33,42 @@
  *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
  */
 // TODO: Very slow, improve search algorithm
-bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn, uint64_t maximum_lcn,
-                            const uint64_t minimum_size, const int must_fit, const bool find_highest_gap,
-                            uint64_t *begin_lcn, uint64_t *end_lcn, const bool ignore_mft_excludes) {
+bool DefragRunner::find_gap(const DefragState &defrag_state, const Lcn minimum_lcn, Lcn maximum_lcn,
+                            const LcnCount minimum_size, const int must_fit, const bool find_highest_gap,
+                            Lcn *begin_lcn, Lcn *end_lcn, const bool ignore_mft_excludes) {
     StopWatch clock_fg(L"find_gap", true);
-    STARTING_LCN_INPUT_BUFFER bitmap_param;
-    struct {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
-        BYTE buffer_[65536]; // Most efficient if binary multiple
-    } bitmap_data{};
+//    STARTING_LCN_INPUT_BUFFER bitmap_param;
+    VolumeBitmap volume_bitmap;
+//    struct {
+//        uint64_t starting_lcn_;
+//        uint64_t bitmap_size_;
+//        BYTE buffer_[DRIVE_BITMAP_READ_SIZE]; // Most efficient if binary multiple
+//    } bitmap_data{};
 
-    uint32_t error_code;
-    DWORD w;
+//    uint32_t error_code;
+//    DWORD bytes_returned;
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
-    if (minimum_lcn >= data.total_clusters_) return false;
+    if (minimum_lcn >= defrag_state.total_clusters_) return false;
 
     // Main loop to walk through the entire clustermap
-    uint64_t lcn = minimum_lcn;
-    uint64_t cluster_start = 0;
+    Lcn lcn = minimum_lcn;
+    Lcn cluster_start = 0;
     int prev_in_use = 1;
-    uint64_t highest_begin_lcn = 0;
-    uint64_t highest_end_lcn = 0;
-    uint64_t largest_begin_lcn = 0;
-    uint64_t largest_end_lcn = 0;
+    Lcn highest_begin_lcn = 0;
+    Lcn highest_end_lcn = 0;
+    Lcn largest_begin_lcn = 0;
+    Lcn largest_end_lcn = 0;
+    uint32_t error_code = NO_ERROR;
 
     do {
         // Fetch a block of cluster data. If error then return false
-        bitmap_param.StartingLcn.QuadPart = lcn;
-        error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
-                                     sizeof bitmap_data, &w, nullptr);
-
-        if (error_code != 0) {
-            error_code = NO_ERROR;
-        } else {
-            error_code = GetLastError();
-        }
+//        bitmap_param.StartingLcn.QuadPart = lcn;
+//        error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+//                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
+//                                     sizeof bitmap_data, &bytes_returned, nullptr);
+        error_code = volume_bitmap.read(defrag_state.disk_.volume_handle_, lcn);
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
             // Show debug message: "ERROR: could not get volume bitmap: %s"
@@ -82,26 +80,30 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
         }
 
         // Sanity check
-        if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) return false;
-        if (maximum_lcn == 0) maximum_lcn = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
+        if (lcn >= volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size()) return false;
+        if (maximum_lcn == 0) {
+            maximum_lcn = Lcn(volume_bitmap.starting_lcn()) + Lcn(volume_bitmap.bitmap_size());
+        }
 
         // Analyze the clusterdata. We resume where the previous block left off. If a cluster is found that matches the
         // criteria then return it's LCN (Logical Cluster Number)
-        lcn = bitmap_data.starting_lcn_;
+        lcn = Lcn(volume_bitmap.starting_lcn());
         int index = 0;
         BYTE mask = 1;
 
-        int index_max = sizeof bitmap_data.buffer_;
+        size_t index_max = volume_bitmap.buffer_size();
 
-        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
+        if (volume_bitmap.bitmap_size() / 8 < index_max) {
+            index_max = volume_bitmap.bitmap_size() / 8;
+        }
 
         while (index < index_max && lcn < maximum_lcn) {
             if (lcn >= minimum_lcn) {
-                int in_use = bitmap_data.buffer_[index] & mask;
+                int in_use = volume_bitmap.buffer(index) & mask;
 
-                if ((lcn >= data.mft_excludes_[0].start_ && lcn < data.mft_excludes_[0].end_) ||
-                    (lcn >= data.mft_excludes_[1].start_ && lcn < data.mft_excludes_[1].end_) ||
-                    (lcn >= data.mft_excludes_[2].start_ && lcn < data.mft_excludes_[2].end_)) {
+                if ((lcn >= defrag_state.mft_excludes_[0].start_ && lcn < defrag_state.mft_excludes_[0].end_) ||
+                    (lcn >= defrag_state.mft_excludes_[1].start_ && lcn < defrag_state.mft_excludes_[1].end_) ||
+                    (lcn >= defrag_state.mft_excludes_[2].start_ && lcn < defrag_state.mft_excludes_[2].end_)) {
                     if (!ignore_mft_excludes) in_use = 1;
                 }
 
@@ -150,7 +152,7 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
             lcn = lcn + 1;
         }
     } while (error_code == ERROR_MORE_DATA &&
-             lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_ &&
+             lcn < volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size() &&
              lcn < maximum_lcn);
 
     // Process the last gap
@@ -205,9 +207,9 @@ bool DefragRunner::find_gap(const DefragState &data, const uint64_t minimum_lcn,
  * \param zone 0=only directories, 1=only regular files, 2=only space hogs, 3=all
  * \return Return a pointer to the item, or nullptr if no file could be found
  */
-FileNode *DefragRunner::find_highest_item(const DefragState &data, const uint64_t cluster_start,
-                                          const uint64_t cluster_end, const Tree::Direction direction,
-                                          const Zone zone) {
+FileNode *DefragRunner::find_highest_item(const DefragState &data, Lcn cluster_start,
+                                          Lcn cluster_end, Tree::Direction direction,
+                                          Zone zone) {
     DefragGui *gui = DefragGui::get_instance();
 
     // "Looking for highest-fit %I64d[%I64d]"
@@ -264,8 +266,8 @@ Zone=2           Only search the SpaceHogs.
 Zone=3           Search all items.
 
 */
-FileNode *DefragRunner::find_best_item(const DefragState &data, const uint64_t cluster_start,
-                                       const uint64_t cluster_end, const Tree::Direction direction, const Zone zone) {
+FileNode *DefragRunner::find_best_item(const DefragState &data, Lcn cluster_start,
+                                       Lcn cluster_end, Tree::Direction direction, Zone zone) {
     __timeb64 time{};
     DefragGui *gui = DefragGui::get_instance();
 

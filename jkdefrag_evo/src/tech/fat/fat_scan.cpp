@@ -79,9 +79,9 @@ void ScanFAT::make_fragment_list(const DefragState &data, const FatDiskInfoStruc
     if (cluster == 0) return;
 
     // Loop through the FAT cluster list, counting the clusters and creating items in the fragment list
-    uint64_t first_cluster = cluster;
-    uint64_t last_cluster = 0;
-    uint64_t vcn = 0;
+    Lcn first_cluster = cluster;
+    Lcn last_cluster = 0;
+    Vcn vcn = 0;
 
     for (max_iterate = 0; max_iterate < disk_info->countof_clusters_ + 1; max_iterate++) {
         // Exit the loop when we have reached the end of the cluster list

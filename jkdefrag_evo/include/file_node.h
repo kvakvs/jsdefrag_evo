@@ -9,8 +9,8 @@
 
 // File fragment descriptor, stored as a list of file fragments; TODO: std::forward_list
 struct FileFragment {
-    uint64_t lcn_; // Logical cluster number, location on disk
-    uint64_t next_vcn_; // Virtual cluster number of next fragment
+    Lcn lcn_; // Logical cluster number, location on disk
+    Vcn next_vcn_; // Virtual cluster number of next fragment
 
     void set_virtual() {
         lcn_ = VIRTUALFRAGMENT;
@@ -21,7 +21,7 @@ struct FileFragment {
     }
 
 private:
-    static constexpr uint64_t VIRTUALFRAGMENT = std::numeric_limits<uint64_t>::max();
+    static constexpr Vcn VIRTUALFRAGMENT = std::numeric_limits<Vcn>::max();
 };
 
 

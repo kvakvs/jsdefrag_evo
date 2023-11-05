@@ -26,11 +26,11 @@
 [[maybe_unused]] void DefragRunner::move_mft_to_begin_of_disk(DefragState &data) {
     FileNode *item;
 
-    uint64_t lcn;
-    uint64_t gap_begin;
-    uint64_t gap_end;
-    uint64_t clusters;
-    uint64_t clusters_done;
+    Lcn lcn;
+    Lcn gap_begin;
+    Lcn gap_end;
+    LcnCount clusters;
+    LcnCount clusters_done;
 
     OSVERSIONINFO os_version;
 

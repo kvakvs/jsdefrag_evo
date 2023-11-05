@@ -31,6 +31,7 @@ set(HEADER_FILES
         ${INCL}/time_util.h
         ${INCL}/tree.h
         ${INCL}/types.h
+        ${SRC}/tech/defrag/volume_bitmap.h
         )
 set(SOURCE_FILES
         ${SRC}/app.cpp
@@ -56,6 +57,7 @@ set(SOURCE_FILES
         ${SRC}/tech/defrag/move_mft.cpp
         ${SRC}/tech/defrag/moving.cpp
         ${SRC}/tech/defrag/scan.cpp
+        ${SRC}/tech/defrag/volume_bitmap.cpp
 
         ${SRC}/tech/ntfs/ntfs_analyze.cpp
         ${SRC}/tech/ntfs/ntfs_attributes.cpp

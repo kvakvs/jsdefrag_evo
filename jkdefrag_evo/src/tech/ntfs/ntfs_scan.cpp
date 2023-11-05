@@ -189,7 +189,7 @@ BYTE *ScanNTFS::read_non_resident_data(const DefragState &data, const NtfsDiskIn
 // Read the RunData list and translate into a list of fragments
 bool ScanNTFS::translate_rundata_to_fragmentlist(
         const DefragState &data, InodeDataStruct *inode_data, const wchar_t *stream_name,
-        ATTRIBUTE_TYPE stream_type, const BYTE *run_data, const uint32_t run_data_length, const uint64_t starting_vcn,
+        ATTRIBUTE_TYPE stream_type, const BYTE *run_data, const uint32_t run_data_length, const Vcn starting_vcn,
         const uint64_t bytes) {
     union UlongBytes {
         struct {
@@ -269,7 +269,7 @@ bool ScanNTFS::translate_rundata_to_fragmentlist(
 
     // Walk through the RunData and add the extents
     uint32_t index = 0;
-    uint64_t lcn = 0;
+    Lcn lcn = 0;
     auto vcn = starting_vcn;
 
     if (run_data != nullptr)

@@ -16,6 +16,7 @@
  */
 
 #include "precompiled_header.h"
+#include "../tech/defrag/volume_bitmap.h"
 
 #include <memory>
 #include <format>
@@ -434,15 +435,17 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 }
 
 // Show a map on the screen of all the clusters on the disk. The map shows which clusters are free and which are in use.
-void DefragGui::show_diskmap(DefragState &data) {
-    struct {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
-        BYTE buffer_[65536]; // Most efficient if binary multiple
-    } bitmap_data{};
+void DefragGui::show_diskmap(DefragState &defrag_state) {
+//    struct {
+//        uint64_t starting_lcn_;
+//        uint64_t bitmap_size_;
+//        BYTE buffer_[DRIVE_BITMAP_READ_SIZE]; // Most efficient if binary multiple
+//    } bitmap_data{};
+    VolumeBitmap volume_bitmap;
+    DWORD error_code;
 
     // Exit if the library is not processing a disk yet.
-    if (data.disk_.volume_handle_ == nullptr) {
+    if (defrag_state.disk_.volume_handle_ == nullptr) {
         return;
     }
 
@@ -450,65 +453,67 @@ void DefragGui::show_diskmap(DefragState &data) {
     clear_screen({});
 
     // Show the map of all the clusters in use
-    uint64_t lcn = 0;
-    uint64_t cluster_start = 0;
+    Lcn lcn = 0;
+    Lcn cluster_start = 0;
     int prev_in_use = 1;
 
-    DWORD error_code;
     StopWatch clock1(L"show_diskmap: load and repaint");
 
     uint64_t count = 0;
     do {
         count++; // for logging after this loop
 
-        if (*data.running_ != RunningState::RUNNING) break;
-        if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
+        if (*defrag_state.running_ != RunningState::RUNNING) break;
+        if (defrag_state.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data
-        STARTING_LCN_INPUT_BUFFER bitmap_param = {.StartingLcn = {.QuadPart = (LONGLONG) lcn}};
-        DWORD w;
-        error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
-                                     sizeof bitmap_data, &w, nullptr);
+//        STARTING_LCN_INPUT_BUFFER bitmap_param = {.StartingLcn = {.QuadPart = (LONGLONG) lcn}};
+//        DWORD w;
+//        error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+//                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
+//                                     sizeof bitmap_data, &w, nullptr);
+        error_code = volume_bitmap.read(defrag_state.disk_.volume_handle_, lcn);
 
-        if (error_code != 0) {
-            error_code = NO_ERROR;
-        } else {
-            error_code = GetLastError();
-        }
+//        if (error_code != 0) {
+//            error_code = NO_ERROR;
+//        } else {
+//            error_code = GetLastError();
+//        }
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
         // Sanity check
-        if (lcn >= bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_) break;
+        if (lcn >= volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size()) break;
 
         // Analyze the clusterdata. We resume where the previous block left off
-        lcn = bitmap_data.starting_lcn_;
+        lcn = volume_bitmap.starting_lcn();
         int index = 0;
         uint8_t mask = 1;
 
-        int index_max = sizeof bitmap_data.buffer_;
+        int index_max = volume_bitmap.buffer_size();
 
-        if (bitmap_data.bitmap_size_ / 8 < index_max) index_max = (int) (bitmap_data.bitmap_size_ / 8);
+        if (volume_bitmap.bitmap_size() / 8 < index_max) {
+            index_max = (int) (volume_bitmap.bitmap_size() / 8);
+        }
 
-        while (index < index_max && data.is_still_running()) {
-            auto in_use = bitmap_data.buffer_[index] & mask;
+        while (index < index_max && defrag_state.is_still_running()) {
+            auto in_use{volume_bitmap.buffer(index) & mask};
 
             // If at the beginning of the disk then copy the in_use value as our starting value
             if (lcn == 0) prev_in_use = in_use;
 
             // At the beginning and end of an Exclude draw the cluster
-            if (lcn == data.mft_excludes_[0].start_ || lcn == data.mft_excludes_[0].end_ ||
-                lcn == data.mft_excludes_[1].start_ || lcn == data.mft_excludes_[1].end_ ||
-                lcn == data.mft_excludes_[2].start_ || lcn == data.mft_excludes_[2].end_) {
-                if (lcn == data.mft_excludes_[0].end_ ||
-                    lcn == data.mft_excludes_[1].end_ ||
-                    lcn == data.mft_excludes_[2].end_) {
-                    draw_cluster(data, cluster_start, lcn, DrawColor::Unmovable);
+            if (lcn == defrag_state.mft_excludes_[0].start_ || lcn == defrag_state.mft_excludes_[0].end_ ||
+                lcn == defrag_state.mft_excludes_[1].start_ || lcn == defrag_state.mft_excludes_[1].end_ ||
+                lcn == defrag_state.mft_excludes_[2].start_ || lcn == defrag_state.mft_excludes_[2].end_) {
+                if (lcn == defrag_state.mft_excludes_[0].end_ ||
+                    lcn == defrag_state.mft_excludes_[1].end_ ||
+                    lcn == defrag_state.mft_excludes_[2].end_) {
+                    draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Unmovable);
                 } else if (prev_in_use == 0) {
-                    draw_cluster(data, cluster_start, lcn, DrawColor::Empty);
+                    draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Empty);
                 } else {
-                    draw_cluster(data, cluster_start, lcn, DrawColor::Allocated);
+                    draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Allocated);
                 }
 
                 in_use = 1;
@@ -518,13 +523,13 @@ void DefragGui::show_diskmap(DefragState &data) {
 
             // Free
             if (prev_in_use == 0 && in_use != 0) {
-                draw_cluster(data, cluster_start, lcn, DrawColor::Empty);
+                draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Empty);
                 cluster_start = lcn;
             }
 
             // In use
             if (prev_in_use != 0 && in_use == 0) {
-                draw_cluster(data, cluster_start, lcn, DrawColor::Allocated);
+                draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Allocated);
                 cluster_start = lcn;
             }
 
@@ -539,27 +544,28 @@ void DefragGui::show_diskmap(DefragState &data) {
 
             lcn = lcn + 1;
         }
-    } while (error_code == ERROR_MORE_DATA && lcn < bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
+    } while (error_code == ERROR_MORE_DATA
+             && lcn < volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size());
 
     clock1.stop_and_log();
 
     if (lcn > 0) {
         if (prev_in_use == 0) {
             // Free
-            draw_cluster(data, cluster_start, lcn, DrawColor::Empty);
+            draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Empty);
         } else {
             // in use
-            draw_cluster(data, cluster_start, lcn, DrawColor::Allocated);
+            draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Allocated);
         }
     }
 
     // Show the MFT zones
     StopWatch clock2(L"show_diskmap: show MFT zones");
 
-    for (auto &mft_exclude: data.mft_excludes_) {
+    for (auto &mft_exclude: defrag_state.mft_excludes_) {
         if (mft_exclude.start_ <= 0) continue;
 
-        draw_cluster(data, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
+        draw_cluster(defrag_state, mft_exclude.start_, mft_exclude.end_, DrawColor::Mft);
     }
 
     clock2.stop_and_log();
@@ -568,15 +574,15 @@ void DefragGui::show_diskmap(DefragState &data) {
     // Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to ignore it
     StopWatch clock3(L"show_diskmap: colorize files");
 
-    for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
-        if (*data.running_ != RunningState::RUNNING) break;
+    for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+        if (*defrag_state.running_ != RunningState::RUNNING) break;
         //		if (*data.RedrawScreen != 2) break;
 
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0))
             continue;
 
-        defrag_lib_->colorize_disk_item(data, item, 0, 0, false);
+        defrag_lib_->colorize_disk_item(defrag_state, item, 0, 0, false);
     }
 
     clock3.stop_and_log();

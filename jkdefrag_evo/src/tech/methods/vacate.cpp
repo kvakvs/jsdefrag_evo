@@ -22,7 +22,7 @@
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then
 // skip them. Then move files upward until the gap is bigger than clusters, or when we
 // encounter an unmovable file.
-void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BOOL ignore_mft_excludes) {
+void DefragRunner::vacate(DefragState &data, Lcn lcn, LcnCount clusters, BOOL ignore_mft_excludes) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
@@ -61,25 +61,25 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(L"move_to = " NUM_FMT, move_to));
 
     // Loop forever
-    uint64_t move_gap_begin = 0;
-    uint64_t move_gap_end = 0;
-    uint64_t done_until = lcn;
+    Lcn move_gap_begin = 0;
+    Lcn move_gap_end = 0;
+    auto done_until = lcn;
 
     while (data.is_still_running()) {
         // Find the first movable data fragment at or above the done_until lcn. If there is nothing
         // then return, we have reached the end of the disk.
         FileNode *bigger_item = nullptr;
-        uint64_t bigger_begin = 0;
-        uint64_t bigger_end;
-        uint64_t bigger_real_vcn;
+        Lcn bigger_begin = 0;
+        Lcn bigger_end;
+        Vcn bigger_real_vcn;
 
         for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
                 continue;
             }
 
-            uint64_t vcn = 0;
-            uint64_t real_vcn = 0;
+            Vcn vcn = 0;
+            Vcn real_vcn = 0;
 
             for (auto &fragment: item->fragments_) {
                 if (!fragment.is_virtual()) {
@@ -113,8 +113,8 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
                         std::format(L"Data found at LCN=" NUM_FMT ", {}", bigger_begin, bigger_item->get_long_path()));
 
         // Find the first gap above the lcn
-        uint64_t test_gap_begin;
-        uint64_t test_gap_end;
+        Lcn test_gap_begin;
+        Lcn test_gap_end;
         bool result = find_gap(data, lcn, 0, 0, true, false,
                                &test_gap_begin, &test_gap_end, ignore_mft_excludes);
 
@@ -162,8 +162,7 @@ void DefragRunner::vacate(DefragState &data, uint64_t lcn, uint64_t clusters, BO
                                 std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
 
                 result = find_gap(data, move_to, 0, bigger_end - bigger_begin, true, false, &move_gap_begin,
-                                  &move_gap_end,
-                                  FALSE);
+                                  &move_gap_end, FALSE);
             }
 
             // If no gap was found then try to find a gap as high on disk as possible, but above the item.

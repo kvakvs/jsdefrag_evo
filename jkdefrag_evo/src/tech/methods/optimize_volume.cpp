@@ -21,8 +21,8 @@
 void DefragRunner::optimize_volume(DefragState &data) {
     FileNode *item;
 
-    uint64_t gap_begin;
-    uint64_t gap_end;
+    Lcn gap_begin;
+    Lcn gap_end;
 
     DefragGui *gui = DefragGui::get_instance();
 
