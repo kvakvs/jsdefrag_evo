@@ -253,4 +253,6 @@ private:
 private:
     // static member that is an instance of itself
     inline static std::unique_ptr<DefragRunner> instance_;
+
+    static void request_privileges_failed();
 };

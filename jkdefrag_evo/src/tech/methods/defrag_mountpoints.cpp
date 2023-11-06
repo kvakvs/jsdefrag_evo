@@ -110,9 +110,9 @@ void DefragRunner::defrag_mountpoints(DefragState &data, const wchar_t *mount_po
             nullptr, OPEN_EXISTING, 0, nullptr);
 
     if (volume_handle == INVALID_HANDLE_VALUE) {
-        gui->show_debug(DebugLevel::Warning, nullptr,
-                        std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    volume_name, mount_point, Str::system_error(GetLastError())));
+        const std::wstring &message = std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
+                                            volume_name, mount_point, Str::system_error(GetLastError()));
+        gui->message_box_error(message.c_str(), L"Error", std::nullopt);
         return;
     }
 

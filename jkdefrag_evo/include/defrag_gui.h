@@ -55,6 +55,11 @@ public:
 
     DiskMap &get_color_map() { return color_map_; }
 
+    /// For non-interactive mode, write a log message. For interactive mode pop up a messagebox and exit if exit code is provided
+    void message_box_error(const wchar_t *text, const wchar_t *caption, std::optional<int> exit_code);
+
+    static void exit_now(int exit_code = 1);
+
 protected:
     void write_stats(const DefragState &data);
 

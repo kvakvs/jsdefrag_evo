@@ -93,7 +93,6 @@ void DefragRunner::try_request_privileges() {
     HANDLE process_token_handle;
     LUID take_ownership_value;
     TOKEN_PRIVILEGES token_privileges;
-    DefragGui *gui = DefragGui::get_instance();
 
     if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
                          &process_token_handle) != 0 &&
@@ -104,11 +103,16 @@ void DefragRunner::try_request_privileges() {
 
         if (AdjustTokenPrivileges(process_token_handle, FALSE, &token_privileges,
                                   sizeof(TOKEN_PRIVILEGES), nullptr, nullptr) == FALSE) {
-            gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
+            return request_privileges_failed();
         }
     } else {
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr, L"Info: could not elevate to SeBackupPrivilege.");
+        return request_privileges_failed();
     }
+}
+
+void DefragRunner::request_privileges_failed() {
+    DefragGui *gui = DefragGui::get_instance();
+    gui->message_box_error(L"Info: could not elevate to SeBackupPrivilege.", L"Fatal", 1);
 }
 
 // Try finding the MountPoint by treating the input path as a path to something on the disk.
@@ -195,10 +199,10 @@ bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &data, const wch
                                             OPEN_EXISTING, 0, nullptr);
 
     if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
-        gui->show_debug(DebugLevel::Warning, nullptr,
-                        std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                    data.disk_.volume_name_, data.disk_.mount_point_,
-                                    Str::system_error(GetLastError())));
+        const std::wstring &message = std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
+                                                  data.disk_.volume_name_, data.disk_.mount_point_,
+                                                  Str::system_error(GetLastError()));
+        gui->message_box_error(message.c_str(), L"Error", std::nullopt);
 
         data.disk_.mount_point_.clear();
         data.disk_.mount_point_slash_.clear();

@@ -293,3 +293,17 @@ void DefragGui::request_delayed_redraw_top_area() {
     redraw_top_area_ = true;
     InvalidateRect(wnd_, &top_area_rect_, FALSE);
 }
+
+void DefragGui::message_box_error(const wchar_t *text, const wchar_t *caption, std::optional<int> exit_code) {
+    // TODO: if interactive, post a messagebox, otherwise log a message
+    show_debug(DebugLevel::AlwaysLog, nullptr, text);
+    ::MessageBoxW(wnd_, text, caption, MB_OK);
+    if (exit_code.has_value()) {
+        exit_now(exit_code.value());
+    }
+}
+
+void DefragGui::exit_now(int exit_code) {
+    ::PostQuitMessage(exit_code);
+    ::exit(exit_code);
+}
