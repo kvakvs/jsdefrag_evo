@@ -51,7 +51,7 @@
         case FAT32: if (FATContent == 0x0FFFFFF7) IsBadCluster = TRUE; break;
     }
 */
-bool ScanFAT::analyze_fat_volume(DefragState &data) {
+bool ScanFAT::analyze_fat_volume(DefragState &defrag_state) {
     FatDiskInfoStruct disk_info{};
     OVERLAPPED g_overlapped;
     DWORD bytes_read;
@@ -69,7 +69,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
     g_overlapped.hEvent = nullptr;
 
     FatBootSectorStruct boot_sector{};
-    result = ReadFile(data.disk_.volume_handle_, &boot_sector, sizeof(FatBootSectorStruct), &bytes_read,
+    result = ReadFile(defrag_state.disk_.volume_handle_, &boot_sector, sizeof(FatBootSectorStruct), &bytes_read,
                       &g_overlapped);
 
     if (result == 0 || bytes_read != 512) {
@@ -129,18 +129,18 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
     disk_info.countof_clusters_ = disk_info.data_sec_ / boot_sector.bpb_sec_per_clus_;
 
     if (disk_info.countof_clusters_ < 4085) {
-        data.disk_.type_ = DiskType::FAT12;
+        defrag_state.disk_.type_ = DiskType::FAT12;
         gui->show_always(L"This is a FAT12 disk.");
     } else if (disk_info.countof_clusters_ < 65525) {
-        data.disk_.type_ = DiskType::FAT16;
+        defrag_state.disk_.type_ = DiskType::FAT16;
         gui->show_always(L"This is a FAT16 disk.");
     } else {
-        data.disk_.type_ = DiskType::FAT32;
+        defrag_state.disk_.type_ = DiskType::FAT32;
         gui->show_always(L"This is a FAT32 disk.");
     }
 
-    data.bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
-    data.total_clusters_ = disk_info.countof_clusters_;
+    defrag_state.bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
+    defrag_state.set_total_clusters(disk_info.countof_clusters_);
 
     // Output debug information
     strncpy_s(s2, BUFSIZ, (char *) &boot_sector.bs_oem_name_[0], 8);
@@ -171,7 +171,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
             boot_sector.bpb_media_, boot_sector.bpb_sec_per_trk_, boot_sector.bpb_num_heads_,
             boot_sector.bpb_hidd_sec_));
 
-    if (data.disk_.type_ != DiskType::FAT32) {
+    if (defrag_state.disk_.type_ != DiskType::FAT32) {
         gui->show_debug(DebugLevel::Progress, nullptr, std::format(
                 L"  BS_DrvNum: " NUM_FMT "\n"
                 L"  BS_BootSig: " NUM_FMT "\n"
@@ -214,7 +214,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
     }
 
     // Read the FAT from disk into memory
-    switch (data.disk_.type_) {
+    switch (defrag_state.disk_.type_) {
         case DiskType::FAT12:
             fat_size = (size_t) (disk_info.countof_clusters_ + 1 + (disk_info.countof_clusters_ + 1) / 2);
             break;
@@ -241,7 +241,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
     gui->show_debug(DebugLevel::Progress, nullptr,
                     std::format(L"Reading FAT, " NUM_FMT " bytes at offset=" NUM_FMT, fat_size, trans.QuadPart));
 
-    result = ReadFile(data.disk_.volume_handle_, disk_info.fat_data_.fat12, (uint32_t) fat_size,
+    result = ReadFile(defrag_state.disk_.volume_handle_, disk_info.fat_data_.fat12, (uint32_t) fat_size,
                       &bytes_read, &g_overlapped);
 
     if (result == 0) {
@@ -253,8 +253,8 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
     //ShowHex(Data,disk_info.FatData.FAT12,32);
 
     // Read the root directory from disk into memory
-    if (data.disk_.type_ == DiskType::FAT32) {
-        root_directory = load_directory(data, &disk_info, boot_sector.fat32.bpb_root_clus_, &root_length);
+    if (defrag_state.disk_.type_ == DiskType::FAT32) {
+        root_directory = load_directory(defrag_state, &disk_info, boot_sector.fat32.bpb_root_clus_, &root_length);
     } else {
         uint64_t root_start;
         root_start = (boot_sector.bpb_rsvd_sec_cnt_ + boot_sector.bpb_num_fats_ * disk_info.fat_sz_) *
@@ -307,7 +307,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
                         std::format(L"Reading root directory, " NUM_FMT " bytes at offset=" NUM_FMT, bytes_read,
                                     trans.QuadPart));
 
-        result = ReadFile(data.disk_.volume_handle_, root_directory, bytes_read, &bytes_read, &g_overlapped);
+        result = ReadFile(defrag_state.disk_.volume_handle_, root_directory, bytes_read, &bytes_read, &g_overlapped);
 
         if (result == 0) {
             gui->show_debug(DebugLevel::Progress, nullptr,
@@ -321,7 +321,7 @@ bool ScanFAT::analyze_fat_volume(DefragState &data) {
     }
 
     // Analyze all the items in the root directory and add to the item tree
-    analyze_fat_directory(data, &disk_info, root_directory, root_length, nullptr);
+    analyze_fat_directory(defrag_state, &disk_info, root_directory, root_length, nullptr);
 
     // Cleanup
     delete root_directory;
@@ -366,7 +366,7 @@ void ScanFAT::analyze_fat_directory(DefragState &data, FatDiskInfoStruct *disk_i
         // Exit at the end of the directory
         if (dir->dir_name_[0] == 0) {
             gui->show_debug(DebugLevel::DetailedGapFinding, nullptr,
-                            std::format(L"{}.\tFree (not used), end of directory.", index / 32));
+                            std::format(L"{}.\tFree (not used), set_end of directory.", index / 32));
             break;
         }
 

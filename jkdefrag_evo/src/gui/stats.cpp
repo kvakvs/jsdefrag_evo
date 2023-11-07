@@ -26,9 +26,9 @@ void DefragGui::write_stats(const DefragState &data) {
     FileNode *item;
     Log::log_always(
             std::format(L"- Total disk space: " NUM_FMT " bytes ({:.1f} Gb), " NUM_FMT " clusters",
-                        data.bytes_per_cluster_ * data.total_clusters_,
-                        (double) (data.bytes_per_cluster_ * data.total_clusters_) / gigabytes(1.0),
-                        data.total_clusters_));
+                        data.bytes_per_cluster_ * data.total_clusters(),
+                        (double) (data.bytes_per_cluster_ * data.total_clusters()) / gigabytes(1.0),
+                        data.total_clusters()));
     Log::log_always(
             std::format(L"- Bytes per cluster: " NUM_FMT " bytes", data.bytes_per_cluster_));
     Log::log_always(
@@ -51,13 +51,13 @@ void DefragGui::write_stats(const DefragState &data) {
                 std::format(L"- Number of fragmented items: " NUM_FMT, data.count_fragmented_items_));
     }
 
-    if (data.count_all_clusters_ > 0 && data.total_clusters_ > 0) {
+    if (data.count_all_clusters_ > 0 && data.total_clusters() > 0) {
         Log::log_always(std::format(
                 L"- Total size of fragmented items: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of all items, " FLT4_FMT "% of disk",
                 data.count_fragmented_clusters_ * data.bytes_per_cluster_,
                 data.count_fragmented_clusters_,
                 (double) (data.count_fragmented_clusters_ * 100) / data.count_all_clusters_,
-                (double) (data.count_fragmented_clusters_ * 100) / data.total_clusters_));
+                (double) (data.count_fragmented_clusters_ * 100) / data.total_clusters()));
     } else {
         Log::log_always(
                 std::format(L"- Total size of fragmented items: " NUM_FMT " bytes, " NUM_FMT " clusters",
@@ -65,12 +65,12 @@ void DefragGui::write_stats(const DefragState &data) {
                             data.count_fragmented_clusters_));
     }
 
-    if (data.total_clusters_ > 0) {
+    if (data.total_clusters() > 0) {
         Log::log_always(
                 std::format(L"- Free disk space: " NUM_FMT " bytes, " NUM_FMT " clusters, " FLT4_FMT "% of disk",
                             data.count_free_clusters_ * data.bytes_per_cluster_,
                             data.count_free_clusters_,
-                            (double) (data.count_free_clusters_ * 100) / data.total_clusters_));
+                            (double) (data.count_free_clusters_ * 100) / data.total_clusters()));
     } else {
         Log::log_always(std::format(L"- Free disk space: " NUM_FMT " bytes, " NUM_FMT " clusters",
                                     data.count_free_clusters_ * data.bytes_per_cluster_,
@@ -138,13 +138,13 @@ void DefragGui::write_stats(const DefragState &data) {
                                     data.biggest_gap_ * data.bytes_per_cluster_, data.biggest_gap_));
     }
 
-    if (data.total_clusters_ > 0) {
+    if (data.total_clusters() > 0) {
         Log::log_always(
-                std::format(L"- Average end-begin distance: " FLT0_FMT " clusters, " FLT4_FMT "% of volume size",
-                            data.average_distance_, 100.0 * data.average_distance_ / data.total_clusters_));
+                std::format(L"- Average set_end-set_begin distance: " FLT0_FMT " clusters, " FLT4_FMT "% of volume size",
+                            data.average_distance_, 100.0 * data.average_distance_ / data.total_clusters()));
     } else {
         Log::log_always(
-                std::format(L"- Average end-begin distance: " FLT0_FMT " clusters", data.average_distance_));
+                std::format(L"- Average set_end-set_begin distance: " FLT0_FMT " clusters", data.average_distance_));
     }
 
     for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {

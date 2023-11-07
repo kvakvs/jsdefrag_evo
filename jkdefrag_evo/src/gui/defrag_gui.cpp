@@ -16,11 +16,13 @@
  */
 
 #include "precompiled_header.h"
-#include "../tech/defrag/volume_bitmap.h"
+#include "app.h"
 
 #include <memory>
 #include <format>
-#include <app.h>
+#include <algorithm>
+
+#undef min
 
 DefragGui *DefragGui::instance_ = nullptr;
 
@@ -296,14 +298,14 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
 #endif
 
     // Sanity check
-    if (data.total_clusters_ == 0) return;
+    if (data.total_clusters() == 0) return;
     if (dc_ == nullptr) return;
     if (cluster_start == cluster_end) return;
 
     std::lock_guard<std::mutex> display_lock(display_mutex_);
 
-    if (color_map_.get_cluster_count() != data.total_clusters_) {
-        color_map_.set_cluster_count(data.total_clusters_);
+    if (color_map_.get_cluster_count() != data.total_clusters()) {
+        color_map_.set_cluster_count(data.total_clusters());
         return; // do not set yet, not till next redraw
     }
 
@@ -436,14 +438,6 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 
 // Show a map on the screen of all the clusters on the disk. The map shows which clusters are free and which are in use.
 void DefragGui::show_diskmap(DefragState &defrag_state) {
-//    struct {
-//        uint64_t starting_lcn_;
-//        uint64_t bitmap_size_;
-//        BYTE buffer_[DRIVE_BITMAP_READ_SIZE]; // Most efficient if binary multiple
-//    } bitmap_data{};
-    VolumeBitmap volume_bitmap;
-    DWORD error_code;
-
     // Exit if the library is not processing a disk yet.
     if (defrag_state.disk_.volume_handle_ == nullptr) {
         return;
@@ -455,11 +449,15 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
     // Show the map of all the clusters in use
     lcn64_t lcn = 0;
     lcn64_t cluster_start = 0;
-    int prev_in_use = 1;
+    bool prev_in_use = true;
 
     StopWatch clock1(L"show_diskmap: load and repaint");
 
     uint64_t count = 0;
+    DWORD result_code;
+    auto volume_end_lcn = defrag_state.bitmap_.volume_end_lcn();
+    auto next_fragment_lcn = std::min(volume_end_lcn, VolumeBitmap::get_next_fragment_start(lcn));
+
     do {
         count++; // for logging after this loop
 
@@ -467,52 +465,28 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
         if (defrag_state.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data
-//        STARTING_LCN_INPUT_BUFFER bitmap_param = {.StartingLcn = {.QuadPart = (LONGLONG) lcn}};
-//        DWORD w;
-//        error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-//                                     &bitmap_param, sizeof bitmap_param, &bitmap_data,
-//                                     sizeof bitmap_data, &w, nullptr);
-        error_code = volume_bitmap.read(defrag_state.disk_.volume_handle_, lcn);
-
-//        if (error_code != 0) {
-//            error_code = NO_ERROR;
-//        } else {
-//            error_code = GetLastError();
-//        }
-
-        if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
+        result_code = defrag_state.bitmap_.ensure_lcn_loaded(defrag_state.disk_.volume_handle_, lcn);
+        if (result_code != NO_ERROR && result_code != ERROR_MORE_DATA) break;
 
         // Sanity check
-        if (lcn >= volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size()) break;
+        if (lcn >= defrag_state.bitmap_.volume_end_lcn()) break;
 
         // Analyze the clusterdata. We resume where the previous block left off
-        lcn = volume_bitmap.starting_lcn();
-        int index = 0;
-        uint8_t mask = 1;
-
-        int index_max = volume_bitmap.buffer_size();
-
-        if (volume_bitmap.bitmap_size() / 8 < index_max) {
-            index_max = (int) (volume_bitmap.bitmap_size() / 8);
-        }
-
-        while (index < index_max && defrag_state.is_still_running()) {
-            auto in_use{volume_bitmap.buffer(index) & mask};
+        while (lcn < next_fragment_lcn && defrag_state.is_still_running()) {
+            auto in_use = defrag_state.bitmap_.in_use(lcn);
 
             // If at the beginning of the disk then copy the in_use value as our starting value
             if (lcn == 0) prev_in_use = in_use;
 
             // At the beginning and end of an Exclude draw the cluster
-            if (lcn == defrag_state.mft_excludes_[0].begin()
-                || lcn == defrag_state.mft_excludes_[0].end()
-                || lcn == defrag_state.mft_excludes_[1].begin()
-                || lcn == defrag_state.mft_excludes_[1].end()
-                || lcn == defrag_state.mft_excludes_[2].begin()
-                || lcn == defrag_state.mft_excludes_[2].end()) {
+            if (std::any_of(std::begin(defrag_state.mft_excludes_),
+                            std::end(defrag_state.mft_excludes_),
+                            [=](const lcn_extent_t &ex) { return ex.begin() == lcn || ex.end() == lcn; })) {
 
-                if (lcn == defrag_state.mft_excludes_[0].end() ||
-                    lcn == defrag_state.mft_excludes_[1].end() ||
-                    lcn == defrag_state.mft_excludes_[2].end()) {
+                if (std::any_of(std::begin(defrag_state.mft_excludes_),
+                                std::end(defrag_state.mft_excludes_),
+                                [=](const lcn_extent_t &ex) { return ex.end() == lcn; })) {
+
                     draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Unmovable);
                 } else if (prev_in_use == 0) {
                     draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Empty);
@@ -520,8 +494,8 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
                     draw_cluster(defrag_state, cluster_start, lcn, DrawColor::Allocated);
                 }
 
-                in_use = 1;
-                prev_in_use = 1;
+                in_use = true;
+                prev_in_use = true;
                 cluster_start = lcn;
             }
 
@@ -538,18 +512,9 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
             }
 
             prev_in_use = in_use;
-
-            if (mask == 128) {
-                mask = 1;
-                index = index + 1;
-            } else {
-                mask = mask << 1;
-            }
-
-            lcn = lcn + 1;
+            lcn++;
         }
-    } while (error_code == ERROR_MORE_DATA
-             && lcn < volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size());
+    } while (lcn < volume_end_lcn);
 
     clock1.stop_and_log();
 

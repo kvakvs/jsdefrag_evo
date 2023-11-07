@@ -20,7 +20,7 @@ inline auto lcn_from(const _LARGE_INTEGER& val) -> lcn64_t {
 using vcn64_t = decltype(_LARGE_INTEGER::QuadPart);
 
 /// A signed LONGLONG, used for counting clusters
-using count64_t = decltype(_LARGE_INTEGER::QuadPart);
+using cluster_count64_t = decltype(_LARGE_INTEGER::QuadPart);
 
 /// A number for an inode
 using inode_t = uint64_t;

@@ -18,29 +18,29 @@
 #include "precompiled_header.h"
 
 // Optimize the harddisk by moving the selected items up
-void DefragRunner::optimize_up(DefragState &data) {
+void DefragRunner::optimize_up(DefragState &defrag_state) {
     lcn_extent_t gap;
     DefragGui *gui = DefragGui::get_instance();
 
-    call_show_status(data, DefragPhase::MoveUp, Zone::None); // "Phase 3: Move Up"
+    call_show_status(defrag_state, DefragPhase::MoveUp, Zone::None); // "Phase 3: Move Up"
 
     // Setup the progress counter: the total number of clusters in all files
     FileNode *item;
-    for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
-        data.phase_todo_ += item->clusters_count_;
+    for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+        defrag_state.phase_todo_ += item->clusters_count_;
     }
 
     // Exit if nothing to do
-    if (data.item_tree_ == nullptr) return;
+    if (defrag_state.item_tree_ == nullptr) return;
 
     // Walk through all the gaps
-    gap.end(data.total_clusters_);
+    gap.set_end(defrag_state.total_clusters());
 
     int retry = 0;
 
-    while (data.is_still_running()) {
+    while (defrag_state.is_still_running()) {
         // Find the previous gap
-        auto result = find_gap(data, data.zones_[1], gap.end(), 0, true, true, false);
+        auto result = find_gap(defrag_state, defrag_state.zones_[1], gap.end(), 0, true, true, false);
 
         if (result.has_value()) {
             gap = result.value();
@@ -52,7 +52,7 @@ void DefragRunner::optimize_up(DefragState &data) {
         below the gap. */
         uint64_t phase_temp = 0;
 
-        for (item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
             if (item->get_item_lcn() >= gap.end()) break;
@@ -60,7 +60,7 @@ void DefragRunner::optimize_up(DefragState &data) {
             phase_temp = phase_temp + item->clusters_count_;
         }
 
-        data.phase_todo_ += phase_temp;
+        defrag_state.phase_todo_ += phase_temp;
         if (phase_temp == 0) break;
 
         // Loop until the gap is filled. First look for combinations of files that perfectly
@@ -70,32 +70,32 @@ void DefragRunner::optimize_up(DefragState &data) {
 
         while (gap.length()
                && retry < 5
-               && data.is_still_running()) {
+               && defrag_state.is_still_running()) {
 
             // Find the Item that is the best fit for the gap. If nothing found (no files
             // fit the gap) then exit the loop.
             if (perfect_fit) {
-                item = find_best_item(data, gap, Tree::Direction::First, Zone::ZoneAll_MaxValue);
+                item = find_best_item(defrag_state, gap, Tree::Direction::First, Zone::ZoneAll_MaxValue);
 
                 if (item == nullptr) {
                     perfect_fit = false;
-                    item = find_highest_item(data, gap, Tree::Direction::First, Zone::ZoneAll_MaxValue);
+                    item = find_highest_item(defrag_state, gap, Tree::Direction::First, Zone::ZoneAll_MaxValue);
                 }
             } else {
-                item = find_highest_item(data, gap, Tree::Direction::First, Zone::ZoneAll_MaxValue);
+                item = find_highest_item(defrag_state, gap, Tree::Direction::First, Zone::ZoneAll_MaxValue);
             }
 
             if (item == nullptr) break;
 
             // Move the item
-            auto result2 = move_item(data, item, gap.end() - item->clusters_count_, 0, item->clusters_count_,
+            auto result2 = move_item(defrag_state, item, gap.end() - item->clusters_count_, 0, item->clusters_count_,
                                      MoveDirection::Down);
 
             if (result2) {
                 gap.shift_end(-item->clusters_count_);
                 retry = 0;
             } else {
-                gap.begin(gap.end()); // Force re-scan of gap
+                gap.set_begin(gap.end()); // Force re-scan of gap
                 retry = retry + 1;
             }
         }
@@ -106,7 +106,7 @@ void DefragRunner::optimize_up(DefragState &data) {
             gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                             std::format(SKIPPING_GAP_FMT, gap.begin(), gap.length()));
 
-            gap.length(0);
+            gap.set_length(0);
             retry = 0;
         }
     }

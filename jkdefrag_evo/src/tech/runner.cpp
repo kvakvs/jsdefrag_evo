@@ -19,8 +19,11 @@
 #include "defrag_state.h"
 #include "defrag/volume_bitmap.h"
 
+#undef min
+
 #include <memory>
 #include <optional>
+#include <algorithm>
 
 DefragRunner::DefragRunner() = default;
 
@@ -415,7 +418,7 @@ bool DefragRunner::is_fragmented(const FileNode *item, const uint64_t offset, co
 }
 
 void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, const vcn64_t busy_offset,
-                                      const count64_t busy_size, const bool erase_from_screen) const {
+                                      const cluster_count64_t busy_size, const bool erase_from_screen) const {
     DefragGui *gui = DefragGui::get_instance();
 
     // Determine if the item is fragmented.
@@ -474,7 +477,7 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
                     }
 
                     if (fragment->lcn_ + segment_begin - real_vcn >= mft_exclude.begin()
-                    && fragment->lcn_ + segment_begin - real_vcn < mft_exclude.end()) {
+                        && fragment->lcn_ + segment_begin - real_vcn < mft_exclude.end()) {
 
                         if (fragment->lcn_ + segment_end - real_vcn > mft_exclude.end()) {
                             segment_end = real_vcn + mft_exclude.end() - fragment->lcn_;
@@ -503,20 +506,10 @@ void DefragRunner::colorize_disk_item(DefragState &data, const FileNode *item, c
     }
 }
 
-// Update some numbers in the DefragData
+/// Update some numbers in the DefragState
 void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase phase, const Zone zone) {
-    FileNode *item;
-//    STARTING_LCN_INPUT_BUFFER bitmap_param;
-
-//    struct {
-//        uint64_t starting_lcn_;
-//        uint64_t bitmap_size_;
-//        // Most efficient if power of 2
-//        BYTE buffer_[DRIVE_BITMAP_READ_SIZE];
-//    } bitmap_data{};
-    VolumeBitmap volume_bitmap;
+//    VolumeBitmapFragment volume_bitmap;
     DWORD error_code;
-//    DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
     // Count the number of free gaps on the disk
@@ -529,38 +522,25 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
     lcn64_t lcn = 0;
     lcn64_t cluster_start = 0;
     int prev_in_use = 1;
+    auto volume_end_lcn = defrag_state.bitmap_.volume_end_lcn();
 
     do {
         // Fetch a block of cluster data
-//        bitmap_param.StartingLcn.QuadPart = lcn;
-//        error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
-//                                     &bitmap_param, sizeof bitmap_param, &bitmap_data, sizeof bitmap_data, &w, nullptr);
-        error_code = volume_bitmap.read(defrag_state.disk_.volume_handle_, lcn);
-
-        if (error_code != 0) {
-            error_code = NO_ERROR;
-        } else {
-            error_code = GetLastError();
-        }
-
+        error_code = defrag_state.bitmap_.ensure_lcn_loaded(defrag_state.disk_.volume_handle_, lcn);
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
-        lcn = volume_bitmap.starting_lcn();
-        int index = 0;
-        BYTE mask = 1;
-        int index_max = volume_bitmap.buffer_size();
+//        if (volume_bitmap.bitmap_size() / 8 < index_max) {
+//            index_max = (int) (volume_bitmap.bitmap_size() / 8);
+//        }
+        auto next_fragment_lcn = std::min(volume_end_lcn, VolumeBitmap::get_next_fragment_start(lcn));
 
-        if (volume_bitmap.bitmap_size() / 8 < index_max) {
-            index_max = (int) (volume_bitmap.bitmap_size() / 8);
-        }
+        while (lcn < next_fragment_lcn) {
+            auto in_use = defrag_state.bitmap_.in_use(lcn);
 
-        while (index < index_max) {
-            auto in_use{volume_bitmap.buffer(index) & mask};
-
-            if ((lcn >= defrag_state.mft_excludes_[0].begin() && lcn < defrag_state.mft_excludes_[0].end())
-            || (lcn >= defrag_state.mft_excludes_[1].begin() && lcn < defrag_state.mft_excludes_[1].end())
-            || (lcn >= defrag_state.mft_excludes_[2].begin() && lcn < defrag_state.mft_excludes_[2].end())) {
-                in_use = 1;
+            if (std::any_of(std::begin(defrag_state.mft_excludes_),
+                            std::end(defrag_state.mft_excludes_),
+                            [=](const lcn_extent_t &ex) { return ex.contains(lcn); })) {
+                in_use = true;
             }
 
             if (prev_in_use == 0 && in_use != 0) {
@@ -577,18 +557,9 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
             if (prev_in_use != 0 && in_use == 0) cluster_start = lcn;
 
             prev_in_use = in_use;
-
-            if (mask == 128) {
-                mask = 1;
-                index = index + 1;
-            } else {
-                mask = mask << 1;
-            }
-
-            lcn = lcn + 1;
+            lcn++;
         }
-    } while (error_code == ERROR_MORE_DATA
-             && lcn < volume_bitmap.starting_lcn() + volume_bitmap.bitmap_size());
+    } while (lcn < volume_end_lcn);
 
     if (prev_in_use == 0) {
         defrag_state.count_gaps_ += 1;
@@ -611,7 +582,7 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
     defrag_state.count_all_clusters_ = 0;
     defrag_state.count_fragmented_clusters_ = 0;
 
-    for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
@@ -666,7 +637,7 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
     */
     int64_t count = 0;
 
-    for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
         if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
              _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
             continue;
@@ -681,7 +652,7 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
         int64_t factor = 1 - count;
         int64_t sum = 0;
 
-        for (item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
             if ((_wcsicmp(item->get_long_fn(), L"$BadClus") == 0 ||
                  _wcsicmp(item->get_long_fn(), L"$BadClus:$Bad:$DATA") == 0)) {
                 continue;

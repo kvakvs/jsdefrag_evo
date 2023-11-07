@@ -54,7 +54,7 @@ bool ScanNTFS::analyze_ntfs_volume(DefragState &data) {
     data.bytes_per_cluster_ = disk_info.bytes_per_sector_ * disk_info.sectors_per_cluster_;
 
     if (disk_info.sectors_per_cluster_ > 0) {
-        data.total_clusters_ = disk_info.total_sectors_ / disk_info.sectors_per_cluster_;
+        data.set_total_clusters(disk_info.total_sectors_ / disk_info.sectors_per_cluster_);
     }
 
     gui->show_always(std::format(

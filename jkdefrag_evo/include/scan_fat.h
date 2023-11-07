@@ -119,7 +119,7 @@ public:
     // Get a non-owning pointer to instance of the class
     static ScanFAT *get_instance();
 
-    bool analyze_fat_volume(DefragState &data);
+    bool analyze_fat_volume(DefragState &defrag_state);
 
 private:
     static uint8_t calculate_short_name_check_sum(const UCHAR *name);

@@ -33,7 +33,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
         call_show_status(data, DefragPhase::ZoneFastOpt, zone); // "Zone N: Fast Optimize"
 
         // Walk through all the gaps
-        gap.begin(data.zones_[(size_t) zone]);
+        gap.set_begin(data.zones_[(size_t) zone]);
         int retry = 0;
 
         while (data.is_still_running()) {
@@ -93,7 +93,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
                     gap.shift_begin(item->clusters_count_);
                     retry = 0;
                 } else {
-                    gap.length(0); // Force re-scan of gap
+                    gap.set_length(0); // Force re-scan of gap
                     retry = retry + 1;
                 }
             }
@@ -103,7 +103,7 @@ void DefragRunner::optimize_volume(DefragState &data) {
                 // Show debug message: "Skipping gap, cannot fill: %I64d[%I64d]"
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                                 std::format(SKIPPING_GAP_FMT, gap.begin(), gap.length()));
-                gap.begin(gap.end());
+                gap.set_begin(gap.end());
                 retry = 0;
             }
         }

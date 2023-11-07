@@ -72,7 +72,7 @@ public:
     FileNode *bigger_ = nullptr;
 
     uint64_t bytes_;
-    count64_t clusters_count_;
+    cluster_count64_t clusters_count_;
     filetime64_t creation_time_;
     filetime64_t mft_change_time_;
     filetime64_t last_access_time_;

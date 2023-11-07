@@ -66,7 +66,7 @@ struct DiskStruct {
 
     DiskType type_;
 
-    count64_t mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
+    cluster_count64_t mft_locked_clusters_; // Number of clusters at begin of MFT that cannot be moved
 };
 
 // List of clusters used by the MFT
@@ -102,7 +102,7 @@ public:
     ///     file, directory) matches one of the strings in this array then it will be ignored (skipped).
     /// \param space_hogs Array of strings. Each string contains a mask, last string must be nullptr. If an item (file,
     ///     directory) matches one of the strings in this array then it will be marked as a space hog and moved to the
-    ///     end of the disk. A build-in list of spacehogs will be added to this list, except if one of the strings in
+    ///     set_end of the disk. A build-in list of spacehogs will be added to this list, except if one of the strings in
     ///     the array is "DisableDefaults".
     /// \param run_state It is used by the stop_defrag() subroutine to stop_and_log the defragger. If the pointer is nullptr
     ///     then this feature is disabled.
@@ -140,7 +140,7 @@ public:
      * \param erase_from_screen true to undraw the file from the screen.
      */
     void colorize_disk_item(DefragState &data, const FileNode *item,
-                            vcn64_t busy_offset, count64_t busy_size, bool erase_from_screen) const;
+                            vcn64_t busy_offset, cluster_count64_t busy_size, bool erase_from_screen) const;
 
     static void call_show_status(DefragState &defrag_state, DefragPhase phase, Zone zone);
 
@@ -151,9 +151,9 @@ private:
     /// `SE_BACKUP_NAME` = Backup and Restore Privileges.
     static void try_request_privileges();
 
-    bool defrag_one_path_mountpoint_setup(DefragState &data, const wchar_t *target_path);
+    bool defrag_one_path_mountpoint_setup(DefragState &defrag_state, const wchar_t *target_path);
 
-    bool defrag_one_path_count_clusters(DefragState &data);
+    bool defrag_one_path_count_clusters(DefragState &defrag_state);
 
     void defrag_one_path_fixup_input_mask(DefragState &data, const wchar_t *target_path);
 
@@ -175,40 +175,40 @@ private:
 
     /**
      * \brief Look for a gap, a block of empty clusters on the volume.
-     * \param minimum_lcn Start scanning for gaps at this location. If there is a gap at this location then return it. Zero is the begin of the disk.
-     * \param maximum_lcn Stop scanning for gaps at this location. Zero is the end of the disk.
+     * \param minimum_lcn Start scanning for gaps at this location. If there is a gap at this location then return it. Zero is the set_begin of the disk.
+     * \param maximum_lcn Stop scanning for gaps at this location. Zero is the set_end of the disk.
      * \param minimum_size The gap must have at least this many contiguous free clusters. Zero will match any gap, so will return the first gap at or above MinimumLcn.
      * \param must_fit if true then only return a gap that is bigger/equal than the MinimumSize. If false then return a gap bigger/equal than MinimumSize,
      *      or if no such gap is found return the largest gap on the volume (above MinimumLcn).
      * \param find_highest_gap if false then return the lowest gap that is bigger/equal than the MinimumSize. If true then return the highest gap.
-     * \param begin_lcn out: LCN of begin of cluster
-     * \param end_lcn out: LCN of end of cluster
+     * \param begin_lcn out: LCN of set_begin of cluster
+     * \param end_lcn out: LCN of set_end of cluster
      * \param ignore_mft_excludes
      * \return true if succes, false if no gap was found or an error occurred. The routine asks Windows for the cluster bitmap every time. It would be
      *  faster to cache the bitmap in memory, but that would cause more fails because of stale information.
      */
     static std::optional<lcn_extent_t>
-    find_gap(const DefragState &defrag_state, lcn64_t minimum_lcn, lcn64_t maximum_lcn,
-             count64_t minimum_size, int must_fit, bool find_highest_gap, bool ignore_mft_excludes);
+    find_gap(DefragState &defrag_state, lcn64_t minimum_lcn, lcn64_t maximum_lcn,
+             cluster_count64_t minimum_size, int must_fit, bool find_highest_gap, bool ignore_mft_excludes);
 
     static void calculate_zones(DefragState &data);
 
     DWORD
     move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item, lcn64_t new_lcn,
-                    lcn64_t offset, count64_t size) const;
+                    lcn64_t offset, cluster_count64_t size) const;
 
     DWORD
     move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item, lcn64_t new_lcn,
-                           lcn64_t offset, count64_t size) const;
+                           lcn64_t offset, cluster_count64_t size) const;
 
     bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                              lcn64_t offset, count64_t size, MoveStrategy strategy) const;
+                              lcn64_t offset, cluster_count64_t size, MoveStrategy strategy) const;
 
     bool move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                                  lcn64_t offset, count64_t size, MoveDirection direction) const;
+                                  lcn64_t offset, cluster_count64_t size, MoveDirection direction) const;
 
     bool move_item(DefragState &data, FileNode *item, lcn64_t new_lcn, lcn64_t offset,
-                   count64_t size, MoveDirection direction) const;
+                   cluster_count64_t size, MoveDirection direction) const;
 
     static FileNode *
     find_highest_item(const DefragState &data, lcn_extent_t gap, Tree::Direction direction, Zone zone);
@@ -232,9 +232,9 @@ private:
 
     void defragment(DefragState &data);
 
-    void forced_fill(DefragState &data);
+    void forced_fill(DefragState &defrag_state);
 
-    void vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_excludes);
+    void vacate(DefragState &defrag_state, lcn_extent_t gap, bool ignore_mft_excludes);
 
     [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState &data);
 
@@ -242,9 +242,9 @@ private:
 
     void optimize_sort(DefragState &data, int sort_field);
 
-    void optimize_up(DefragState &data);
+    void optimize_up(DefragState &defrag_state);
 
-    void defrag_one_path(DefragState &data, const wchar_t *target_path, OptimizeMode opt_mode);
+    void defrag_one_path(DefragState &defrag_state, const wchar_t *target_path, OptimizeMode opt_mode);
 
     void defrag_mountpoints(DefragState &data, const wchar_t *mount_point, OptimizeMode opt_mode);
 

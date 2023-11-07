@@ -29,8 +29,8 @@
     lcn64_t lcn;
 //    lcn64_t gap_begin;
 //    lcn64_t gap_end;
-    count64_t clusters;
-    count64_t clusters_done;
+    cluster_count64_t clusters;
+    cluster_count64_t clusters_done;
 
     OSVERSIONINFO os_version;
 

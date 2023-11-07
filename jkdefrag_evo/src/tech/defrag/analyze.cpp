@@ -41,7 +41,7 @@ void DefragRunner::analyze_volume_read_fs(DefragState &data) {
         gui->log_detailed_progress(L"This is not a FAT or NTFS disk, using the slow scanner.");
 
         // Set up the width of the progress bar
-        data.phase_todo_ = data.total_clusters_ - data.count_free_clusters_;
+        data.phase_todo_ = data.total_clusters() - data.count_free_clusters_;
 
         for (auto &mft_exclude: data.mft_excludes_) {
             data.phase_todo_ -= mft_exclude.length();
@@ -97,7 +97,7 @@ void DefragRunner::analyze_volume(DefragState &data) {
     gui->show_analyze(data, nullptr);
 
     // Walk through all the items one by one
-    const auto update_every_n_clusters = std::max<uint64_t>(10000UL, data.total_clusters_ / 100000UL);
+    const auto update_every_n_clusters = std::max<uint64_t>(10'000UL, data.total_clusters() / 100'000UL);
 
     {
         StopWatch watch1(L"analyze_volume: all files loop");

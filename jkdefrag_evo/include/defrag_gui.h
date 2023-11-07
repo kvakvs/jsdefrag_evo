@@ -39,7 +39,7 @@ public:
 
     void show_move(const FileNode *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
 
-    void show_diskmap(DefragState &defrag_state);
+    void show_diskmap(DefragState &ex);
 
     int initialize(HINSTANCE instance, int cmd_show, DebugLevel debug_level);
 

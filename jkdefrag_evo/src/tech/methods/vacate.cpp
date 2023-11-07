@@ -22,15 +22,15 @@
 // Vacate an area by moving files upward. If there are unmovable files at the lcn then
 // skip them. Then move files upward until the gap is bigger than clusters, or when we
 // encounter an unmovable file.
-void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_excludes) {
+void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool ignore_mft_excludes) {
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                     std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT, gap.length(), gap.begin()));
 
     // Sanity check
-    if (gap.begin() >= data.total_clusters_) {
-        gui->show_debug(DebugLevel::Warning, nullptr, L"Error: trying to vacate an area beyond the end of the disk.");
+    if (gap.begin() >= defrag_state.total_clusters()) {
+        gui->show_debug(DebugLevel::Warning, nullptr, L"Error: trying to vacate an area beyond the set_end of the disk.");
         return;
     }
 
@@ -39,17 +39,17 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
     // again and again.
     lcn64_t move_to = gap.end();
 
-    switch (data.zone_) {
+    switch (defrag_state.zone_) {
         case Zone::ZoneFirst:
-            move_to = data.zones_[1];
+            move_to = defrag_state.zones_[1];
             break;
         case Zone::ZoneCommon:
-            move_to = data.zones_[2];
+            move_to = defrag_state.zones_[2];
             break;
         case Zone::ZoneLast:
             // Zone 2: end of disk minus all the free space
-            move_to = data.total_clusters_ - data.count_free_clusters_ +
-                      (uint64_t) (data.total_clusters_ * 2.0 * data.free_space_ / 100.0);
+            move_to = defrag_state.total_clusters() - defrag_state.count_free_clusters_ +
+                      (uint64_t) (defrag_state.total_clusters() * 2.0 * defrag_state.free_space_ / 100.0);
             break;
         default:
             break;
@@ -63,14 +63,14 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
     lcn_extent_t move_gap;
     auto done_until = gap.begin();
 
-    while (data.is_still_running()) {
+    while (defrag_state.is_still_running()) {
         // Find the first movable data fragment at or above the done_until lcn. If there is nothing
         // then return, we have reached the end of the disk.
         FileNode *bigger_item = nullptr;
         lcn_extent_t bigger;
         vcn64_t bigger_real_vcn;
 
-        for (auto item = Tree::smallest(data.item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
             if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
                 continue;
             }
@@ -83,8 +83,8 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
                     if (fragment.lcn_ >= done_until &&
                         (bigger.begin() > fragment.lcn_ || bigger_item == nullptr)) {
                         bigger_item = item;
-                        bigger.begin(fragment.lcn_);
-                        bigger.end(fragment.lcn_ + fragment.next_vcn_ - vcn);
+                        bigger.set_begin(fragment.lcn_);
+                        bigger.set_end(fragment.lcn_ + fragment.next_vcn_ - vcn);
                         bigger_real_vcn = real_vcn;
 
                         if (bigger.begin() == gap.begin()) break;
@@ -111,7 +111,7 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
 
         // Find the first gap above the lcn
         lcn_extent_t test_gap;
-        auto result = find_gap(data, gap.begin(), 0, 0, true, false, ignore_mft_excludes);
+        auto result = find_gap(defrag_state, gap.begin(), 0, 0, true, false, ignore_mft_excludes);
         if (result.has_value()) {
             test_gap = result.value();
         } else {
@@ -153,11 +153,11 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
             auto local_success = false;
 
             // First try to find a gap above the move_to point
-            if (move_to < data.total_clusters_ && move_to >= bigger.end()) {
+            if (move_to < defrag_state.total_clusters() && move_to >= bigger.end()) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                                 std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
 
-                auto result2 = find_gap(data, move_to, 0, bigger.length(), true, false, false);
+                auto result2 = find_gap(defrag_state, move_to, 0, bigger.length(), true, false, false);
                 if (result2.has_value()) {
                     move_gap = result2.value();
                     local_success = true;
@@ -167,9 +167,9 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
             // If no gap was found then try to find a gap as high on disk as possible, but above the item.
             if (!local_success) {
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                std::format(L"Finding gap from end of disk above bigger_end=" NUM_FMT, bigger.end()));
+                                std::format(L"Finding gap from set_end of disk above bigger_end=" NUM_FMT, bigger.end()));
 
-                auto result3 = find_gap(data, bigger.end(), 0, bigger.length(), true, true, false);
+                auto result3 = find_gap(defrag_state, bigger.end(), 0, bigger.length(), true, true, false);
                 if (result3.has_value()) {
                     move_gap = result3.value();
                     local_success = true;
@@ -184,13 +184,13 @@ void DefragRunner::vacate(DefragState &data, lcn_extent_t gap, bool ignore_mft_e
         }
 
         // Move the fragment to the gap.
-        auto result4 = move_item(data, bigger_item, move_gap.begin(), bigger_real_vcn, bigger.length(), MoveDirection::Up);
+        auto result4 = move_item(defrag_state, bigger_item, move_gap.begin(), bigger_real_vcn, bigger.length(), MoveDirection::Up);
 
         if (result4) {
             if (move_gap.begin() < move_to) move_to = move_gap.begin();
             move_gap.shift_begin(bigger.length());
         } else {
-            move_gap.length(0); // Force re-scan of gap
+            move_gap.set_length(0); // Force re-scan of gap
         }
 
         // Adjust the done_until lcn. We don't want an infinite loop

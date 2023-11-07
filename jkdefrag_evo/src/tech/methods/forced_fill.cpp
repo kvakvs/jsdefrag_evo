@@ -18,18 +18,16 @@
 #include "precompiled_header.h"
 
 // Fill all the gaps at the beginning of the disk with fragments from the files above
-void DefragRunner::forced_fill(DefragState &data) {
-    call_show_status(data, DefragPhase::ForcedFill, Zone::None); // "Phase 3: ForcedFill"
+void DefragRunner::forced_fill(DefragState &defrag_state) {
+    call_show_status(defrag_state, DefragPhase::ForcedFill, Zone::None); // "Phase 3: ForcedFill"
 
     // Walk through all the gaps
-//    lcn64_t gap_begin = 0;
     lcn_extent_t gap;
-    lcn64_t max_lcn = data.total_clusters_;
+    lcn64_t max_lcn = defrag_state.total_clusters();
 
-    while (data.is_still_running()) {
+    while (defrag_state.is_still_running()) {
         // Find the next gap. If there are no more gaps then exit
-//        lcn64_t gap_end;
-        auto result = find_gap(data, gap.begin(), 0, 0, true, false, false);
+        auto result = find_gap(defrag_state, gap.begin(), 0, 0, true, false, false);
 
         if (result.has_value()) {
             gap = result.value();
@@ -41,9 +39,9 @@ void DefragRunner::forced_fill(DefragState &data) {
         FileNode *highest_item = nullptr;
         lcn64_t highest_lcn = 0;
         vcn64_t highest_vcn = 0;
-        count64_t highest_size = 0;
+        cluster_count64_t highest_size = 0;
 
-        for (auto item = Tree::biggest(data.item_tree_); item != nullptr; item = Tree::prev(item)) {
+        for (auto item = Tree::biggest(defrag_state.item_tree_); item != nullptr; item = Tree::prev(item)) {
             if (item->is_unmovable_) continue;
             if (item->is_excluded_) continue;
             if (item->clusters_count_ == 0) continue;
@@ -73,12 +71,12 @@ void DefragRunner::forced_fill(DefragState &data) {
         if (highest_lcn <= gap.begin()) break;
 
         // Move as much of the item into the gap as possible
-        count64_t clusters = gap.length();
+        cluster_count64_t clusters = gap.length();
 
         if (clusters > highest_size) clusters = highest_size;
 
         // TODO: return value is ignored
-        move_item(data, highest_item, gap.begin(), highest_vcn + highest_size - clusters, clusters, MoveDirection::Up);
+        move_item(defrag_state, highest_item, gap.begin(), highest_vcn + highest_size - clusters, clusters, MoveDirection::Up);
 
         gap.shift_begin(clusters);
         max_lcn = highest_lcn + highest_size - clusters;

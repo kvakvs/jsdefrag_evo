@@ -247,7 +247,7 @@ bool ScanNTFS::fixup_raw_mftdata(DefragState &data, const NtfsDiskInfoStruct *di
     if (memcmp(buffer, "FILE", 4) != 0) {
         gui->show_debug(
                 DebugLevel::Progress, nullptr,
-                L"This is not a valid MFT record, it does not begin with FILE (maybe trying to read past the end?).");
+                L"This is not a valid MFT record, it does not set_begin with FILE (maybe trying to read past the set_end?).");
 
         DefragRunner::show_hex(data, buffer, buf_length);
 

@@ -140,7 +140,7 @@ void DefragRunner::fixup(DefragState &data) {
                                 L"Cannot move file away because no gap is big enough: lcn=" NUM_FMT "[" NUM_FMT " clusters]",
                                 item->get_item_lcn(), item->clusters_count_));
 
-                gap[file_zone].length(0); // Force re-scan of gap
+                gap[file_zone].set_length(0); // Force re-scan of gap
 
                 data.clusters_done_ += item->clusters_count_;
                 continue;
@@ -153,7 +153,7 @@ void DefragRunner::fixup(DefragState &data) {
         if (result4) {
             gap[file_zone].shift_begin(item->clusters_count_);
         } else {
-            gap[file_zone].length(0); // Force re-scan of gap
+            gap[file_zone].set_length(0); // Force re-scan of gap
         }
 
         // Get new system time

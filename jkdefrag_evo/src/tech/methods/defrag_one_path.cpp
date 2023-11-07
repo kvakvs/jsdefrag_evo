@@ -19,11 +19,11 @@
 
 // Run the defragmenter. Input is the name of a disk, mountpoint, directory, or file,
 // and may contain wildcards '*' and '?'
-void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path, OptimizeMode opt_mode) {
+void DefragRunner::defrag_one_path(DefragState &defrag_state, const wchar_t *target_path, OptimizeMode opt_mode) {
     DefragGui *gui = DefragGui::get_instance();
 
     // Compare the item with the Exclude masks. If a mask matches then return, ignoring the item.
-    for (const auto &each_exclude: data.excludes_) {
+    for (const auto &each_exclude: defrag_state.excludes_) {
         if (Str::match_mask(target_path, each_exclude.c_str())) break;
         if (wcschr(each_exclude.c_str(), L'*') == nullptr
             && each_exclude.length() <= 3
@@ -45,9 +45,9 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path
 
     try_request_privileges();
 
-    if (!defrag_one_path_mountpoint_setup(data, target_path)) return;
+    if (!defrag_one_path_mountpoint_setup(defrag_state, target_path)) return;
 
-    defrag_one_path_count_clusters(data);
+    defrag_one_path_count_clusters(defrag_state);
 
     // Determine the number of bytes per cluster.
     // Again I have to do this in a roundabout manner. As far as I know, there is no system call that returns the number
@@ -60,33 +60,33 @@ void DefragRunner::defrag_one_path(DefragState &data, const wchar_t *target_path
                                           (PULARGE_INTEGER) &total_bytes,
                                           (PULARGE_INTEGER) &free_bytes);
 
-    if (error_code != 0) data.bytes_per_cluster_ = total_bytes / data.total_clusters_;
+    if (error_code != 0) defrag_state.bytes_per_cluster_ = total_bytes / defrag_state.total_clusters();
 
-    set_up_unusable_cluster_list(data);
+    set_up_unusable_cluster_list(defrag_state);
 
-    defrag_one_path_fixup_input_mask(data, target_path);
+    defrag_one_path_fixup_input_mask(defrag_state, target_path);
 
     // Defragment and optimize; Potentially long running, on large volumes
     StopWatch clock_clustermap(L"defrag_one_path: clustermap");
-    gui->get_color_map().set_cluster_count(data.total_clusters_);
-    gui->show_diskmap(data);
+    gui->get_color_map().set_cluster_count(defrag_state.total_clusters());
+    gui->show_diskmap(defrag_state);
     clock_clustermap.stop_and_log();
 
-    defrag_one_path_stages(data, opt_mode);
+    defrag_one_path_stages(defrag_state, opt_mode);
 
-    call_show_status(data, DefragPhase::Done, Zone::None); // "Finished."
+    call_show_status(defrag_state, DefragPhase::Done, Zone::None); // "Finished."
 
     // Close the volume handles
-    if (data.disk_.volume_handle_ != nullptr &&
-        data.disk_.volume_handle_ != INVALID_HANDLE_VALUE) {
-        CloseHandle(data.disk_.volume_handle_);
+    if (defrag_state.disk_.volume_handle_ != nullptr &&
+        defrag_state.disk_.volume_handle_ != INVALID_HANDLE_VALUE) {
+        CloseHandle(defrag_state.disk_.volume_handle_);
     }
 
     // Cleanup
-    Tree::delete_tree(data.item_tree_);
+    Tree::delete_tree(defrag_state.item_tree_);
 
-    data.disk_.mount_point_.clear();
-    data.disk_.mount_point_slash_.clear();
+    defrag_state.disk_.mount_point_.clear();
+    defrag_state.disk_.mount_point_slash_.clear();
 }
 
 void DefragRunner::try_request_privileges() {
@@ -117,60 +117,60 @@ void DefragRunner::request_privileges_failed() {
 
 // Try finding the MountPoint by treating the input path as a path to something on the disk.
 // If this does not succeed, then use the Path as a literal MountPoint name.
-bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &data, const wchar_t *target_path) {
+bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &defrag_state, const wchar_t *target_path) {
     DefragGui *gui = DefragGui::get_instance();
 
-    data.disk_.mount_point_ = target_path;
+    defrag_state.disk_.mount_point_ = target_path;
 
     // Will write into mount_point_
-    auto result = GetVolumePathNameW(target_path, data.disk_.mount_point_.data(),
-                                     (uint32_t) data.disk_.mount_point_.length() + 1);
+    auto result = GetVolumePathNameW(target_path, defrag_state.disk_.mount_point_.data(),
+                                     (uint32_t) defrag_state.disk_.mount_point_.length() + 1);
 
     if (result == FALSE) {
-        data.disk_.mount_point_ = target_path;
+        defrag_state.disk_.mount_point_ = target_path;
     }
 
     // Make two versions of the MountPoint, one with a trailing backslash and one without
     // Kill the trailing backslash
-    if (!data.disk_.mount_point_.empty() && data.disk_.mount_point_.back() == L'\\') {
-        data.disk_.mount_point_.pop_back();
+    if (!defrag_state.disk_.mount_point_.empty() && defrag_state.disk_.mount_point_.back() == L'\\') {
+        defrag_state.disk_.mount_point_.pop_back();
     }
 
-    data.disk_.mount_point_slash_ = std::format(L"{}\\", data.disk_.mount_point_);
+    defrag_state.disk_.mount_point_slash_ = std::format(L"{}\\", defrag_state.disk_.mount_point_);
 
     // Determine the name of the volume (something like "\\?\Volume{08439462-3004-11da-bbca-806d6172696f}\").
     wchar_t vname[MAX_PATH];
-    result = GetVolumeNameForVolumeMountPointW(data.disk_.mount_point_slash_.c_str(), vname, MAX_PATH);
-    data.disk_.volume_name_slash_ = vname;
+    result = GetVolumeNameForVolumeMountPointW(defrag_state.disk_.mount_point_slash_.c_str(), vname, MAX_PATH);
+    defrag_state.disk_.volume_name_slash_ = vname;
 
     if (result == FALSE) {
         // API puts a limit of 52 on length, but wstring has no length limit
-        if (data.disk_.mount_point_slash_.length() > 52 - 1 - 4) {
+        if (defrag_state.disk_.mount_point_slash_.length() > 52 - 1 - 4) {
             // "Cannot find volume name for mountpoint '%s': %s"
             gui->show_debug(DebugLevel::AlwaysLog, nullptr,
                             std::format(L"Cannot find volume name for mountpoint '{}': reason {}",
-                                        data.disk_.mount_point_slash_, Str::system_error(GetLastError())));
+                                        defrag_state.disk_.mount_point_slash_, Str::system_error(GetLastError())));
 
-            data.disk_.mount_point_.clear();
-            data.disk_.mount_point_slash_.clear();
+            defrag_state.disk_.mount_point_.clear();
+            defrag_state.disk_.mount_point_slash_.clear();
 
             return false;
         }
 
-        data.disk_.volume_name_slash_ = std::format(L"\\\\.\\{}", data.disk_.mount_point_slash_);
+        defrag_state.disk_.volume_name_slash_ = std::format(L"\\\\.\\{}", defrag_state.disk_.mount_point_slash_);
     }
 
     // Make a copy of the VolumeName without the trailing backslash
-    data.disk_.volume_name_ = data.disk_.volume_name_slash_;
+    defrag_state.disk_.volume_name_ = defrag_state.disk_.volume_name_slash_;
 
     // Kill the trailing backslash
-    if (!data.disk_.volume_name_.empty() && data.disk_.volume_name_.back() == L'\\') {
-        data.disk_.volume_name_.pop_back();
+    if (!defrag_state.disk_.volume_name_.empty() && defrag_state.disk_.volume_name_.back() == L'\\') {
+        defrag_state.disk_.volume_name_.pop_back();
     }
 
     // Exit if the disk is hybernated (if "?/hiberfil.sys" exists and does not begin with 4 zero bytes).
     // length = wcslen(data.disk_.mount_point_slash_.get()) + 14;
-    auto hibernation_path = std::format(L"{}\\hiberfil.sys", data.disk_.mount_point_slash_);
+    auto hibernation_path = std::format(L"{}\\hiberfil.sys", defrag_state.disk_.mount_point_slash_);
 
     FILE *fin;
     result = _wfopen_s(&fin, hibernation_path.c_str(), L"rb");
@@ -181,8 +181,8 @@ bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &data, const wch
         if (fread(&w, 4, 1, fin) == 1 && w != 0) {
             gui->show_always(L"Will not process this disk, it contains hybernated data.");
 
-            data.disk_.mount_point_.clear();
-            data.disk_.mount_point_slash_.clear();
+            defrag_state.disk_.mount_point_.clear();
+            defrag_state.disk_.mount_point_slash_.clear();
 
             return false;
         }
@@ -190,22 +190,22 @@ bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &data, const wch
 
     // Show a debug message: "Opening volume '%s' at mountpoint '%s'"
     gui->show_debug(DebugLevel::AlwaysLog, nullptr,
-                    std::format(L"Opening volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
-                                data.disk_.mount_point_));
+                    std::format(L"Opening volume '{}' at mountpoint '{}'", defrag_state.disk_.volume_name_,
+                                defrag_state.disk_.mount_point_));
 
     // Open the VolumeHandle. If error then leave.
-    data.disk_.volume_handle_ = CreateFileW(data.disk_.volume_name_.c_str(), GENERIC_READ,
+    defrag_state.disk_.volume_handle_ = CreateFileW(defrag_state.disk_.volume_name_.c_str(), GENERIC_READ,
                                             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                                            OPEN_EXISTING, 0, nullptr);
+                                                    OPEN_EXISTING, 0, nullptr);
 
-    if (data.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
+    if (defrag_state.disk_.volume_handle_ == INVALID_HANDLE_VALUE) {
         const std::wstring &message = std::format(L"Cannot open volume '{}' at mountpoint '{}': reason {}",
-                                                  data.disk_.volume_name_, data.disk_.mount_point_,
+                                                  defrag_state.disk_.volume_name_, defrag_state.disk_.mount_point_,
                                                   Str::system_error(GetLastError()));
         gui->message_box_error(message.c_str(), L"Error", std::nullopt);
 
-        data.disk_.mount_point_.clear();
-        data.disk_.mount_point_slash_.clear();
+        defrag_state.disk_.mount_point_.clear();
+        defrag_state.disk_.mount_point_slash_.clear();
         return false;
     }
     return true;
@@ -217,7 +217,7 @@ bool DefragRunner::defrag_one_path_mountpoint_setup(DefragState &data, const wch
 // but is limited to 2Gb volumes, GetDiskFreeSpaceEx() reports in bytes, not clusters, _getdiskfree()
 // requires a drive letter so cannot be used on unmounted volumes or volumes that are mounted on a directory,
 // and FSCTL_GET_NTFS_VOLUME_DATA only works for NTFS volumes.
-bool DefragRunner::defrag_one_path_count_clusters(DefragState &data) {
+bool DefragRunner::defrag_one_path_count_clusters(DefragState &defrag_state) {
     DefragGui *gui = DefragGui::get_instance();
 
     STARTING_LCN_INPUT_BUFFER bitmap_param;
@@ -228,7 +228,7 @@ bool DefragRunner::defrag_one_path_count_clusters(DefragState &data) {
         uint64_t bitmap_size_;
         BYTE buffer_[8];
     } bitmap_data{};
-    DWORD error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
+    DWORD error_code = DeviceIoControl(defrag_state.disk_.volume_handle_, FSCTL_GET_VOLUME_BITMAP,
                                        &bitmap_param, sizeof bitmap_param, &bitmap_data,
                                        sizeof bitmap_data, &w, nullptr);
 
@@ -241,18 +241,18 @@ bool DefragRunner::defrag_one_path_count_clusters(DefragState &data) {
     if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) {
         // Show debug message: "Cannot defragment volume '%s' at mountpoint '%s'"
         gui->show_debug(DebugLevel::AlwaysLog, nullptr,
-                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", data.disk_.volume_name_,
-                                    data.disk_.mount_point_));
+                        std::format(L"Cannot defragment volume '{}' at mountpoint '{}'", defrag_state.disk_.volume_name_,
+                                    defrag_state.disk_.mount_point_));
 
-        CloseHandle(data.disk_.volume_handle_);
+        CloseHandle(defrag_state.disk_.volume_handle_);
 
-        data.disk_.mount_point_.clear();
-        data.disk_.mount_point_slash_.clear();
+        defrag_state.disk_.mount_point_.clear();
+        defrag_state.disk_.mount_point_slash_.clear();
 
         return false;
     }
 
-    data.total_clusters_ = bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_;
+    defrag_state.set_total_clusters(bitmap_data.starting_lcn_ + bitmap_data.bitmap_size_);
     return true;
 }
 

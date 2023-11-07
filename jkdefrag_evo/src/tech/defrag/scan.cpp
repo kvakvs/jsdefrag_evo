@@ -53,10 +53,10 @@ void DefragRunner::calculate_zones(DefragState &data) {
     for (int iterate = 1; iterate <= 10; iterate++) {
         // Calculate the end of the zones
         zone_end[0] = size_of_movable_files[0] + size_of_unmovable_fragments[0] +
-                      (uint64_t) (data.total_clusters_ * data.free_space_ / 100.0);
+                      (uint64_t) (data.total_clusters() * data.free_space_ / 100.0);
 
         zone_end[1] = zone_end[0] + size_of_movable_files[1] + size_of_unmovable_fragments[1] +
-                      (uint64_t) (data.total_clusters_ * data.free_space_ / 100.0);
+                      (uint64_t) (data.total_clusters() * data.free_space_ / 100.0);
 
         zone_end[2] = zone_end[1] + size_of_movable_files[2] + size_of_unmovable_fragments[2];
 
@@ -242,8 +242,7 @@ link. */
 
         max_loop = max_loop - 1;
 
-        /* Ask Windows for the (next segment of the) clustermap of this file. If error
-        then leave the loop. */
+        // Ask Windows for the (next segment of the) clustermap of this file. If error then leave the loop.
         retrieve_param.StartingVcn.QuadPart = vcn;
 
         error_code = DeviceIoControl(file_handle, FSCTL_GET_RETRIEVAL_POINTERS,
@@ -258,8 +257,7 @@ link. */
 
         if (error_code != NO_ERROR && error_code != ERROR_MORE_DATA) break;
 
-        /* Walk through the clustermap, count the total number of clusters, and
-        save all fragments in memory. */
+        // Walk through the clustermap, count the total number of clusters, and save all fragments in memory.
         for (i = 0; i < extent_data.extent_count_; i++) {
             // Show debug message
 #ifdef jk

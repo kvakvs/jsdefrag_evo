@@ -34,7 +34,7 @@ ScanNTFS *ScanNTFS::get_instance() {
 
 /**
  * \brief Read the data that is specified in a RunData list from disk into memory, skipping the first Offset bytes.
- * \param offset Bytes to skip from begin of data
+ * \param offset Bytes to skip from set_begin of data
  * \return Return a malloc'ed buffer with the data, or nullptr if error. Note: The caller owns the returned buffer.
  */
 BYTE *ScanNTFS::read_non_resident_data(const DefragState &data, const NtfsDiskInfoStruct *disk_info,

@@ -32,14 +32,13 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
 
     // Process all the zones
     [[maybe_unused]] uint64_t vacated_until = 0;
-    const uint64_t minimum_vacate = data.total_clusters_ / 200;
+    const uint64_t minimum_vacate = data.total_clusters() / 200;
 
     for (data.zone_ = Zone::ZoneFirst;
          data.zone_ < Zone::ZoneAll_MaxValue; data.zone_ = (Zone) ((int) data.zone_ + 1)) {
         call_show_status(data, DefragPhase::ZoneSort, data.zone_); // "Zone N: Sort"
 
-        /* Start at the begin of the zone and move all the items there, one by one
-        in the requested sorting order, making room as we go. */
+        // Start at the begin of the zone and move all the items there, one by one in the requested sorting order, making room as we go.
         FileNode *previous_item = nullptr;
 
         uint64_t lcn = data.zones_[(size_t) data.zone_];
@@ -101,9 +100,9 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                                                 item->clusters_count_ - clusters_done));
                 }
 
-                /* Call the Vacate() function to make a gap at Lcn big enough to hold the item.
-                The Vacate() function may not be able to move whatever is now at the Lcn, so
-                after calling it we have to locate the first gap after the Lcn. */
+                // Call the Vacate() function to make a gap at Lcn big enough to hold the item.
+                // The Vacate() function may not be able to move whatever is now at the Lcn, so
+                // after calling it we have to locate the first gap after the Lcn.
                 if (gap.begin() + item->clusters_count_ - clusters_done + 16 > gap.end()) {
                     vacate(data, lcn_extent_t::with_length(lcn, item->clusters_count_ - clusters_done + minimum_vacate),
                            false);
@@ -116,8 +115,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                     }
                 }
 
-                /* If the gap is not big enough to hold the entire item then calculate how much
-                of the item will fit in the gap. */
+                // If the gap is not big enough to hold the entire item then calculate how much of the item will fit in the gap.
                 uint64_t clusters = item->clusters_count_ - clusters_done;
 
                 if (clusters > gap.length()) {

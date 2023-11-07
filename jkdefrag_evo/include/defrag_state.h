@@ -5,6 +5,7 @@
 
 #include "runner.h"
 #include "extent.h"
+#include "../src/tech/defrag/volume_bitmap.h"
 
 // The big data struct that holds all the defragger's variables for a single thread
 class DefragState {
@@ -13,23 +14,32 @@ public:
 
     void add_default_space_hogs();
 
-    bool is_still_running() const {
+    [[nodiscard]] bool is_still_running() const {
         return *running_ == RunningState::RUNNING;
     }
 
+    [[nodiscard]] auto total_clusters() const -> cluster_count64_t { return total_clusters_; }
+
+    void set_total_clusters(cluster_count64_t n) {
+        total_clusters_ = n;
+        bitmap_.reset(n);
+    }
+
 public:
-    // The current Phase (1...3)
+    /// The current Phase (1...3)
     DefragPhase phase_ = DefragPhase::Analyze;
-    // The current Zone (0..2) for Phase 3
+    /// The current Zone (0..2) for Phase 3
     Zone zone_{};
-    // If not RUNNING then stop defragging
+    /// If not RUNNING then stop defragging
     RunningState *running_{};
-    // If TRUE then use LastAccessTime for SpaceHogs
+    /// If TRUE then use LastAccessTime for SpaceHogs
     bool use_last_access_time_{};
-    // If bigger than 20 then do not move dirs
+    /// If bigger than 20 then do not move dirs
     int cannot_move_dirs_{};
 
-    std::wstring include_mask_; // Example: "c:\t1\*"
+    /// Example: "c:\t1\*"
+    std::wstring include_mask_;
+
     DiskStruct disk_ = {
             .volume_handle_ = nullptr,
             .mount_point_ = {},
@@ -39,45 +49,52 @@ public:
             .type_ = DiskType::UnknownType,
     };
 
-    double free_space_; // Percentage of total disk size 0..100
+    /// Percentage of total disk size 0..100
+    double free_space_;
 
-    // Tree in memory with information about all the files. 
+    /// Tree in memory with information about all the files.
     FileNode *item_tree_{};
     int balance_count_{};
 
-    // Array with exclude masks
+    /// Array with exclude masks
     Wstrings excludes_{};
 
-    // use the built-in SpaceHogs
+    /// use the built-in SpaceHogs
     bool use_default_space_hogs_{};
 
-    // Array with SpaceHog masks
+    /// Array with SpaceHog masks
     std::vector<std::wstring> space_hogs_{};
 
-    // Begin (LCN) of the zones
+    /// Begin (LCN) of the zones
     lcn64_t zones_[4] = {};
 
-    // List of clusters reserved for the MFT
+    /// List of clusters reserved for the MFT
     lcn_extent_t mft_excludes_[3] = {};
 
     /*
      * Counters filled before Phase 1.
      */
 
-    // Size of the volume, in clusters. 
-    count64_t total_clusters_{};
-    // Number of bytes per cluster.
+    /// Busy/available clusters bitmap, read in section, updated as we go
+    VolumeBitmap bitmap_;
+
+    /// Number of bytes per cluster.
     uint64_t bytes_per_cluster_{};
 
-    /*
-     * Counters updated before/after every Phase.
-     */
+    //
+    // Counters updated before/after every Phase.
+    //
 
-    count64_t count_free_clusters_; // Number of free clusters
-    uint64_t count_gaps_; // Number of gaps
-    count64_t biggest_gap_; // Size of biggest gap, in clusters
-    uint64_t count_gaps_less16_; // Number of gaps smaller than 16 clusters
-    uint64_t count_clusters_less16_; // Number of clusters in gaps that are smaller than 16 clusters
+    /// Number of free clusters
+    cluster_count64_t count_free_clusters_;
+    /// Number of gaps
+    uint64_t count_gaps_;
+    /// Size of biggest gap, in clusters
+    cluster_count64_t biggest_gap_;
+    /// Number of gaps smaller than 16 clusters
+    uint64_t count_gaps_less16_;
+    /// Number of clusters in gaps that are smaller than 16 clusters
+    uint64_t count_clusters_less16_;
 
     //
     // Counters updated after every Phase, but not before Phase 1 (analyze).
@@ -117,4 +134,8 @@ public:
     Clock::time_point last_checkpoint_{};
 
     void check_last_access_enabled();
+
+private:
+    /// Size of the volume, in clusters.
+    cluster_count64_t total_clusters_{};
 };

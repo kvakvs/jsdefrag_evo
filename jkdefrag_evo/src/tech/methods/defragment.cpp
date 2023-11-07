@@ -94,8 +94,8 @@ void DefragRunner::defragment(DefragState &data) {
         }
 
         // Move the file in parts, each time selecting the biggest gap available
-        count64_t clusters_done = 0;
-        count64_t clusters;
+        cluster_count64_t clusters_done = 0;
+        cluster_count64_t clusters;
 
         do {
             clusters = gap.length();

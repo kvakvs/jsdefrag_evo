@@ -15,7 +15,7 @@ public:
     constexpr lcn_extent_t() : begin_{}, end_{} {
     }
 
-    static constexpr lcn_extent_t with_length(lcn64_t begin, count64_t length) {
+    static constexpr lcn_extent_t with_length(lcn64_t begin, cluster_count64_t length) {
         return {begin, begin + length};
     }
 
@@ -23,26 +23,26 @@ public:
 
     [[nodiscard]] constexpr auto end() const -> lcn64_t { return end_; }
 
-    [[nodiscard]] constexpr auto length() const -> count64_t { return end_ - begin_; }
+    [[nodiscard]] constexpr auto length() const -> cluster_count64_t { return end_ - begin_; }
 
-    /// Modify the begin value
-    inline void begin(lcn64_t n) { begin_ = n; }
+    /// Modify the set_begin value
+    inline void set_begin(lcn64_t n) { begin_ = n; }
 
-    /// Modify the end value
-    inline void end(lcn64_t n) { end_ = n; }
+    /// Modify the set_end value
+    inline void set_end(lcn64_t n) { end_ = n; }
 
-    /// Modify the length
-    inline void length(count64_t n) { end_ = begin_ + n; }
+    /// Modify the set_length
+    inline void set_length(cluster_count64_t n) { end_ = begin_ + n; }
 
-    inline void shift_begin(count64_t n) {
+    inline void shift_begin(cluster_count64_t n) {
         begin_ += n;
     }
 
-    inline void shift_end(count64_t n) {
+    inline void shift_end(cluster_count64_t n) {
         end_ += n;
     }
 
-    inline void shift(count64_t n) {
+    inline void shift(cluster_count64_t n) {
         shift_begin(n);
         shift_end(n);
     }

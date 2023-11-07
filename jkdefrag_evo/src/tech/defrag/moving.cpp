@@ -28,7 +28,7 @@
  * \return
  */
 bool DefragRunner::move_item(DefragState &data, FileNode *item, lcn64_t new_lcn,
-                             lcn64_t offset, count64_t size, MoveDirection direction) const {
+                             lcn64_t offset, cluster_count64_t size, MoveDirection direction) const {
     // If the Item is Unmovable, Excluded, or has zero size then we cannot move it
     if (item->is_unmovable_) return false;
     if (item->is_excluded_) return false;
@@ -105,7 +105,7 @@ bool DefragRunner::move_item(DefragState &data, FileNode *item, lcn64_t new_lcn,
  */
 DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item,
                                     lcn64_t new_lcn, const lcn64_t offset,
-                                    const count64_t size) const {
+                                    const cluster_count64_t size) const {
     MOVE_FILE_DATA move_params;
     uint64_t lcn;
     DWORD w;
@@ -178,7 +178,7 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
  * \return NO_ERROR or GetLastError() from DeviceIoControl()
  */
 DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item,
-                                           lcn64_t new_lcn, const lcn64_t offset, const count64_t size) const {
+                                           lcn64_t new_lcn, const lcn64_t offset, const cluster_count64_t size) const {
     MOVE_FILE_DATA move_params;
     uint64_t from_lcn;
     DWORD w;
@@ -286,7 +286,7 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle
  */
 bool
 DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                                   lcn64_t offset, count64_t size, MoveStrategy strategy) const {
+                                   lcn64_t offset, cluster_count64_t size, MoveStrategy strategy) const {
     DWORD error_code;
     DefragGui *gui = DefragGui::get_instance();
 
@@ -339,8 +339,8 @@ DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE fil
  * \return true if success, false if failed to move without fragmenting the item
  */
 bool DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle,
-                                           lcn64_t new_lcn, lcn64_t offset, count64_t size,
-                                           const MoveDirection direction) const {
+                                            lcn64_t new_lcn, lcn64_t offset, cluster_count64_t size,
+                                            const MoveDirection direction) const {
     lcn_extent_t cluster;
 
     DefragGui *gui = DefragGui::get_instance();
