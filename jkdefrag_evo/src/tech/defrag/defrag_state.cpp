@@ -81,7 +81,7 @@ void DefragState::add_default_space_hogs() {
     space_hogs_.emplace_back(L"*.mp4"); // MPEG4 video
     space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis sound
     space_hogs_.emplace_back(L"*.wmv"); // Windows media video
-    space_hogs_.emplace_back(L"*.vob"); // DVD
+    space_hogs_.emplace_back(L"*.vob"); // DVD data files
     space_hogs_.emplace_back(L"*.ogg"); // Ogg Vorbis Video
 
     // Images

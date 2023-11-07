@@ -18,7 +18,8 @@
 #include "precompiled_header.h"
 
 
-bool DefragRunner::move_item(DefragState &defrag_state, MoveTask &task, MoveDirection direction) const {
+bool DefragRunner::move_item(DefragState &defrag_state, MoveTask &task,
+                             MoveDirection direction) const {
     // If the Item is Unmovable, Excluded, or has zero size then we cannot move it
     if (!task.file_->can_move()) return false;
 
@@ -64,7 +65,7 @@ bool DefragRunner::move_item(DefragState &defrag_state, MoveTask &task, MoveDire
         }
 
         clusters_done = clusters_done + clusters_todo;
-        FlushFileBuffers(file_handle); // Is this useful? Can't hurt
+        FlushFileBuffers(file_handle);// Is this useful? Can't hurt
         CloseHandle(file_handle);
     }
 
@@ -129,17 +130,19 @@ DWORD DefragRunner::move_item_whole(DefragState &data, MoveTask &task) const {
     }
 
     // Show progress message
-    gui->show_move(task.file_, move_params.ClusterCount, lcn, task.lcn_to_, move_params.StartingVcn.QuadPart);
+    gui->show_move(task.file_, task.count_, lcn, task.lcn_to_, move_params.StartingVcn.QuadPart);
+    data.bitmap_.mark(lcn, lcn + task.count_, ClusterMapValue::Free);
+    data.bitmap_.mark(task.lcn_to_, task.lcn_to_ + task.count_, ClusterMapValue::InUse);
 
     // Draw the item and the destination clusters on the screen in the BUSY	color
-    colorize_disk_item(data, task.file_, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
+    colorize_disk_item(data, task.file_, move_params.StartingVcn.QuadPart, move_params.ClusterCount,
+                       false);
 
     gui->draw_cluster(data, task.lcn_to_, task.lcn_to_ + task.count_, DrawColor::Busy);
 
     // Call Windows to perform the move.
-    DWORD result = DeviceIoControl(
-            data.disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
-            sizeof move_params, nullptr, 0, &w, nullptr);
+    DWORD result = DeviceIoControl(data.disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
+                                   sizeof move_params, nullptr, 0, &w, nullptr);
 
     if (result != FALSE) {
         result = NO_ERROR;
@@ -152,7 +155,6 @@ DWORD DefragRunner::move_item_whole(DefragState &data, MoveTask &task) const {
 
     // Undraw the destination clusters on the screen
     gui->draw_cluster(data, task.lcn_to_, task.lcn_to_ + task.count_, DrawColor::Empty);
-    data.bitmap_.mark(task.lcn_to_, task.lcn_to_ + task.count_, false);
 
     return result;
 }
@@ -200,7 +202,8 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, MoveTask &task) co
                     if (task.count_ < fragment.next_vcn_ - vcn - (task.vcn_from_ - real_vcn)) {
                         move_params.ClusterCount = (uint32_t) task.count_;
                     } else {
-                        move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn - (task.vcn_from_ - real_vcn));
+                        move_params.ClusterCount =
+                                (uint32_t) (fragment.next_vcn_ - vcn - (task.vcn_from_ - real_vcn));
                     }
 
                     from_lcn = fragment.lcn_ + (task.vcn_from_ - real_vcn);
@@ -212,25 +215,33 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, MoveTask &task) co
                     if (fragment.next_vcn_ - vcn < task.vcn_from_ + task.count_ - real_vcn) {
                         move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn);
                     } else {
-                        move_params.ClusterCount = (uint32_t) (task.vcn_from_ + task.count_ - real_vcn);
+                        move_params.ClusterCount =
+                                (uint32_t) (task.vcn_from_ + task.count_ - real_vcn);
                     }
                     from_lcn = fragment.lcn_;
                 }
 
                 // Show progress message
-                gui->show_move(task.file_, move_params.ClusterCount, from_lcn, move_params.StartingLcn.QuadPart,
-                               move_params.StartingVcn.QuadPart);
+                gui->show_move(task.file_, move_params.ClusterCount, from_lcn,
+                               move_params.StartingLcn.QuadPart, move_params.StartingVcn.QuadPart);
+                data.bitmap_.mark(from_lcn, from_lcn + move_params.ClusterCount,
+                                  ClusterMapValue::Free);
+                data.bitmap_.mark(move_params.StartingLcn.QuadPart,
+                                  move_params.StartingLcn.QuadPart + move_params.ClusterCount,
+                                  ClusterMapValue::InUse);
 
                 // Draw the item and the destination clusters on the screen in the BUSY	color.
-                colorize_disk_item(data, task.file_, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
+                colorize_disk_item(data, task.file_, move_params.StartingVcn.QuadPart,
+                                   move_params.ClusterCount, false);
 
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
                                   DrawColor::Busy);
 
                 // Call Windows to perform the move
-                error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
-                                             sizeof move_params, nullptr, 0, &w, nullptr);
+                error_code =
+                        DeviceIoControl(data.disk_.volume_handle_, FSCTL_MOVE_FILE, &move_params,
+                                        sizeof move_params, nullptr, 0, &w, nullptr);
 
                 if (error_code != 0) {
                     error_code = NO_ERROR;
@@ -245,6 +256,9 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, MoveTask &task) co
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
                                   DrawColor::Empty);
+                data.bitmap_.mark(move_params.StartingLcn.QuadPart,
+                                  move_params.StartingLcn.QuadPart + move_params.ClusterCount,
+                                  ClusterMapValue::Free);
 
                 // If there was an error then exit
                 if (error_code != NO_ERROR) return error_code;
@@ -271,8 +285,8 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, MoveTask &task) co
  * \param strategy move in one part, move individual fragments
  * \return True if all good
  */
-bool
-DefragRunner::move_item_with_strat(DefragState &data, MoveTask &task, MoveStrategy strategy) const {
+bool DefragRunner::move_item_with_strat(DefragState &data, MoveTask &task,
+                                        MoveStrategy strategy) const {
     DWORD error_code;
     DefragGui *gui = DefragGui::get_instance();
 
@@ -290,9 +304,7 @@ DefragRunner::move_item_with_strat(DefragState &data, MoveTask &task, MoveStrate
 
     // If there was an error then fetch the errormessage and save it
     std::wstring error_string;
-    if (error_code != NO_ERROR) {
-        error_string = Str::system_error(error_code);
-    }
+    if (error_code != NO_ERROR) { error_string = Str::system_error(error_code); }
 
     // Fetch the new fragment map of the item and refresh the screen
     colorize_disk_item(data, task.file_, 0, 0, true);
@@ -313,7 +325,8 @@ DefragRunner::move_item_with_strat(DefragState &data, MoveTask &task, MoveStrate
     return result;
 }
 
-bool DefragRunner::move_item_try_strategies(DefragState &data, MoveTask &task, const MoveDirection direction) const {
+bool DefragRunner::move_item_try_strategies(DefragState &data, MoveTask &task,
+                                            const MoveDirection direction) const {
     lcn_extent_t cluster;
 
     DefragGui *gui = DefragGui::get_instance();
@@ -332,7 +345,8 @@ bool DefragRunner::move_item_try_strategies(DefragState &data, MoveTask &task, c
     if (!is_fragmented(task.file_, task.vcn_from_, task.count_)) return true;
 
     // Show debug message: "Windows could not move the file, trying alternative method."
-    gui->show_debug(DebugLevel::DetailedProgress, task.file_, L"Windows could not move the file, trying alternative method.");
+    gui->show_debug(DebugLevel::DetailedProgress, task.file_,
+                    L"Windows could not move the file, trying alternative method.");
 
     // Find another gap on disk for the item
     switch (direction) {
@@ -391,7 +405,8 @@ bool DefragRunner::move_item_try_strategies(DefragState &data, MoveTask &task, c
     // If the block is still fragmented then return false.
     if (is_fragmented(task.file_, task.vcn_from_, task.count_)) {
         // Show debug message: "Alternative method failed, leaving file where it is."
-        gui->show_debug(DebugLevel::DetailedProgress, task.file_, L"Alternative method failed, leaving file where it is.");
+        gui->show_debug(DebugLevel::DetailedProgress, task.file_,
+                        L"Alternative method failed, leaving file where it is.");
         return false;
     }
 

@@ -10,15 +10,14 @@ public:
 
     ~DefragApp();
 
-    // Return non-owning pointer to instance of the class
+    /// Return non-owning pointer to instance of the class
     static DefragApp *get_instance();
 
-    // Reset the owning instance pointer
+    /// Reset the owning instance pointer
     static void release_instance();
 
     WPARAM start_program(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show);
 
-//    static DWORD WINAPI defrag_thread(LPVOID);
     static void defrag_thread();
 
 #ifdef _DEBUG
@@ -27,6 +26,8 @@ public:
 
 #endif
 
+    /// If the defragger is not yet running then return false. If it's already running or if there was an error getting
+    /// the processlist then return true.
     [[nodiscard]] bool is_already_running(void) const;
 
 public:

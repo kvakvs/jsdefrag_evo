@@ -3,69 +3,39 @@
 #include <Windows.h>
 #include <cstdint>
 
-/// Represents one section of volume bitmap read from disk, each bit represents a cluster busy or available.
-class VolumeBitmapFragment {
-public:
-    static constexpr lcn64_t DRIVE_BITMAP_READ_SIZE = 1ULL << 16;
-    DWORD bytes_returned_{};
-
-private:
-    struct BitmapData {
-        uint64_t starting_lcn_;
-        uint64_t bitmap_size_;
-        BYTE buffer_[DRIVE_BITMAP_READ_SIZE]; // Most efficient if binary multiple
-    };
-
-    BitmapData bitmap_{};
-
-public:
-    VolumeBitmapFragment() = default;
-
-    /// Fetch a block of cluster data. If error then return false
-    DWORD read(HANDLE handle, lcn64_t start_lcn);
-
-    [[nodiscard]] lcn64_t starting_lcn() const { return (lcn64_t) bitmap_.starting_lcn_; }
-
-    [[nodiscard]] uint64_t bitmap_size() const { return (size_t) bitmap_.bitmap_size_; }
-
-    [[nodiscard]] constexpr size_t buffer_size() const { return sizeof(bitmap_.buffer_); }
-
-    /// Gives access to the utilization bitmap
-    [[nodiscard]] decltype(auto) buffer(size_t index) const {
-        return bitmap_.buffer_[index];
-    }
-
-    [[nodiscard]] auto buffer_bit(lcn64_t lcn) -> bool {
-        const auto rel_lcn = lcn - starting_lcn();
-        const auto mask = rel_lcn & 7;
-        const auto index = rel_lcn / 8;
-        return (bitmap_.buffer_[index] & mask) != 0;
-    }
+enum class ClusterMapValue : uint8_t {
+    Free,
+    InUse,
 };
 
 /// Represents entire drive cluster bitmap
-class VolumeBitmap {
+class ClusterMap {
 private:
-    /// Contains all bits of the volume
-    std::vector<bool> bitmap_;
+    /// Contains all bits of the volume, stored as bytes
+    using BitmapStorageItem = ClusterMapValue;
+    std::vector<BitmapStorageItem> cluster_map_;
 
     /// Set to true for each available (loaded) fragment of DRIVE_BITMAP_READ_SIZE bits
     std::vector<bool> availability_;
 
     lcn64_t max_lcn_;
-public:
-    static constexpr lcn64_t LCN_PER_BITMAP_FRAGMENT = VolumeBitmapFragment::DRIVE_BITMAP_READ_SIZE / 8;
 
-    [[nodiscard]] lcn64_t volume_end_lcn() const {
-        return max_lcn_;
-    }
+public:
+    static constexpr lcn64_t DRIVE_BITMAP_READ_SIZE = 1ULL << 16;
+    static constexpr lcn64_t LCN_PER_BITMAP_FRAGMENT = DRIVE_BITMAP_READ_SIZE * 8;
+
+    [[nodiscard]] lcn64_t volume_end_lcn() const { return max_lcn_; }
 
     void reset(lcn64_t max_lcn) {
         max_lcn_ = max_lcn;
-        bitmap_.clear();
-        bitmap_.resize(max_lcn);
+
+        cluster_map_.clear();
+
+        const auto round_up_max_lcn = (max_lcn + 7LL) & ~7LL;
+        cluster_map_.resize(round_up_max_lcn);
+
         availability_.clear();
-        availability_.resize(max_lcn / LCN_PER_BITMAP_FRAGMENT);
+        availability_.resize(get_next_fragment_start(max_lcn) / LCN_PER_BITMAP_FRAGMENT);
     }
 
     /// Return true if the fragment of drive bitmap is loaded
@@ -76,13 +46,10 @@ public:
 
     auto ensure_lcn_loaded(HANDLE handle, lcn64_t lcn) -> DWORD;
 
-    auto load_lcn(HANDLE handle, lcn64_t lcn) -> DWORD;
-
     /// Returns true if a cluster is in use (assumes the drive map was loaded)
     inline auto in_use(lcn64_t lcn) -> bool {
         _ASSERT(has_fragment_for_lcn(lcn));
-
-        return bitmap_[lcn];
+        return cluster_map_[lcn] == ClusterMapValue::InUse;
     }
 
     static constexpr auto get_fragment_start(lcn64_t lcn) -> lcn64_t {
@@ -93,7 +60,10 @@ public:
         return (lcn / LCN_PER_BITMAP_FRAGMENT + 1) * LCN_PER_BITMAP_FRAGMENT;
     }
 
-    inline void mark(lcn64_t lcn, cluster_count64_t count, const bool value) {
-        std::fill(std::begin(bitmap_) + lcn, std::begin(bitmap_) + lcn + count, value);
+    inline void mark(lcn64_t lcn, cluster_count64_t count, const ClusterMapValue value) {
+        std::fill(std::begin(cluster_map_) + lcn, std::begin(cluster_map_) + lcn + count, value);
     }
+
+private:
+    auto load_lcn(HANDLE handle, lcn64_t lcn) -> DWORD;
 };

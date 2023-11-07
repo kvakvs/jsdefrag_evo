@@ -17,8 +17,8 @@
 
 #include "precompiled_header.h"
 
-#include <ctime>
 #include <cstdarg>
+#include <ctime>
 #include <defrag_log.h>
 
 
@@ -42,7 +42,7 @@ DefragLog::DefragLog() {
         p1 = DefragRunner::stristr_w(log_file_.c_str(), L".scr");
         log_file_.clear();
     } else {
-//        *p1 = '\0';
+        //        *p1 = '\0';
         log_file_ += L".log";
         _wunlink(log_file_.c_str());
     }
@@ -54,9 +54,7 @@ void DefragLog::set_log_filename(const wchar_t *file_name) {
     _wunlink(file_name);
 }
 
-const wchar_t *DefragLog::get_log_filename() {
-    return log_file_.c_str();
-}
+const wchar_t *DefragLog::get_log_filename() { return log_file_.c_str(); }
 
 ///* Write a text to the logfile. The parameters are the same as for the "printf"
 //functions, a Format string and a series of parameters. */
@@ -118,9 +116,7 @@ void DefragLog::write_timestamp(FILE *fout) {
 }
 
 DefragLog *DefragLog::get_instance() {
-    if (instance_ == nullptr) {
-        instance_ = std::make_unique<DefragLog>();
-    }
+    if (instance_ == nullptr) { instance_ = std::make_unique<DefragLog>(); }
 
     return instance_.get();
 }

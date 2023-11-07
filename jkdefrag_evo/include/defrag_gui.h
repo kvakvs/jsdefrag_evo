@@ -1,8 +1,8 @@
 #pragma once
 
 #include "constants.h"
-#include "defrag_state.h"
 #include "defrag_log.h"
+#include "defrag_state.h"
 #include "file_node.h"
 
 class DefragGui {
@@ -17,7 +17,8 @@ public:
 
     void clear_screen(std::wstring &&text);
 
-    void draw_cluster(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end, DrawColor color);
+    void draw_cluster(const DefragState &data, uint64_t cluster_start, uint64_t cluster_end,
+                      DrawColor color);
 
     void show_debug(DebugLevel level, const FileNode *item, std::wstring &&text);
 
@@ -37,7 +38,8 @@ public:
 
     void show_analyze_update_item_text(const FileNode *item);
 
-    void show_move(const FileNode *item, cluster_count64_t  clusters, lcn64_t from_lcn, lcn64_t to_lcn, vcn64_t from_vcn);
+    void show_move(const FileNode *item, cluster_count64_t clusters, lcn64_t from_lcn,
+                   lcn64_t to_lcn, vcn64_t from_vcn);
 
     void show_diskmap(DefragState &ex);
 
@@ -51,12 +53,14 @@ public:
 
     void full_redraw_window(HDC dc);
 
-    static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param, LPARAM l_param);
+    static LRESULT CALLBACK process_messagefn(HWND WindowHandle, UINT message, WPARAM w_param,
+                                              LPARAM l_param);
 
     DiskMap &get_color_map() { return color_map_; }
 
     /// For non-interactive mode, write a log message. For interactive mode pop up a messagebox and exit if exit code is provided
-    void message_box_error(const wchar_t *text, const wchar_t *caption, std::optional<int> exit_code);
+    void message_box_error(const wchar_t *text, const wchar_t *caption,
+                           std::optional<int> exit_code);
 
     static void exit_now(int exit_code = 1);
 
@@ -65,7 +69,8 @@ protected:
 
     void paint_top_background(Graphics *graphics) const;
 
-    void paint_background(Graphics *graphics, const POINT &diskmap_org, const POINT &diskmap_end) const;
+    void paint_background(Graphics *graphics, const POINT &diskmap_org,
+                          const POINT &diskmap_end) const;
 
     void paint_diskmap_outline(Graphics *graphics, const POINT &m_org, const POINT &m_end) const;
 
@@ -76,7 +81,8 @@ protected:
     void paint_empty_cell(Graphics *graphics, const POINT &cell_pos, COLORREF col, const Pen &pen,
                           const Pen &pen_empty) const;
 
-    void paint_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col, const Pen &pen) const;
+    void paint_cell(Graphics *graphics, const POINT &cell_pos, const COLORREF col,
+                    const Pen &pen) const;
 
     static void paint_set_gradient_colors(COLORREF col, Color &c1, Color &c2);
 

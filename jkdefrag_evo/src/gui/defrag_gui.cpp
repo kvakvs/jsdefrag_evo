@@ -15,12 +15,12 @@
  http://www.kessels.com/
  */
 
-#include "precompiled_header.h"
 #include "app.h"
+#include "precompiled_header.h"
 
-#include <memory>
-#include <format>
 #include <algorithm>
+#include <format>
+#include <memory>
 
 #undef min
 
@@ -30,13 +30,11 @@ DefragGui::DefragGui() : color_map_(1), diskmap_pos_() {
     defrag_lib_ = DefragRunner::get_instance();
 
     square_size_ = 6;
-    drawing_area_offset_ = {.x=8, .y=8};
+    drawing_area_offset_ = {.x = 8, .y = 8};
 }
 
 DefragGui *DefragGui::get_instance() {
-    if (instance_ == nullptr) {
-        instance_ = new DefragGui();
-    }
+    if (instance_ == nullptr) { instance_ = new DefragGui(); }
 
     return instance_;
 }
@@ -126,16 +124,17 @@ void DefragGui::set_display_data(HDC dc) {
     }
 
     disk_area_size_.Width = client_window_size.Width - drawing_area_offset_.x * 2;
-    disk_area_size_.Height = client_window_size.Height - top_area_height_ - drawing_area_offset_.y * 2;
+    disk_area_size_.Height =
+            client_window_size.Height - top_area_height_ - drawing_area_offset_.y * 2;
 
     color_map_.set_size((size_t) (disk_area_size_.Width / square_size_),
                         (size_t) (disk_area_size_.Height / square_size_));
 
     // Find centered position for the disk map
-    diskmap_pos_ = {
-            .x = (client_size_.Width - (int) color_map_.get_width() * square_size_) / 2,
-            .y = (client_size_.Height - top_area_height_ - (int) color_map_.get_height() * square_size_) / 2
-    };
+    diskmap_pos_ = {.x = (client_size_.Width - (int) color_map_.get_width() * square_size_) / 2,
+                    .y = (client_size_.Height - top_area_height_ -
+                          (int) color_map_.get_height() * square_size_) /
+                         2};
 
     bmp_ = std::make_unique<Bitmap>(client_size_.Width, client_size_.Height);
 }
@@ -146,9 +145,7 @@ void DefragGui::clear_screen(std::wstring &&text) {
     messages_[0] = std::move(text);
 
     // Clear all the other messages
-    for (auto i = 1; i < sizeof(messages_) / sizeof(messages_[0]); i++) {
-        messages_[i].clear();
-    }
+    for (auto i = 1; i < sizeof(messages_) / sizeof(messages_[0]); i++) { messages_[i].clear(); }
 
     // If there is no logfile then return.
     Log::log(DebugLevel::DetailedProgress, messages_[0].c_str());
@@ -157,8 +154,8 @@ void DefragGui::clear_screen(std::wstring &&text) {
 }
 
 // Callback: whenever an item (file, directory) is moved on disk.
-void DefragGui::show_move(const FileNode *item, const cluster_count64_t clusters, const lcn64_t from_lcn,
-                          const lcn64_t to_lcn, const vcn64_t from_vcn) {
+void DefragGui::show_move(const FileNode *item, const cluster_count64_t clusters,
+                          const lcn64_t from_lcn, const lcn64_t to_lcn, const vcn64_t from_vcn) {
     // Save the message in Messages 3
     if (clusters == 1) {
         messages_[3] = std::format(MOVING_1_CLUSTER_FMT, from_lcn, to_lcn);
@@ -179,20 +176,24 @@ void DefragGui::show_move(const FileNode *item, const cluster_count64_t clusters
     if (from_vcn > 0) {
         if (clusters % 10 == 1) {
             Log::log(DebugLevel::DetailedProgress,
-                     std::format(L"{}\n  Moving 1 cluster from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
+                     std::format(L"{}\n  Moving 1 cluster from " NUM_FMT " to " NUM_FMT
+                                 ", VCN=" NUM_FMT,
                                  item->get_long_path(), from_lcn, to_lcn, from_vcn));
         } else {
             Log::log(DebugLevel::DetailedProgress,
-                     std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT ", VCN=" NUM_FMT,
+                     std::format(L"{}\n  Moving " NUM_FMT " clusters from " NUM_FMT " to " NUM_FMT
+                                 ", VCN=" NUM_FMT,
                                  item->get_long_path(), clusters, from_lcn, to_lcn, from_vcn));
         }
     } else {
         if (clusters % 10 == 1) {
             Log::log(DebugLevel::DetailedProgress,
-                     std::format(L"{}\n  " MOVING_1_CLUSTER_FMT, item->get_long_path(), from_lcn, to_lcn));
+                     std::format(L"{}\n  " MOVING_1_CLUSTER_FMT, item->get_long_path(), from_lcn,
+                                 to_lcn));
         } else {
             Log::log(DebugLevel::DetailedProgress,
-                     std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters, from_lcn, to_lcn));
+                     std::format(L"{}\n  " MOVING_CLUSTERS_FMT, item->get_long_path(), clusters,
+                                 from_lcn, to_lcn));
         }
     }
 
@@ -205,9 +206,7 @@ static bool show_analyze_throttle_timer() {
     auto current_time = std::chrono::steady_clock::now();
     auto duration = current_time - last_time;
 
-    if (duration < std::chrono::milliseconds(100)) {
-        return false;
-    }
+    if (duration < std::chrono::milliseconds(100)) { return false; }
 
     last_time = current_time;
     return true;
@@ -231,7 +230,7 @@ void DefragGui::show_analyze_no_state(const FileNode *item) {
 
     repaint_top_area();
     request_delayed_redraw_top_area();
-//    repaint_window(dc_);
+    //    repaint_window(dc_);
 }
 
 // Callback: for every file during analysis.
@@ -241,7 +240,8 @@ void DefragGui::show_analyze(const DefragState &data, const FileNode *item) {
 
     if (data.count_all_files_ != 0) {
         messages_[3] = std::format(L"Files " NUM_FMT ", Directories " NUM_FMT ", Clusters " NUM_FMT,
-                                   data.count_all_files_, data.count_directories_, data.count_all_clusters_);
+                                   data.count_all_files_, data.count_directories_,
+                                   data.count_all_clusters_);
     }
 
     show_analyze_update_item_text(item);
@@ -254,9 +254,7 @@ void DefragGui::show_debug(const DebugLevel level, const FileNode *item, std::ws
     // Avoid extra data motions below log level
     if (level <= DefragLog::debug_level_) {
         // Save the name of the file in messages[4]
-        if (item != nullptr && item->have_long_path()) {
-            messages_[4] = item->get_long_path();
-        }
+        if (item != nullptr && item->have_long_path()) { messages_[4] = item->get_long_path(); }
 
         // Save the debug message in Messages 5
         messages_[5] = std::move(text);
@@ -277,8 +275,8 @@ void DefragGui::show_debug(const DebugLevel level, const FileNode *item, std::ws
 }
 
 // Callback: paint a cluster on the screen in a given palette color
-void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_start, const uint64_t cluster_end,
-                             const DrawColor color) {
+void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_start,
+                             const uint64_t cluster_end, const DrawColor color) {
     [[maybe_unused]] Rect window_size = client_size_;
 
     // Save the PhaseTodo and PhaseDone counters for later use by the progress counter
@@ -306,7 +304,7 @@ void DefragGui::draw_cluster(const DefragState &data, const uint64_t cluster_sta
 
     if (color_map_.get_cluster_count() != data.total_clusters()) {
         color_map_.set_cluster_count(data.total_clusters());
-        return; // do not set yet, not till next redraw
+        return;// do not set yet, not till next redraw
     }
 
     color_map_.set_cluster_colors(cluster_start, cluster_end, color);
@@ -349,7 +347,8 @@ void DefragGui::show_status(const DefragState &data) {
             break;
         case DefragPhase::Done:
             messages_[1] = L"Finished.";
-            messages_[4] = std::format(L"Logfile: {}", DefragLog::get_instance()->get_log_filename());
+            messages_[4] =
+                    std::format(L"Logfile: {}", DefragLog::get_instance()->get_log_filename());
             break;
         case DefragPhase::Fixup:
             messages_[1] = L"Phase 3: Fixup";
@@ -359,9 +358,7 @@ void DefragGui::show_status(const DefragState &data) {
     Log::log(DebugLevel::DetailedProgress, messages_[1].c_str());
 
     // Write some statistics to the logfile
-    if (data.phase_ == DefragPhase::Done) {
-        write_stats(data);
-    }
+    if (data.phase_ == DefragPhase::Done) { write_stats(data); }
 }
 
 void DefragGui::on_paint(HDC dc, const PAINTSTRUCT &ps) const {
@@ -372,8 +369,8 @@ void DefragGui::on_paint(HDC dc, const PAINTSTRUCT &ps) const {
                          invalidated_rc.bottom - invalidated_rc.top);
 
     // graphics.DrawImage(bmp_.get(), 0, 0);
-    graphics.DrawImage(bmp_.get(), invalidated_rf, invalidated_rf.X, invalidated_rf.Y, invalidated_rf.Width,
-                       invalidated_rf.Height, UnitPixel);
+    graphics.DrawImage(bmp_.get(), invalidated_rf, invalidated_rf.X, invalidated_rf.Y,
+                       invalidated_rf.Width, invalidated_rf.Height, UnitPixel);
 }
 
 // Message handler
@@ -385,7 +382,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             return 0;
 
         case WM_TIMER: {
-//          InvalidateRect(wnd, nullptr, FALSE);
+            //          InvalidateRect(wnd, nullptr, FALSE);
 
             std::lock_guard<std::mutex> display_lock(instance_->display_mutex_);
             PAINTSTRUCT ps{};
@@ -423,7 +420,8 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
             EndPaint(wnd, &ps);
 
             // Full update of all squares (can be long) TODO: Can be a separate worker thread
-            instance_->color_map_.update_square_colors_from_diskmap(0, instance_->color_map_.get_total_count());
+            instance_->color_map_.update_square_colors_from_diskmap(
+                    0, instance_->color_map_.get_total_count());
             instance_->request_delayed_redraw();
 
             return 0;
@@ -439,9 +437,7 @@ LRESULT CALLBACK DefragGui::process_messagefn(HWND wnd, const UINT message, cons
 // Show a map on the screen of all the clusters on the disk. The map shows which clusters are free and which are in use.
 void DefragGui::show_diskmap(DefragState &defrag_state) {
     // Exit if the library is not processing a disk yet.
-    if (defrag_state.disk_.volume_handle_ == nullptr) {
-        return;
-    }
+    if (defrag_state.disk_.volume_handle_ == nullptr) { return; }
 
     // Clear screen
     clear_screen({});
@@ -456,22 +452,29 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
     uint64_t count = 0;
     DWORD result_code;
     auto volume_end_lcn = defrag_state.bitmap_.volume_end_lcn();
-    auto next_fragment_lcn = std::min(volume_end_lcn, VolumeBitmap::get_next_fragment_start(lcn));
 
     do {
-        count++; // for logging after this loop
+        count++;// for logging after this loop
 
         if (*defrag_state.running_ != RunningState::RUNNING) break;
         if (defrag_state.disk_.volume_handle_ == INVALID_HANDLE_VALUE) break;
 
         // Fetch a block of cluster data
-        result_code = defrag_state.bitmap_.ensure_lcn_loaded(defrag_state.disk_.volume_handle_, lcn);
+        result_code =
+                defrag_state.bitmap_.ensure_lcn_loaded(defrag_state.disk_.volume_handle_, lcn);
         if (result_code != NO_ERROR && result_code != ERROR_MORE_DATA) break;
+        //        if (!defrag_state.bitmap_.has_fragment_for_lcn(lcn)) {
+        //            // Skip drawing a section that's not loaded yet
+        //            lcn += ClusterMap::LCN_PER_BITMAP_FRAGMENT;
+        //            continue;
+        //        }
 
         // Sanity check
         if (lcn >= defrag_state.bitmap_.volume_end_lcn()) break;
 
         // Analyze the clusterdata. We resume where the previous block left off
+        auto next_fragment_lcn = std::min(volume_end_lcn, ClusterMap::get_next_fragment_start(lcn));
+
         while (lcn < next_fragment_lcn && defrag_state.is_still_running()) {
             auto in_use = defrag_state.bitmap_.in_use(lcn);
 
@@ -480,8 +483,9 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
 
             // At the beginning and end of an Exclude draw the cluster
             if (std::any_of(std::begin(defrag_state.mft_excludes_),
-                            std::end(defrag_state.mft_excludes_),
-                            [=](const lcn_extent_t &ex) { return ex.begin() == lcn || ex.end() == lcn; })) {
+                            std::end(defrag_state.mft_excludes_), [=](const lcn_extent_t &ex) {
+                                return ex.begin() == lcn || ex.end() == lcn;
+                            })) {
 
                 if (std::any_of(std::begin(defrag_state.mft_excludes_),
                                 std::end(defrag_state.mft_excludes_),
@@ -543,7 +547,8 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
     // Note: the "$BadClus" file on NTFS disks maps the entire disk, so we have to ignore it
     StopWatch clock3(L"show_diskmap: colorize files");
 
-    for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+    for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr;
+         item = Tree::next(item)) {
         if (*defrag_state.running_ != RunningState::RUNNING) break;
         //		if (*data.RedrawScreen != 2) break;
 
@@ -556,4 +561,3 @@ void DefragGui::show_diskmap(DefragState &defrag_state) {
 
     clock3.stop_and_log();
 }
-

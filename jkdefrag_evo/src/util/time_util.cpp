@@ -26,6 +26,7 @@ StopWatch::StopWatch(const wchar_t *description, bool start)
         : description_(description), running_(start) {
     if (start) {
         start_clock_ = Clock::now();
+        start_count_++;
     }
 }
 

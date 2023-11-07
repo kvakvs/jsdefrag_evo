@@ -26,11 +26,13 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
     DefragGui *gui = DefragGui::get_instance();
 
     gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                    std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT, gap.length(), gap.begin()));
+                    std::format(L"Vacating " NUM_FMT " clusters starting at LCN=" NUM_FMT,
+                                gap.length(), gap.begin()));
 
     // Sanity check
     if (gap.begin() >= defrag_state.total_clusters()) {
-        gui->show_debug(DebugLevel::Warning, nullptr, L"Error: trying to vacate an area beyond the set_end of the disk.");
+        gui->show_debug(DebugLevel::Warning, nullptr,
+                        L"Error: trying to vacate an area beyond the set_end of the disk.");
         return;
     }
 
@@ -49,7 +51,8 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
         case Zone::ZoneLast:
             // Zone 2: end of disk minus all the free space
             move_to = defrag_state.total_clusters() - defrag_state.count_free_clusters_ +
-                      (uint64_t) (defrag_state.total_clusters() * 2.0 * defrag_state.free_space_ / 100.0);
+                      (uint64_t) (defrag_state.total_clusters() * 2.0 * defrag_state.free_space_ /
+                                  100.0);
             break;
         default:
             break;
@@ -57,7 +60,8 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
 
     if (move_to < gap.end()) move_to = gap.end();
 
-    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, std::format(L"move_to = " NUM_FMT, move_to));
+    gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                    std::format(L"move_to = " NUM_FMT, move_to));
 
     // Loop forever
     lcn_extent_t move_gap;
@@ -70,7 +74,8 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
         lcn_extent_t bigger;
         vcn64_t bigger_real_vcn;
 
-        for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr; item = Tree::next(item)) {
+        for (auto item = Tree::smallest(defrag_state.item_tree_); item != nullptr;
+             item = Tree::next(item)) {
             if (item->is_unmovable_ || item->is_excluded_ || item->clusters_count_ == 0) {
                 continue;
             }
@@ -107,7 +112,8 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
         }
 
         gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                        std::format(L"Data found at LCN=" NUM_FMT ", {}", bigger.begin(), bigger_item->get_long_path()));
+                        std::format(L"Data found at LCN=" NUM_FMT ", {}", bigger.begin(),
+                                    bigger_item->get_long_path()));
 
         // Find the first gap above the lcn
         lcn_extent_t test_gap;
@@ -122,10 +128,10 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
 
         // Exit if the end of the first gap is below the first movable item, the gap cannot be expanded.
         if (test_gap.end() < bigger.begin()) {
-            gui->show_debug(
-                    DebugLevel::DetailedGapFilling, nullptr,
-                    std::format(L"Cannot expand the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT " clusters) any further.",
-                                test_gap.begin(), test_gap.end(), test_gap.length()));
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            std::format(L"Cannot expand the gap from " NUM_FMT " to " NUM_FMT
+                                        " (" NUM_FMT " clusters) any further.",
+                                        test_gap.begin(), test_gap.end(), test_gap.length()));
             return;
         }
 
@@ -134,16 +140,17 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
         if (test_gap.end() == bigger.begin() && test_gap.length() >= gap.length()) {
             gui->show_debug(
                     DebugLevel::DetailedGapFilling, nullptr,
-                    std::format(L"Finished vacating, the gap from " NUM_FMT " to " NUM_FMT " (" NUM_FMT
-                    " clusters) is now bigger than " NUM_FMT " clusters.",
-                    test_gap.begin(), test_gap.end(), test_gap.length(), gap.length()));
+                    std::format(L"Finished vacating, the gap from " NUM_FMT " to " NUM_FMT
+                                " (" NUM_FMT " clusters) is now bigger than " NUM_FMT " clusters.",
+                                test_gap.begin(), test_gap.end(), test_gap.length(), gap.length()));
 
             return;
         }
 
         // Exit if we have moved the item before. We don't want a worm
         if (gap.begin() >= move_to) {
-            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr, L"Stopping vacate because of possible worm.");
+            gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
+                            L"Stopping vacate because of possible worm.");
             return;
         }
 
@@ -157,7 +164,8 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
                 gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
                                 std::format(L"Finding gap above move_to=" NUM_FMT, move_to));
 
-                auto result2 = find_gap(defrag_state, move_to, 0, bigger.length(), true, false, false);
+                auto result2 =
+                        find_gap(defrag_state, move_to, 0, bigger.length(), true, false, false);
                 if (result2.has_value()) {
                     move_gap = result2.value();
                     local_success = true;
@@ -166,10 +174,13 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
 
             // If no gap was found then try to find a gap as high on disk as possible, but above the item.
             if (!local_success) {
-                gui->show_debug(DebugLevel::DetailedGapFilling, nullptr,
-                                std::format(L"Finding gap from set_end of disk above bigger_end=" NUM_FMT, bigger.end()));
+                gui->show_debug(
+                        DebugLevel::DetailedGapFilling, nullptr,
+                        std::format(L"Finding gap from set_end of disk above bigger_end=" NUM_FMT,
+                                    bigger.end()));
 
-                auto result3 = find_gap(defrag_state, bigger.end(), 0, bigger.length(), true, true, false);
+                auto result3 =
+                        find_gap(defrag_state, bigger.end(), 0, bigger.length(), true, true, false);
                 if (result3.has_value()) {
                     move_gap = result3.value();
                     local_success = true;
@@ -196,7 +207,7 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
             if (move_gap.begin() < move_to) move_to = move_gap.begin();
             move_gap.shift_begin(bigger.length());
         } else {
-            move_gap.set_length(0); // Force re-scan of gap
+            move_gap.set_length(0);// Force re-scan of gap
         }
 
         // Adjust the done_until lcn. We don't want an infinite loop
@@ -211,8 +222,7 @@ void DefragRunner::set_up_unusable_cluster_list(DefragState &data) {
     NTFS_VOLUME_DATA_BUFFER ntfs_data;
     DWORD w2;
     auto error_code = DeviceIoControl(data.disk_.volume_handle_, FSCTL_GET_NTFS_VOLUME_DATA,
-                                      nullptr, 0, &ntfs_data, sizeof ntfs_data,
-                                      &w2, nullptr);
+                                      nullptr, 0, &ntfs_data, sizeof ntfs_data, &w2, nullptr);
 
     if (error_code != 0) {
         // Note: NtfsData.TotalClusters.QuadPart should be exactly the same
@@ -222,26 +232,34 @@ void DefragRunner::set_up_unusable_cluster_list(DefragState &data) {
 
         data.mft_excludes_[0] = lcn_extent_t(lcn_from(ntfs_data.MftStartLcn),
                                              lcn_from(ntfs_data.MftStartLcn) +
-                                             lcn_from(ntfs_data.MftValidDataLength) / ntfs_data.BytesPerCluster);
-        data.mft_excludes_[1] = lcn_extent_t(lcn_from(ntfs_data.MftZoneStart), lcn_from(ntfs_data.MftZoneEnd));
+                                                     lcn_from(ntfs_data.MftValidDataLength) /
+                                                             ntfs_data.BytesPerCluster);
+        data.mft_excludes_[1] =
+                lcn_extent_t(lcn_from(ntfs_data.MftZoneStart), lcn_from(ntfs_data.MftZoneEnd));
         data.mft_excludes_[2] = lcn_extent_t(lcn_from(ntfs_data.Mft2StartLcn),
                                              lcn_from(ntfs_data.Mft2StartLcn) +
-                                             lcn_from(ntfs_data.MftValidDataLength) / ntfs_data.BytesPerCluster);
+                                                     lcn_from(ntfs_data.MftValidDataLength) /
+                                                             ntfs_data.BytesPerCluster);
 
         // Show debug message: "MftStartLcn=%I64d, MftZoneStart=%I64d, MftZoneEnd=%I64d, Mft2StartLcn=%I64d, MftValidDataLength=%I64d"
-        gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(
-                                L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT ", MftValidDataLength=" NUM_FMT,
-                                lcn_from(ntfs_data.MftStartLcn), lcn_from(ntfs_data.MftZoneStart),
-                                lcn_from(ntfs_data.MftZoneEnd), lcn_from(ntfs_data.Mft2StartLcn),
-                                lcn_from(ntfs_data.MftValidDataLength) / ntfs_data.BytesPerCluster));
+        gui->show_debug(
+                DebugLevel::DetailedProgress, nullptr,
+                std::format(L"MftStartLcn=" NUM_FMT ", MftZoneStart=" NUM_FMT
+                            ", MftZoneEnd=" NUM_FMT ", Mft2StartLcn=" NUM_FMT
+                            ", MftValidDataLength=" NUM_FMT,
+                            lcn_from(ntfs_data.MftStartLcn), lcn_from(ntfs_data.MftZoneStart),
+                            lcn_from(ntfs_data.MftZoneEnd), lcn_from(ntfs_data.Mft2StartLcn),
+                            lcn_from(ntfs_data.MftValidDataLength) / ntfs_data.BytesPerCluster));
 
         // Show debug message: "MftExcludes[%u].Start=%I64d, MftExcludes[%u].End=%I64d"
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 0, data.mft_excludes_[0].begin(), 0, data.mft_excludes_[0].end()));
+                        std::format(MFT_EXCL_FMT, 0, data.mft_excludes_[0].begin(), 0,
+                                    data.mft_excludes_[0].end()));
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 1, data.mft_excludes_[1].begin(), 1, data.mft_excludes_[1].end()));
+                        std::format(MFT_EXCL_FMT, 1, data.mft_excludes_[1].begin(), 1,
+                                    data.mft_excludes_[1].end()));
         gui->show_debug(DebugLevel::DetailedProgress, nullptr,
-                        std::format(MFT_EXCL_FMT, 2, data.mft_excludes_[2].begin(), 2, data.mft_excludes_[2].end()));
+                        std::format(MFT_EXCL_FMT, 2, data.mft_excludes_[2].begin(), 2,
+                                    data.mft_excludes_[2].end()));
     }
 }

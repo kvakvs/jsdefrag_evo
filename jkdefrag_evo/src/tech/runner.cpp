@@ -532,7 +532,7 @@ void DefragRunner::call_show_status(DefragState &defrag_state, const DefragPhase
 //        if (volume_bitmap.bitmap_size() / 8 < index_max) {
 //            index_max = (int) (volume_bitmap.bitmap_size() / 8);
 //        }
-        auto next_fragment_lcn = std::min(volume_end_lcn, VolumeBitmap::get_next_fragment_start(lcn));
+        auto next_fragment_lcn = std::min(volume_end_lcn, ClusterMap::get_next_fragment_start(lcn));
 
         while (lcn < next_fragment_lcn) {
             auto in_use = defrag_state.bitmap_.in_use(lcn);

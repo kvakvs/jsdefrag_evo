@@ -76,7 +76,7 @@ public:
      */
 
     /// Busy/available clusters bitmap, read in section, updated as we go
-    VolumeBitmap bitmap_;
+    ClusterMap bitmap_;
 
     /// Number of bytes per cluster.
     cluster_count64_t bytes_per_cluster_{};
