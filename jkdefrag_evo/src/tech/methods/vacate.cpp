@@ -184,7 +184,13 @@ void DefragRunner::vacate(DefragState &defrag_state, lcn_extent_t gap, bool igno
         }
 
         // Move the fragment to the gap.
-        auto result4 = move_item(defrag_state, bigger_item, move_gap.begin(), bigger_real_vcn, bigger.length(), MoveDirection::Up);
+        MoveTask task = {
+                .vcn_from_ = bigger_real_vcn,
+                .lcn_to_ = move_gap.begin(),
+                .count_ = bigger.length(),
+                .file_ = bigger_item,
+        };
+        auto result4 = move_item(defrag_state, task, MoveDirection::Up);
 
         if (result4) {
             if (move_gap.begin() < move_to) move_to = move_gap.begin();

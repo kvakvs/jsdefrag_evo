@@ -17,60 +17,51 @@
 
 #include "precompiled_header.h"
 
-/**
- * \brief Move (part of) an item to a new location on disk. Moving the Item will automatically defragment it. If unsuccesful then set the Unmovable
- * flag of the item and return false, otherwise return true. Note: the item will move to a different location in the tree.
- * Note: the offset and size of the block is in absolute clusters, not virtual clusters.
- * \param new_lcn Where to move to
- * \param offset Number of first cluster to be moved
- * \param size Number of clusters to be moved
- * \param direction 0: move up, 1: move down
- * \return
- */
-bool DefragRunner::move_item(DefragState &data, FileNode *item, lcn64_t new_lcn,
-                             lcn64_t offset, cluster_count64_t size, MoveDirection direction) const {
+
+bool DefragRunner::move_item(DefragState &defrag_state, MoveTask &task, MoveDirection direction) const {
     // If the Item is Unmovable, Excluded, or has zero size then we cannot move it
-    if (item->is_unmovable_) return false;
-    if (item->is_excluded_) return false;
-    if (item->clusters_count_ == 0) return false;
+    if (!task.file_->can_move()) return false;
 
     // Directories cannot be moved on FAT volumes. This is a known Windows limitation
     // and not a bug in JkDefrag. But JkDefrag will still try, to allow for possible
     // circumstances where the Windows defragmentation API can move them after all.
     // To speed up things we count the number of directories that could not be moved,
     // and when it reaches 20 we ignore all directories from then on.
-    if (item->is_dir_ && data.cannot_move_dirs_ > 20) {
-        item->is_unmovable_ = true;
-        colorize_disk_item(data, item, 0, 0, false);
+    if (task.file_->is_dir_ && defrag_state.cannot_move_dirs_ > 20) {
+        task.file_->is_unmovable_ = true;
+        colorize_disk_item(defrag_state, task.file_, 0, 0, false);
         return false;
     }
 
     // Open a filehandle for the item and call the subfunctions (see above) to
     // move the file. If success then return true.
-    uint64_t clusters_done = 0;
+    cluster_count64_t clusters_done = 0;
     bool result = true;
 
-    while (clusters_done < size && data.is_still_running()) {
-        uint64_t clusters_todo = size - clusters_done;
+    while (clusters_done < task.count_ && defrag_state.is_still_running()) {
+        cluster_count64_t clusters_todo = task.count_ - clusters_done;
 
-        if (data.bytes_per_cluster_ > 0) {
-            if (clusters_todo > 0x40000000UL / data.bytes_per_cluster_) {
-                clusters_todo = 0x40000000UL / data.bytes_per_cluster_;
+        if (defrag_state.bytes_per_cluster_ > 0) {
+            if (clusters_todo > 0x40000000LL / defrag_state.bytes_per_cluster_) {
+                clusters_todo = 0x40000000LL / defrag_state.bytes_per_cluster_;
             }
         } else {
             if (clusters_todo > 262144) clusters_todo = 262144;
         }
 
-        HANDLE file_handle = open_item_handle(data, item);
-
-        result = false;
-
+        HANDLE file_handle = open_item_handle(defrag_state, task.file_);
         if (file_handle == nullptr) break;
 
-        result = move_item_try_strategies(data, item, file_handle, new_lcn + clusters_done, offset + clusters_done,
-                                          clusters_todo, direction);
+        {
+            auto try_task = task;
+            try_task.lcn_to_ = task.lcn_to_ + clusters_done;
+            try_task.vcn_from_ = task.vcn_from_ + clusters_done;
+            try_task.count_ = clusters_todo;
 
-        if (!result) break;
+            result = move_item_try_strategies(defrag_state, try_task, direction);
+
+            if (!result) break;
+        }
 
         clusters_done = clusters_done + clusters_todo;
         FlushFileBuffers(file_handle); // Is this useful? Can't hurt
@@ -78,18 +69,18 @@ bool DefragRunner::move_item(DefragState &data, FileNode *item, lcn64_t new_lcn,
     }
 
     if (result) {
-        if (item->is_dir_) data.cannot_move_dirs_ = 0;
+        if (task.file_->is_dir_) defrag_state.cannot_move_dirs_ = 0;
         return true;
     }
 
     // If error then set the Unmovable flag, colorize the item on the screen, recalculate
     // the begin of the zone's, and return false.
-    item->is_unmovable_ = true;
+    task.file_->is_unmovable_ = true;
 
-    if (item->is_dir_) data.cannot_move_dirs_++;
+    if (task.file_->is_dir_) defrag_state.cannot_move_dirs_++;
 
-    colorize_disk_item(data, item, 0, 0, false);
-    calculate_zones(data);
+    colorize_disk_item(defrag_state, task.file_, 0, 0, false);
+    calculate_zones(defrag_state);
 
     return false;
 }
@@ -103,24 +94,21 @@ bool DefragRunner::move_item(DefragState &data, FileNode *item, lcn64_t new_lcn,
  * \param size
  * \return NO_ERROR value or GetLastError() from DeviceIoControl()
  */
-DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item,
-                                    lcn64_t new_lcn, const lcn64_t offset,
-                                    const cluster_count64_t size) const {
+DWORD DefragRunner::move_item_whole(DefragState &data, MoveTask &task) const {
     MOVE_FILE_DATA move_params;
     uint64_t lcn;
     DWORD w;
     DefragGui *gui = DefragGui::get_instance();
 
-    /* Find the first fragment that contains clusters inside the block, so we
-    can translate the absolute cluster number of the block into the virtual
-    cluster number used by Windows. */
-    uint64_t vcn = 0;
-    uint64_t real_vcn = 0;
+    // Find the first fragment that contains clusters inside the block, so we can translate the absolute cluster number
+    // of the block into the virtual cluster number used by Windows.
+    vcn64_t vcn = 0;
+    vcn64_t real_vcn = 0;
 
-    auto fragment = item->fragments_.begin();
-    for (; fragment != item->fragments_.end(); fragment++) {
+    auto fragment = task.file_->fragments_.begin();
+    for (; fragment != task.file_->fragments_.end(); fragment++) {
         if (!fragment->is_virtual()) {
-            if (real_vcn + fragment->next_vcn_ - vcn - 1 >= offset) break;
+            if (real_vcn + fragment->next_vcn_ - vcn - 1 >= task.vcn_from_) break;
 
             real_vcn = real_vcn + fragment->next_vcn_ - vcn;
         }
@@ -129,24 +117,24 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
     }
 
     // Set up the parameters for the move
-    move_params.FileHandle = file_handle;
-    move_params.StartingLcn.QuadPart = new_lcn;
-    move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
-    move_params.ClusterCount = (uint32_t) size;
+    move_params.FileHandle = task.file_handle_;
+    move_params.StartingLcn.QuadPart = task.lcn_to_;
+    move_params.StartingVcn.QuadPart = vcn + (task.vcn_from_ - real_vcn);
+    move_params.ClusterCount = (uint32_t) task.count_;
 
-    if (fragment == item->fragments_.end()) {
+    if (fragment == task.file_->fragments_.end()) {
         lcn = 0;
     } else {
-        lcn = fragment->lcn_ + (offset - real_vcn);
+        lcn = fragment->lcn_ + (task.vcn_from_ - real_vcn);
     }
 
     // Show progress message
-    gui->show_move(item, move_params.ClusterCount, lcn, new_lcn, move_params.StartingVcn.QuadPart);
+    gui->show_move(task.file_, move_params.ClusterCount, lcn, task.lcn_to_, move_params.StartingVcn.QuadPart);
 
     // Draw the item and the destination clusters on the screen in the BUSY	color
-    colorize_disk_item(data, item, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
+    colorize_disk_item(data, task.file_, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
 
-    gui->draw_cluster(data, new_lcn, new_lcn + size, DrawColor::Busy);
+    gui->draw_cluster(data, task.lcn_to_, task.lcn_to_ + task.count_, DrawColor::Busy);
 
     // Call Windows to perform the move.
     DWORD result = DeviceIoControl(
@@ -163,7 +151,8 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
     data.clusters_done_ += move_params.ClusterCount;
 
     // Undraw the destination clusters on the screen
-    gui->draw_cluster(data, new_lcn, new_lcn + size, DrawColor::Empty);
+    gui->draw_cluster(data, task.lcn_to_, task.lcn_to_ + task.count_, DrawColor::Empty);
+    data.bitmap_.mark(task.lcn_to_, task.lcn_to_ + task.count_, false);
 
     return result;
 }
@@ -177,8 +166,7 @@ DWORD DefragRunner::move_item_whole(DefragState &data, HANDLE file_handle, const
  * \param size Number of clusters to be moved
  * \return NO_ERROR or GetLastError() from DeviceIoControl()
  */
-DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item,
-                                           lcn64_t new_lcn, const lcn64_t offset, const cluster_count64_t size) const {
+DWORD DefragRunner::move_item_in_fragments(DefragState &data, MoveTask &task) const {
     MOVE_FILE_DATA move_params;
     uint64_t from_lcn;
     DWORD w;
@@ -186,56 +174,55 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle
 
     // Walk through the fragments of the item and move them one by one to the new location
     DWORD error_code = NO_ERROR;
-    uint64_t vcn = 0;
-    uint64_t real_vcn = 0;
+    vcn64_t vcn = 0;
+    vcn64_t real_vcn = 0;
 
-    for (auto &fragment: item->fragments_) {
+    for (auto &fragment: task.file_->fragments_) {
         if (*data.running_ != RunningState::RUNNING) break;
 
         if (!fragment.is_virtual()) {
-            if (real_vcn >= offset + size) break;
+            if (real_vcn >= task.vcn_from_ + task.count_) break;
 
-            if (real_vcn + fragment.next_vcn_ - vcn - 1 >= offset) {
-                /* Setup the parameters for the move. If the block that we want to move
-                begins somewhere in the middle of a fragment then we have to setup
-                slightly differently than when the fragment is at or after the begin
-                of the block. */
-                move_params.FileHandle = file_handle;
+            if (real_vcn + fragment.next_vcn_ - vcn - 1 >= task.vcn_from_) {
+                // Setup the parameters for the move. If the block that we want to move begins somewhere in
+                // the middle of a fragment then we have to setup slightly differently than when the fragment is
+                // at or after the begin of the block.
+                // TODO: THis can be filled from the MoveTask (by the MoveTask class)
+                move_params.FileHandle = task.file_handle_;
 
-                if (real_vcn < offset) {
+                if (real_vcn < task.vcn_from_) {
                     /* The fragment starts before the Offset and overlaps. Move the
                     part of the fragment from the Offset until the end of the
                     fragment or the block. */
-                    move_params.StartingLcn.QuadPart = new_lcn;
-                    move_params.StartingVcn.QuadPart = vcn + (offset - real_vcn);
+                    move_params.StartingLcn.QuadPart = task.lcn_to_;
+                    move_params.StartingVcn.QuadPart = vcn + (task.vcn_from_ - real_vcn);
 
-                    if (size < fragment.next_vcn_ - vcn - (offset - real_vcn)) {
-                        move_params.ClusterCount = (uint32_t) size;
+                    if (task.count_ < fragment.next_vcn_ - vcn - (task.vcn_from_ - real_vcn)) {
+                        move_params.ClusterCount = (uint32_t) task.count_;
                     } else {
-                        move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn - (offset - real_vcn));
+                        move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn - (task.vcn_from_ - real_vcn));
                     }
 
-                    from_lcn = fragment.lcn_ + (offset - real_vcn);
+                    from_lcn = fragment.lcn_ + (task.vcn_from_ - real_vcn);
                 } else {
-                    /* The fragment starts at or after the Offset. Move the part of
-                    the fragment inside the block (up until Offset+Size). */
-                    move_params.StartingLcn.QuadPart = new_lcn + real_vcn - offset;
+                    // The fragment starts at or after the Offset. Move the part of the fragment inside the block (up until Offset+Size).
+                    move_params.StartingLcn.QuadPart = task.lcn_to_ + real_vcn - task.vcn_from_;
                     move_params.StartingVcn.QuadPart = vcn;
 
-                    if (fragment.next_vcn_ - vcn < offset + size - real_vcn) {
+                    if (fragment.next_vcn_ - vcn < task.vcn_from_ + task.count_ - real_vcn) {
                         move_params.ClusterCount = (uint32_t) (fragment.next_vcn_ - vcn);
                     } else {
-                        move_params.ClusterCount = (uint32_t) (offset + size - real_vcn);
+                        move_params.ClusterCount = (uint32_t) (task.vcn_from_ + task.count_ - real_vcn);
                     }
                     from_lcn = fragment.lcn_;
                 }
 
                 // Show progress message
-                gui->show_move(item, move_params.ClusterCount, from_lcn, move_params.StartingLcn.QuadPart,
+                gui->show_move(task.file_, move_params.ClusterCount, from_lcn, move_params.StartingLcn.QuadPart,
                                move_params.StartingVcn.QuadPart);
 
                 // Draw the item and the destination clusters on the screen in the BUSY	color.
-                colorize_disk_item(data, item, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
+                colorize_disk_item(data, task.file_, move_params.StartingVcn.QuadPart, move_params.ClusterCount, false);
 
                 gui->draw_cluster(data, move_params.StartingLcn.QuadPart,
                                   move_params.StartingLcn.QuadPart + move_params.ClusterCount,
@@ -285,8 +272,7 @@ DWORD DefragRunner::move_item_in_fragments(DefragState &data, HANDLE file_handle
  * \return True if all good
  */
 bool
-DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                                   lcn64_t offset, cluster_count64_t size, MoveStrategy strategy) const {
+DefragRunner::move_item_with_strat(DefragState &data, MoveTask &task, MoveStrategy strategy) const {
     DWORD error_code;
     DefragGui *gui = DefragGui::get_instance();
 
@@ -296,10 +282,10 @@ DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE fil
     // Move the item, either in a single block or fragment by fragment
     switch (strategy) {
         case MoveStrategy::Whole:
-            error_code = move_item_whole(data, file_handle, item, new_lcn, offset, size);
+            error_code = move_item_whole(data, task);
             break;
         case MoveStrategy::InFragments:
-            error_code = move_item_in_fragments(data, file_handle, item, new_lcn, offset, size);
+            error_code = move_item_in_fragments(data, task);
     }
 
     // If there was an error then fetch the errormessage and save it
@@ -309,17 +295,17 @@ DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE fil
     }
 
     // Fetch the new fragment map of the item and refresh the screen
-    colorize_disk_item(data, item, 0, 0, true);
-    Tree::detach(data.item_tree_, item);
+    colorize_disk_item(data, task.file_, 0, 0, true);
+    Tree::detach(data.item_tree_, task.file_);
 
-    const bool result = get_fragments(data, item, file_handle);
+    const bool result = get_fragments(data, task.file_, task.file_handle_);
 
-    Tree::insert(data.item_tree_, data.balance_count_, item);
-    colorize_disk_item(data, item, 0, 0, false);
+    Tree::insert(data.item_tree_, data.balance_count_, task.file_);
+    colorize_disk_item(data, task.file_, 0, 0, false);
 
     // if windows reported an error while moving the item then show the error message and return false
     if (error_code != NO_ERROR) {
-        gui->show_debug(DebugLevel::DetailedProgress, item, std::move(error_string));
+        gui->show_debug(DebugLevel::DetailedProgress, task.file_, std::move(error_string));
         return false;
     }
 
@@ -327,51 +313,38 @@ DefragRunner::move_item_with_strat(DefragState &data, FileNode *item, HANDLE fil
     return result;
 }
 
-/**
- * \brief Subfunction for MoveItem(), see below. Move the item with strategy 0. If this results in fragmentation then try again using strategy 1.
- * Note: The Windows defragmentation API does not report an error if it only moves part of the file and has fragmented the file. This can for example
- * happen when part of the file is locked and cannot be moved, or when (part of) the gap was previously in use by another file but has not yet been
- * released by the NTFS checkpoint system. Note: the offset and size of the block is in absolute clusters, not virtual clusters.
- * \param new_lcn Where to move to
- * \param offset Number of first cluster to be moved
- * \param size Number of clusters to be moved
- * \param direction 0: move up, 1: move down
- * \return true if success, false if failed to move without fragmenting the item
- */
-bool DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle,
-                                            lcn64_t new_lcn, lcn64_t offset, cluster_count64_t size,
-                                            const MoveDirection direction) const {
+bool DefragRunner::move_item_try_strategies(DefragState &data, MoveTask &task, const MoveDirection direction) const {
     lcn_extent_t cluster;
 
     DefragGui *gui = DefragGui::get_instance();
 
     // Remember the current position on disk of the item
-    const auto old_lcn = item->get_item_lcn();
+    const auto old_lcn = task.file_->get_item_lcn();
 
     // Move the Item to the requested LCN. If error then return false
     {
-        auto result = move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::Whole);
+        auto result = move_item_with_strat(data, task, MoveStrategy::Whole);
         if (!result) return false;
     }
     if (*data.running_ != RunningState::RUNNING) return false;
 
     // If the block is not fragmented then return true
-    if (!is_fragmented(item, offset, size)) return true;
+    if (!is_fragmented(task.file_, task.vcn_from_, task.count_)) return true;
 
     // Show debug message: "Windows could not move the file, trying alternative method."
-    gui->show_debug(DebugLevel::DetailedProgress, item, L"Windows could not move the file, trying alternative method.");
+    gui->show_debug(DebugLevel::DetailedProgress, task.file_, L"Windows could not move the file, trying alternative method.");
 
     // Find another gap on disk for the item
     switch (direction) {
         case MoveDirection::Up: {
-            lcn64_t cluster_start = old_lcn + item->clusters_count_;
+            lcn64_t cluster_start = old_lcn + task.file_->clusters_count_;
 
-            if (cluster_start + item->clusters_count_ >= new_lcn &&
-                cluster_start < new_lcn + item->clusters_count_) {
-                cluster_start = new_lcn + item->clusters_count_;
+            if (cluster_start + task.file_->clusters_count_ >= task.lcn_to_ &&
+                cluster_start < task.lcn_to_ + task.file_->clusters_count_) {
+                cluster_start = task.lcn_to_ + task.file_->clusters_count_;
             }
 
-            auto result2 = find_gap(data, cluster_start, 0, size, true, false, false);
+            auto result2 = find_gap(data, cluster_start, 0, task.count_, true, false, false);
             if (result2.has_value()) {
                 cluster = result2.value();
             } else {
@@ -380,7 +353,7 @@ bool DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, H
             break;
         }
         case MoveDirection::Down: {
-            auto result3 = find_gap(data, data.zones_[1], old_lcn, size, true, true, false);
+            auto result3 = find_gap(data, data.zones_[1], old_lcn, task.count_, true, true, false);
             if (result3.has_value()) {
                 cluster = result3.value();
             } else {
@@ -391,36 +364,42 @@ bool DefragRunner::move_item_try_strategies(DefragState &data, FileNode *item, H
     }
 
     // Add the size of the item to the width of the progress bar, we have discovered that we have more work to do.
-    data.phase_todo_ += size;
+    data.phase_todo_ += task.count_;
 
     // Move the item to the other gap using strategy InFragments.
     switch (direction) {
         case MoveDirection::Up: {
-            auto result = move_item_with_strat(data, item, file_handle, cluster.begin(), offset, size,
-                                          MoveStrategy::InFragments);
+            auto up_task = task;
+            up_task.lcn_to_ = cluster.begin();
+
+            auto result = move_item_with_strat(data, up_task, MoveStrategy::InFragments);
+
             if (!result) return false;
             break;
         }
         case MoveDirection::Down: {
-            auto result = move_item_with_strat(data, item, file_handle, cluster.end() - size, offset, size,
-                                          MoveStrategy::InFragments);
+            auto down_task = task;
+            down_task.lcn_to_ = cluster.end() - task.count_;
+
+            auto result = move_item_with_strat(data, down_task, MoveStrategy::InFragments);
+
             if (!result) return false;
             break;
         }
     }
 
     // If the block is still fragmented then return false.
-    if (is_fragmented(item, offset, size)) {
+    if (is_fragmented(task.file_, task.vcn_from_, task.count_)) {
         // Show debug message: "Alternative method failed, leaving file where it is."
-        gui->show_debug(DebugLevel::DetailedProgress, item, L"Alternative method failed, leaving file where it is.");
+        gui->show_debug(DebugLevel::DetailedProgress, task.file_, L"Alternative method failed, leaving file where it is.");
         return false;
     }
 
-    gui->show_debug(DebugLevel::DetailedProgress, item, L"");
+    gui->show_debug(DebugLevel::DetailedProgress, task.file_, L"");
 
     // Add the size of the item to the width of the progress bar, we have more work to do.
-    data.phase_todo_ += size;
+    data.phase_todo_ += task.count_;
 
     // Strategy 1 has helped. Move the Item again to where we want it, but this time use strategy InFragments.
-    return move_item_with_strat(data, item, file_handle, new_lcn, offset, size, MoveStrategy::InFragments);
+    return move_item_with_strat(data, task, MoveStrategy::InFragments);
 }

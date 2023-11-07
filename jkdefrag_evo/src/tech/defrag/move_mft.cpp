@@ -124,7 +124,13 @@
         }
 
         // Move the MFT to the gap
-        auto result = move_item(data, item, gap.begin(), clusters_done, clusters, MoveDirection::Up);
+        MoveTask task{
+                .vcn_from_ = clusters_done,
+                .lcn_to_ = gap.begin(),
+                .count_ = clusters,
+                .file_ = item,
+        };
+        auto result = move_item(data, task, MoveDirection::Up);
 
         if (result) {
             gap.shift(clusters);

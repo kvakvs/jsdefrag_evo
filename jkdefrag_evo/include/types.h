@@ -24,3 +24,14 @@ using cluster_count64_t = decltype(_LARGE_INTEGER::QuadPart);
 
 /// A number for an inode
 using inode_t = uint64_t;
+
+class FileNode;
+
+struct MoveTask {
+    vcn64_t vcn_from_;
+    lcn64_t lcn_to_;
+    cluster_count64_t count_;
+
+    FileNode *file_ = nullptr;
+    HANDLE file_handle_ = nullptr;
+};

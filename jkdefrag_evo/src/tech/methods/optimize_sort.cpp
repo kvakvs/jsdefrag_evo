@@ -23,32 +23,32 @@
 // SortField=2    Date/Time LastAccess
 // SortField=3    Date/Time LastChange
 // SortField=4    Date/Time Creation
-void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
+void DefragRunner::optimize_sort(DefragState &defrag_state, const int sort_field) {
     lcn_extent_t gap;
     DefragGui *gui = DefragGui::get_instance();
 
     // Sanity check
-    if (data.item_tree_ == nullptr) return;
+    if (defrag_state.item_tree_ == nullptr) return;
 
     // Process all the zones
     [[maybe_unused]] uint64_t vacated_until = 0;
-    const uint64_t minimum_vacate = data.total_clusters() / 200;
+    const uint64_t minimum_vacate = defrag_state.total_clusters() / 200;
 
-    for (data.zone_ = Zone::ZoneFirst;
-         data.zone_ < Zone::ZoneAll_MaxValue; data.zone_ = (Zone) ((int) data.zone_ + 1)) {
-        call_show_status(data, DefragPhase::ZoneSort, data.zone_); // "Zone N: Sort"
+    for (defrag_state.zone_ = Zone::ZoneFirst;
+         defrag_state.zone_ < Zone::ZoneAll_MaxValue; defrag_state.zone_ = (Zone) ((int) defrag_state.zone_ + 1)) {
+        call_show_status(defrag_state, DefragPhase::ZoneSort, defrag_state.zone_); // "Zone N: Sort"
 
         // Start at the begin of the zone and move all the items there, one by one in the requested sorting order, making room as we go.
         FileNode *previous_item = nullptr;
 
-        uint64_t lcn = data.zones_[(size_t) data.zone_];
+        uint64_t lcn = defrag_state.zones_[(size_t) defrag_state.zone_];
 
-        while (data.is_still_running()) {
+        while (defrag_state.is_still_running()) {
             // Find the next item that we want to place
             FileNode *item = nullptr;
             uint64_t phase_temp = 0;
 
-            for (auto temp_item = Tree::smallest(data.item_tree_);
+            for (auto temp_item = Tree::smallest(defrag_state.item_tree_);
                  temp_item != nullptr;
                  temp_item = Tree::next(temp_item)) {
                 if (temp_item->is_unmovable_) continue;
@@ -56,7 +56,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                 if (temp_item->clusters_count_ == 0) continue;
 
                 auto preferred_zone = temp_item->get_preferred_zone();
-                if (preferred_zone != data.zone_) continue;
+                if (preferred_zone != defrag_state.zone_) continue;
 
                 if (previous_item != nullptr &&
                     compare_items(previous_item, temp_item, sort_field) >= 0) {
@@ -72,13 +72,13 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
 
             if (item == nullptr) {
                 gui->show_debug(DebugLevel::Progress, nullptr,
-                                std::format(L"Finished sorting zone {}.", zone_to_str(data.zone_)));
+                                std::format(L"Finished sorting zone {}.", zone_to_str(defrag_state.zone_)));
 
                 break;
             }
 
             previous_item = item;
-            data.phase_todo_ = data.clusters_done_ + phase_temp;
+            defrag_state.phase_todo_ = defrag_state.clusters_done_ + phase_temp;
 
             // If the item is already at the Lcn then skip
             if (item->get_item_lcn() == lcn) {
@@ -89,9 +89,9 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
 
             // Move the item to the Lcn. If the gap at Lcn is not big enough then fragment
             // the file into whatever gaps are available.
-            uint64_t clusters_done = 0;
+            cluster_count64_t clusters_done = 0;
 
-            while (data.is_still_running() &&
+            while (defrag_state.is_still_running() &&
                    clusters_done < item->clusters_count_ &&
                    !item->is_unmovable_) {
                 if (clusters_done > 0) {
@@ -104,10 +104,10 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                 // The Vacate() function may not be able to move whatever is now at the Lcn, so
                 // after calling it we have to locate the first gap after the Lcn.
                 if (gap.begin() + item->clusters_count_ - clusters_done + 16 > gap.end()) {
-                    vacate(data, lcn_extent_t::with_length(lcn, item->clusters_count_ - clusters_done + minimum_vacate),
+                    vacate(defrag_state, lcn_extent_t::with_length(lcn, item->clusters_count_ - clusters_done + minimum_vacate),
                            false);
 
-                    auto result = find_gap(data, lcn, 0, 0, true, false, false);
+                    auto result = find_gap(defrag_state, lcn, 0, 0, true, false, false);
                     if (result.has_value()) {
                         gap = result.value();
                     } else {
@@ -116,7 +116,7 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                 }
 
                 // If the gap is not big enough to hold the entire item then calculate how much of the item will fit in the gap.
-                uint64_t clusters = item->clusters_count_ - clusters_done;
+                cluster_count64_t clusters = item->clusters_count_ - clusters_done;
 
                 if (clusters > gap.length()) {
                     clusters = gap.length();
@@ -131,12 +131,18 @@ void DefragRunner::optimize_sort(DefragState &data, const int sort_field) {
                 }
 
                 // Move the item to the gap
-                auto result = move_item(data, item, gap.begin(), clusters_done, clusters, MoveDirection::Up);
+                MoveTask task = {
+                        .vcn_from_ = clusters_done,
+                        .lcn_to_ = gap.begin(),
+                        .count_ = clusters,
+                        .file_ = item,
+                };
+                auto result = move_item(defrag_state, task, MoveDirection::Up);
 
                 if (result) {
                     gap.shift_begin(clusters);
                 } else {
-                    auto result2 = find_gap(data, gap.begin(), 0, 0, true, false, false);
+                    auto result2 = find_gap(defrag_state, gap.begin(), 0, 0, true, false, false);
                     if (result2.has_value()) {
                         gap = result2.value();
                     } else {

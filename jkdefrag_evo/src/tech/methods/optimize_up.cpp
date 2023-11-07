@@ -88,8 +88,13 @@ void DefragRunner::optimize_up(DefragState &defrag_state) {
             if (item == nullptr) break;
 
             // Move the item
-            auto result2 = move_item(defrag_state, item, gap.end() - item->clusters_count_, 0, item->clusters_count_,
-                                     MoveDirection::Down);
+            MoveTask task = {
+                    .vcn_from_ = 0,
+                    .lcn_to_ = gap.end() - item->clusters_count_,
+                    .count_ = item->clusters_count_,
+                    .file_ = item,
+            };
+            auto result2 = move_item(defrag_state, task, MoveDirection::Down);
 
             if (result2) {
                 gap.shift_end(-item->clusters_count_);

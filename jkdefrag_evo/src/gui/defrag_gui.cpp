@@ -157,8 +157,8 @@ void DefragGui::clear_screen(std::wstring &&text) {
 }
 
 // Callback: whenever an item (file, directory) is moved on disk.
-void DefragGui::show_move(const FileNode *item, const uint64_t clusters, const uint64_t from_lcn,
-                          const uint64_t to_lcn, const uint64_t from_vcn) {
+void DefragGui::show_move(const FileNode *item, const cluster_count64_t clusters, const lcn64_t from_lcn,
+                          const lcn64_t to_lcn, const vcn64_t from_vcn) {
     // Save the message in Messages 3
     if (clusters == 1) {
         messages_[3] = std::format(MOVING_1_CLUSTER_FMT, from_lcn, to_lcn);

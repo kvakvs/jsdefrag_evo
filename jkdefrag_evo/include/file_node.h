@@ -27,6 +27,7 @@ private:
 
 
 /// List in memory of all the files on disk, sorted by LCN (Logical Cluster Number)
+// TODO: Change storage to some std:: sort of tree
 struct FileNode {
 public:
     void set_names(const wchar_t *long_path, const wchar_t *long_filename, const wchar_t *short_path,
@@ -38,9 +39,11 @@ public:
 
     // Tree node location type
     using TreeLcn = lcn64_t;
-//    using TreeLcn = struct {
-//        uint64_t lcn;
-//    };
+
+    /// Check whether the file can be moved or is empty and not worth bothering
+    [[nodiscard]] auto can_move() const -> bool {
+        return (!is_unmovable_ && !is_excluded_ && clusters_count_ > 0);
+    }
 
     // Return the location on disk (LCN, Logical Cluster Number) of an item
     [[nodiscard]] TreeLcn get_item_lcn() const {

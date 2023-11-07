@@ -79,7 +79,7 @@ public:
     VolumeBitmap bitmap_;
 
     /// Number of bytes per cluster.
-    uint64_t bytes_per_cluster_{};
+    cluster_count64_t bytes_per_cluster_{};
 
     //
     // Counters updated before/after every Phase.

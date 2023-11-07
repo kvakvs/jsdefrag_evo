@@ -97,7 +97,7 @@ this allows for better optimizations in containers (e.g. optimal moves/swaps)
 and less cognitive load on consumers.
 
 Having a `result<T, E>` type on your API not only semantically encodes that
-a function is _able to_ fail, it also indicates to the caller _how_ the function
+a function is _able lcn_to_ fail, it also indicates to the caller _how_ the function
 may fail, and what discrete, testable conditions may cause it to fail -- which
 is what this library intends to solve.
 

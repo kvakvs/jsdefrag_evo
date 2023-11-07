@@ -76,7 +76,13 @@ void DefragRunner::forced_fill(DefragState &defrag_state) {
         if (clusters > highest_size) clusters = highest_size;
 
         // TODO: return value is ignored
-        move_item(defrag_state, highest_item, gap.begin(), highest_vcn + highest_size - clusters, clusters, MoveDirection::Up);
+        MoveTask task = {
+                .vcn_from_ = highest_vcn + highest_size - clusters,
+                .lcn_to_ = gap.begin(),
+                .count_ = clusters,
+                .file_ = highest_item,
+        };
+        move_item(defrag_state, task, MoveDirection::Up);
 
         gap.shift_begin(clusters);
         max_lcn = highest_lcn + highest_size - clusters;

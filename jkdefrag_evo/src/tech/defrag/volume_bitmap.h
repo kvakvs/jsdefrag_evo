@@ -92,4 +92,8 @@ public:
     static constexpr auto get_next_fragment_start(lcn64_t lcn) -> lcn64_t {
         return (lcn / LCN_PER_BITMAP_FRAGMENT + 1) * LCN_PER_BITMAP_FRAGMENT;
     }
+
+    inline void mark(lcn64_t lcn, cluster_count64_t count, const bool value) {
+        std::fill(std::begin(bitmap_) + lcn, std::begin(bitmap_) + lcn + count, value);
+    }
 };

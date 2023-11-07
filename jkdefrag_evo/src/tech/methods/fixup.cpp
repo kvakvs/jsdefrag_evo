@@ -148,7 +148,13 @@ void DefragRunner::fixup(DefragState &data) {
         }
 
         // Move the item.
-        auto result4 = move_item(data, item, gap[file_zone].begin(), 0, item->clusters_count_, MoveDirection::Up);
+        MoveTask task = {
+                .vcn_from_ = 0,
+                .lcn_to_ = gap[file_zone].begin(),
+                .count_ = item->clusters_count_,
+                .file_ = item,
+        };
+        auto result4 = move_item(data, task, MoveDirection::Up);
 
         if (result4) {
             gap[file_zone].shift_begin(item->clusters_count_);

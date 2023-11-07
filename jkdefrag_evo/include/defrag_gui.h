@@ -37,7 +37,7 @@ public:
 
     void show_analyze_update_item_text(const FileNode *item);
 
-    void show_move(const FileNode *item, uint64_t clusters, uint64_t from_lcn, uint64_t to_lcn, uint64_t from_vcn);
+    void show_move(const FileNode *item, cluster_count64_t  clusters, lcn64_t from_lcn, lcn64_t to_lcn, vcn64_t from_vcn);
 
     void show_diskmap(DefragState &ex);
 

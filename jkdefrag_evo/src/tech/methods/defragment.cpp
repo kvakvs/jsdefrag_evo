@@ -78,7 +78,13 @@ void DefragRunner::defragment(DefragState &data) {
 
         // If the gap is big enough to hold the entire item then move the file in a single go, and loop.
         if (gap.length() >= item->clusters_count_) {
-            move_item(data, item, gap.begin(), 0, item->clusters_count_, MoveDirection::Up);
+            MoveTask task {
+                    .vcn_from_ = 0,
+                    .lcn_to_ = gap.begin(),
+                    .count_ = item->clusters_count_,
+                    .file_ = item,
+            };
+            move_item(data, task, MoveDirection::Up);
             continue;
         }
 
@@ -129,7 +135,13 @@ void DefragRunner::defragment(DefragState &data) {
 
             // Move the segment
             // result =
-            move_item_try_strategies(data, item, file_handle, gap.begin(), clusters_done, clusters, MoveDirection::Up);
+            MoveTask task = {
+                    .vcn_from_ = clusters_done,
+                    .lcn_to_ = gap.begin(),
+                    .count_ = clusters,
+                    .file_ = item,
+            };
+            move_item_try_strategies(data, task, MoveDirection::Up);
 
             // Next segment
             clusters_done = clusters_done + clusters;

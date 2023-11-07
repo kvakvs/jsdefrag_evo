@@ -809,3 +809,4 @@ void DefragRunner::stop_defrag_sync(RunningState *run_state, SystemClock::durati
         }
     }
 }
+

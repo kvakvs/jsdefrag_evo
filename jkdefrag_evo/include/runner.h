@@ -193,22 +193,36 @@ private:
 
     static void calculate_zones(DefragState &data);
 
-    DWORD
-    move_item_whole(DefragState &data, HANDLE file_handle, const FileNode *item, lcn64_t new_lcn,
-                    lcn64_t offset, cluster_count64_t size) const;
+    DWORD move_item_whole(DefragState &data, MoveTask &task) const;
 
-    DWORD
-    move_item_in_fragments(DefragState &data, HANDLE file_handle, const FileNode *item, lcn64_t new_lcn,
-                           lcn64_t offset, cluster_count64_t size) const;
+    DWORD move_item_in_fragments(DefragState &data, MoveTask &task) const;
 
-    bool move_item_with_strat(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                              lcn64_t offset, cluster_count64_t size, MoveStrategy strategy) const;
+    bool move_item_with_strat(DefragState &data, MoveTask &task, MoveStrategy strategy) const;
 
-    bool move_item_try_strategies(DefragState &data, FileNode *item, HANDLE file_handle, lcn64_t new_lcn,
-                                  lcn64_t offset, cluster_count64_t size, MoveDirection direction) const;
+    /**
+     * \brief Subfunction for MoveItem(), see below. Move the item with strategy 0. If this results in fragmentation then try again using strategy 1.
+     * Note: The Windows defragmentation API does not report an error if it only moves part of the file and has fragmented the file. This can for example
+     * happen when part of the file is locked and cannot be moved, or when (part of) the gap was previously in use by another file but has not yet been
+     * released by the NTFS checkpoint system. Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+     * \param new_lcn Where to move to
+     * \param offset Number of first cluster to be moved
+     * \param size Number of clusters to be moved
+     * \param direction 0: move up, 1: move down
+     * \return true if success, false if failed to move without fragmenting the item
+     */
+    bool move_item_try_strategies(DefragState &data, MoveTask &task, MoveDirection direction) const;
 
-    bool move_item(DefragState &data, FileNode *item, lcn64_t new_lcn, lcn64_t offset,
-                   cluster_count64_t size, MoveDirection direction) const;
+    /**
+     * \brief Move (part of) an item to a new location on disk. Moving the Item will automatically defragment it. If unsuccesful then set the Unmovable
+     * flag of the item and return false, otherwise return true. Note: the item will move to a different location in the tree.
+     * Note: the offset and size of the block is in absolute clusters, not virtual clusters.
+     * \param new_lcn Where to move to
+     * \param offset Number of first cluster to be moved
+     * \param size Number of clusters to be moved
+     * \param direction 0: move up, 1: move down
+     * \return
+     */
+    bool move_item(DefragState &defrag_state, MoveTask &task, MoveDirection direction) const;
 
     static FileNode *
     find_highest_item(const DefragState &data, lcn_extent_t gap, Tree::Direction direction, Zone zone);
@@ -238,9 +252,9 @@ private:
 
     [[maybe_unused]] void move_mft_to_begin_of_disk(DefragState &data);
 
-    void optimize_volume(DefragState &data);
+    void optimize_volume(DefragState &defrag_state);
 
-    void optimize_sort(DefragState &data, int sort_field);
+    void optimize_sort(DefragState &defrag_state, int sort_field);
 
     void optimize_up(DefragState &defrag_state);
 

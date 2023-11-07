@@ -44,6 +44,7 @@ auto VolumeBitmap::load_lcn(HANDLE handle, lcn64_t lcn) -> DWORD {
     }
 
     availability_[fragment_id] = true;
+    return NO_ERROR;
 }
 
 auto VolumeBitmap::ensure_lcn_loaded(HANDLE handle, lcn64_t lcn) -> DWORD {
